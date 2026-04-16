@@ -713,15 +713,13 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
                         content_div = div
 
         if content_div:
-            # Clean up the HTML — remove scripts, styles, ads
-            for tag in content_div.find_all(["script", "style", "iframe", "noscript"]):
+            # Clean up the HTML — remove scripts, styles, ads, nav elements
+            for tag in content_div.find_all(["script", "style", "iframe", "noscript", "nav", "header", "footer"]):
                 tag.decompose()
 
             body_html = str(content_div)
             body_text = content_div.get_text("\n", strip=True)
 
-            # Try to extract company name from the page
-            # Often in a heading or specific element above the body
             company_tag = soup.find("h2") or soup.find("h3")
             if company_tag:
                 company = company_tag.get_text(strip=True)
@@ -729,13 +727,71 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
             body_text = "Could not extract announcement body from the page."
             body_html = "<p>Could not extract announcement body from the page.</p>"
 
-        # Clean up body text — remove Investegate boilerplate
+        # Aggressively clean body text — remove Investegate navigation and boilerplate
+        # Strip everything before the actual RNS content
+        start_markers = [
+            "Summary by AI",  # AI summary appears before the RNS body
+            "Close X\n",      # End of AI summary section
+        ]
+        for marker in start_markers:
+            idx = body_text.find(marker)
+            if idx >= 0:
+                # Find the end of the AI summary section
+                after = body_text[idx:]
+                # Look for where the actual RNS body starts (after "Close X" or "Disclaimer")
+                for body_start in ["Disclaimer*\n", "Disclaimer\n", "Close X\n"]:
+                    bs_idx = after.find(body_start)
+                    if bs_idx >= 0:
+                        body_text = after[bs_idx + len(body_start):].strip()
+                        break
+
+        # Remove common navigation text that leaks into the body
+        nav_lines = [
+            "Fundraise", "Welcome", "About", "Contact Us", "Help", "Home",
+            "Companies", "Advanced search", "Archive", "UK Short Positions",
+            "Meetings", "UK Newswire", "New", "Login", "Register",
+            "Search the UK's largest", "Advanced Search", "Sponsored By",
+            "FTSE 100", "FTSE 250", "AIM", "Aquis", "Asset Match",
+            "JP Jenkins", "techMark", "My List", "Category", "Sector",
+            "NAVs & Form8's", "Crypto News", "Show 50100200300",
+            "Filter by source", "Read More", "Full Archive",
+            "All directors dealings today", "I am a Private Investor",
+            "Investor Meet Company", "UK 100", "FTSE quotes",
+        ]
+        cleaned_lines = []
+        for line in body_text.split("\n"):
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            # Skip known navigation lines
+            if line_stripped in nav_lines:
+                continue
+            # Skip very short lines that look like menu items
+            if len(line_stripped) < 4 and line_stripped not in ("", ):
+                continue
+            # Skip lines that are just a date with day name
+            if re.match(r'^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\d', line_stripped):
+                continue
+            # Skip "COMPANIES COVERED:" lines
+            if line_stripped.startswith("COMPANIES COVERED:"):
+                continue
+            # Skip lines that are just tickers (2-4 uppercase letters)
+            if re.match(r'^[A-Z]{2,5}\.?$', line_stripped):
+                continue
+            cleaned_lines.append(line_stripped)
+        body_text = "\n".join(cleaned_lines)
+
+        # Trim trailing boilerplate
         boilerplate_markers = [
             "This information is provided by RNS",
             "Please note, this site uses cookies",
             "To continue using Investegate",
             "Privacy and Cookie Policy",
             "Terms and conditions relating to",
+            "A Private Investor is a recipient",
+            "All intraday prices are subject",
+            "Investegate takes no responsibility",
+            "© 2026 Stockomendation",
         ]
         for marker in boilerplate_markers:
             idx = body_text.find(marker)
