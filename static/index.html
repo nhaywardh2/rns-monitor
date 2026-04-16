@@ -139,6 +139,27 @@
       );
     }
 
+    // ── Full Text Toggle ──
+    function FullTextToggle({text}) {
+      const [showFull, setShowFull] = useState(false);
+      if (!text || text === "Could not extract announcement body from the page.") return null;
+      return (
+        <div style={{marginBottom:16}}>
+          <button onClick={(e)=>{e.stopPropagation();setShowFull(!showFull);}} style={{
+            display:"inline-flex",alignItems:"center",gap:6,
+            padding:"6px 14px",border:"1px solid var(--border)",borderRadius:8,
+            background:"transparent",color:"var(--text-secondary)",
+            fontFamily:"var(--font-sans)",fontSize:12,fontWeight:500,cursor:"pointer",
+            transition:"all 0.2s",marginBottom:showFull?10:0,
+          }}>
+            {showFull ? "Hide full announcement" : "Show full announcement"}
+            <span style={{fontSize:10,transition:"transform 0.2s",transform:showFull?"rotate(180deg)":"rotate(0)"}}>&#9660;</span>
+          </button>
+          {showFull && <div className="detail-body">{text}</div>}
+        </div>
+      );
+    }
+
     // ── Expandable Announcement Card ──
     function AnnouncementCard({ann, index, backendUrl}) {
       const [expanded, setExpanded] = useState(false);
@@ -242,7 +263,7 @@
 
               {detail && !loading && (
                 <div>
-                  {/* AI Summary */}
+                  {/* AI Summary — prominent at top */}
                   {detail.ai_summary && (
                     <div style={{
                       marginBottom:16, padding:"12px 16px",
@@ -251,7 +272,7 @@
                       borderRadius:8,
                     }}>
                       <div style={{fontSize:12,fontWeight:600,color:"var(--text-muted)",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Summary</div>
-                      <div style={{fontSize:13,color:"var(--text-primary)",lineHeight:1.7}}>{detail.ai_summary}</div>
+                      <div style={{fontSize:14,color:"var(--text-primary)",lineHeight:1.7}}>{detail.ai_summary}</div>
                     </div>
                   )}
 
@@ -267,11 +288,8 @@
                     </div>
                   )}
 
-                  {/* Body Text */}
-                  <div style={{marginBottom:16}}>
-                    <div style={{fontSize:12,fontWeight:600,color:"var(--text-muted)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Full announcement</div>
-                    <div className="detail-body">{detail.body_text || "No body text could be extracted."}</div>
-                  </div>
+                  {/* Full Announcement — collapsed by default with show/hide toggle */}
+                  <FullTextToggle text={detail.body_text} />
 
                   {/* Actions */}
                   <div style={{display:"flex",gap:10,alignItems:"center",paddingTop:12,borderTop:"1px solid var(--border)"}}>
