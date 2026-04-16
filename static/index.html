@@ -37,7 +37,8 @@
     .fade-up { animation:fadeUp 0.4s ease-out both; }
     .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-card-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:shimmer 1.8s ease-in-out infinite; border-radius:6px; }
     .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
-    .detail-body { font-size:13px; line-height:1.75; color:var(--text-secondary); white-space:pre-wrap; word-wrap:break-word; max-height:500px; overflow-y:auto; padding:12px 0; }
+    .detail-body { font-size:13px; line-height:1.75; color:var(--text-secondary); white-space:normal; word-wrap:break-word; max-height:500px; overflow-y:auto; padding:12px 0; }
+    .detail-body p { margin:0 0 12px 0; }
     .detail-body::-webkit-scrollbar { width:4px; }
     .detail-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
     .key-figure { display:block; padding:8px 12px; margin:0 0 6px 0; background:rgba(61,184,106,0.06); border:1px solid rgba(61,184,106,0.12); border-radius:8px; font-size:12px; color:var(--accent); line-height:1.6; word-wrap:break-word; }
@@ -143,6 +144,37 @@
     function FullTextToggle({text}) {
       const [showFull, setShowFull] = useState(false);
       if (!text || text === "Could not extract announcement body from the page.") return null;
+
+      // Join broken lines into proper paragraphs
+      // Lines that don't end with a period/colon and are followed by a lowercase line = same paragraph
+      const buildParagraphs = (raw) => {
+        const lines = raw.split("\n").filter(l => l.trim());
+        const paragraphs = [];
+        let current = "";
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          if (!current) {
+            current = line;
+          } else {
+            // If previous line doesn't end with sentence-ending punctuation
+            // and current line starts with lowercase or continues mid-sentence, join them
+            const prevEnds = /[.!?:;"\u2019\u201D]$/.test(current);
+            const curStartsLower = /^[a-z]/.test(line);
+            if (!prevEnds || curStartsLower) {
+              current += " " + line;
+            } else {
+              paragraphs.push(current);
+              current = line;
+            }
+          }
+        }
+        if (current) paragraphs.push(current);
+        return paragraphs;
+      };
+
+      const paragraphs = buildParagraphs(text);
+
       return (
         <div style={{marginBottom:16}}>
           <button onClick={(e)=>{e.stopPropagation();setShowFull(!showFull);}} style={{
@@ -155,7 +187,11 @@
             {showFull ? "Hide full announcement" : "Show full announcement"}
             <span style={{fontSize:10,transition:"transform 0.2s",transform:showFull?"rotate(180deg)":"rotate(0)"}}>&#9660;</span>
           </button>
-          {showFull && <div className="detail-body">{text}</div>}
+          {showFull && (
+            <div className="detail-body">
+              {paragraphs.map((p, i) => <p key={i} style={{margin:"0 0 10px 0"}}>{p}</p>)}
+            </div>
+          )}
         </div>
       );
     }
