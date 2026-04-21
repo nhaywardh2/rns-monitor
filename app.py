@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 # ── Configuration via environment variables ──────────────────────────────────
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # Empty = no password required
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # For outreach draft generation
 PORT = int(os.environ.get("PORT", "8000"))
 HOST = os.environ.get("HOST", "0.0.0.0")
 
@@ -151,6 +152,20 @@ DEFAULT_WATCHLIST = {
     "NFG":  {"name": "Next 15 Group",                    "sector": "Marketing / communications"},
     "REC":  {"name": "Record",                           "sector": "Currency management / financial services"},
     "TRI":  {"name": "Trifast",                          "sector": "Industrial fasteners / manufacturing"},
+    "CRST": {"name": "Crest Nicholson",                   "sector": "Housebuilding"},
+    "BTRW": {"name": "Barratt Redrow",                    "sector": "Housebuilding"},
+    "TW.":  {"name": "Taylor Wimpey",                     "sector": "Housebuilding"},
+    "GRI":  {"name": "Grainger",                          "sector": "Residential property / REIT"},
+    "KNOS": {"name": "Kainos Group",                      "sector": "GovTech / digital transformation"},
+    "BBOX": {"name": "Tritax Big Box REIT",               "sector": "Logistics REIT"},
+    "SAVS": {"name": "Savills",                           "sector": "Property services / estate agency"},
+    "LSL":  {"name": "LSL Property Services",             "sector": "Estate agency / surveying"},
+    "ALFA": {"name": "Alfa Financial Software",           "sector": "Specialist software"},
+    "WTB":  {"name": "Whitbread",                         "sector": "Hospitality / hotels"},
+    "JET2": {"name": "Jet2",                              "sector": "Leisure travel / airline"},
+    "SUS":  {"name": "S&U",                               "sector": "Consumer finance / motor lending"},
+    "SGRO": {"name": "SEGRO",                             "sector": "Industrial REIT"},
+    "SAFE": {"name": "Safestore Holdings",                "sector": "Self-storage REIT"},
 }
 
 def load_watchlist() -> dict:
@@ -340,13 +355,149 @@ class ShareholdingDetail(BaseModel):
     holder: Optional[str] = None
     new_pct: Optional[float] = None
     old_pct: Optional[float] = None
-    direction: Optional[str] = None  # "increase", "decrease", or "unchanged"
-    change_pp: Optional[float] = None  # percentage point change
+    direction: Optional[str] = None
+    change_pp: Optional[float] = None
     voting_rights: Optional[str] = None
     date_of_change: Optional[str] = None
-    summary: Optional[str] = None  # The raw AI summary text
+    summary: Optional[str] = None
     fetched_at: str
     error: Optional[str] = None
+
+class OutreachRequest(BaseModel):
+    company: str
+    ticker: Optional[str] = None
+    headline: str
+    category: Optional[str] = None
+    ai_summary: Optional[str] = None
+    key_figures: Optional[list[str]] = None
+    investor_type: str = "generalist"  # generalist, compounder, contrarian, smid
+
+class OutreachVariant(BaseModel):
+    label: str
+    subject: str
+    body: str
+
+class OutreachResponse(BaseModel):
+    variants: list[OutreachVariant]
+    generated_at: str
+    error: Optional[str] = None
+
+# ── Outreach Prompt Template ─────────────────────────────────────────────────
+
+OUTREACH_SYSTEM_PROMPT = """You are an investor relations professional at h2Radnor Limited, a research and IR advisory firm based in London. You draft investor outreach emails following a management meeting, results release, or material company announcement.
+
+Your writing style:
+- Professional, concise, and direct
+- Mandate-aware: tailor content to the investor's strategy
+- Lead with the most material data points — never bury the numbers
+- No promotional language or sell-side bias
+- Assume the recipient is a sophisticated institutional investor
+- Keep emails to 150-250 words maximum
+- Use specific figures from the announcement, not vague language
+- Close with a clear call to action (meeting, call, further materials)
+- Sign off as the h2Radnor Capital Markets team
+
+Format: plain text email, no HTML or markdown. Include a subject line on the first line prefixed with "Subject: "
+
+Do NOT include any preamble, explanation, or commentary. Output ONLY the email."""
+
+def build_outreach_prompt(req: OutreachRequest) -> str:
+    """Build the user prompt for outreach generation."""
+    parts = [
+        f"Company: {req.company} ({req.ticker or 'N/A'})",
+        f"Announcement type: {req.category or 'General'}",
+        f"Headline: {req.headline}",
+    ]
+    if req.ai_summary:
+        parts.append(f"Summary: {req.ai_summary}")
+    if req.key_figures:
+        parts.append(f"Key figures: {'; '.join(req.key_figures[:8])}")
+
+    investor_descriptions = {
+        "generalist": "a UK equity generalist fund manager",
+        "compounder": "a quality/compounder-focused fund manager who values margin expansion, recurring revenue, and management execution",
+        "contrarian": "a contrarian/value investor looking for mispriced situations and catalysts for re-rating",
+        "smid": "a UK small/mid-cap specialist focused on AIM and FTSE SmallCap companies with growth potential",
+    }
+    inv_desc = investor_descriptions.get(req.investor_type, investor_descriptions["generalist"])
+    parts.append(f"Target investor profile: {inv_desc}")
+    parts.append("Draft an outreach email to this investor about this announcement. Highlight why it matters for their mandate specifically.")
+
+    return "\n".join(parts)
+
+async def generate_outreach(req: OutreachRequest) -> OutreachResponse:
+    """Call Claude API to generate outreach email variants."""
+    if not ANTHROPIC_API_KEY:
+        return OutreachResponse(
+            variants=[], generated_at=datetime.now().isoformat(),
+            error="ANTHROPIC_API_KEY not configured. Set it as an environment variable."
+        )
+
+    investor_types = ["generalist", "compounder", "contrarian"]
+    variants = []
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        for inv_type in investor_types:
+            req_copy = req.model_copy()
+            req_copy.investor_type = inv_type
+            prompt = build_outreach_prompt(req_copy)
+
+            try:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": ANTHROPIC_API_KEY,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": "claude-sonnet-4-20250514",
+                        "max_tokens": 1000,
+                        "system": OUTREACH_SYSTEM_PROMPT,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
+                )
+                if resp.status_code != 200:
+                    variants.append(OutreachVariant(
+                        label=inv_type.title(),
+                        subject="Error",
+                        body=f"API error: {resp.status_code} — {resp.text[:200]}"
+                    ))
+                    continue
+
+                data = resp.json()
+                text = ""
+                for block in data.get("content", []):
+                    if block.get("type") == "text":
+                        text += block.get("text", "")
+
+                # Parse subject line from response
+                subject = ""
+                body = text.strip()
+                if body.lower().startswith("subject:"):
+                    lines = body.split("\n", 1)
+                    subject = lines[0].replace("Subject:", "").replace("subject:", "").strip()
+                    body = lines[1].strip() if len(lines) > 1 else ""
+
+                label_map = {
+                    "generalist": "Generalist",
+                    "compounder": "Compounder / quality",
+                    "contrarian": "Contrarian / value",
+                }
+                variants.append(OutreachVariant(
+                    label=label_map.get(inv_type, inv_type.title()),
+                    subject=subject,
+                    body=body,
+                ))
+
+            except Exception as e:
+                variants.append(OutreachVariant(
+                    label=inv_type.title(),
+                    subject="Error",
+                    body=f"Failed to generate: {str(e)}"
+                ))
+
+    return OutreachResponse(variants=variants, generated_at=datetime.now().isoformat())
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1040,6 +1191,11 @@ async def get_rns_detail(url: str = Query(..., description="Full Investegate ann
 async def get_shareholding_detail(url: str = Query(..., description="Full Investegate TR-1/Holdings announcement URL")):
     """Fetch a TR-1/Holdings announcement and return structured shareholding data."""
     return await fetch_shareholding_detail(url)
+
+@app.post("/api/outreach", response_model=OutreachResponse)
+async def generate_outreach_emails(req: OutreachRequest):
+    """Generate investor outreach email variants for a given announcement."""
+    return await generate_outreach(req)
 
 @app.get("/api/rns/{ticker}")
 async def get_rns_by_ticker(ticker: str):
