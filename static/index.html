@@ -392,6 +392,394 @@
       </div>;
     }
 
+    // ── Read-Across View ──
+    function ReadAcrossView({backendUrl, refreshTick}) {
+      const [raData, setRaData] = useState(null);
+      const [raLoading, setRaLoading] = useState(true);
+      const [raError, setRaError] = useState(null);
+      const [selectedCell, setSelectedCell] = useState(null);
+      const [typeFilter, setTypeFilter] = useState("ALL");
+      const [liveDetails, setLiveDetails] = useState({});
+      const [loadingDetail, setLoadingDetail] = useState(false);
+      const rowRefs = useRef({});
+
+      const fetchRA = useCallback(async () => {
+        setRaLoading(true);
+        try {
+          const r = await fetch(`${backendUrl}/api/readacross`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json();
+          setRaData(j);
+          setRaError(null);
+        } catch (e) {
+          setRaError(e.message);
+        } finally {
+          setRaLoading(false);
+        }
+      }, [backendUrl]);
+
+      useEffect(() => { fetchRA(); }, [fetchRA, refreshTick]);
+
+      if (raLoading && !raData) {
+        return <div style={{display:"flex",flexDirection:"column",gap:10}}>{[0,1,2].map(i=><SkeletonCard key={i} index={i}/>)}</div>;
+      }
+      if (raError && !raData) {
+        return <div style={{padding:20,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,color:"var(--danger)"}}>Failed to load read-across: {raError}</div>;
+      }
+      if (!raData) return null;
+
+      const {matrix, rel_types: RT, core, read_across, triggered} = raData;
+
+      const activeCoreSet = new Set();
+      Object.values(matrix).forEach(row => { Object.keys(row).forEach(t => activeCoreSet.add(t)); });
+      const activeCore = core.filter(c => activeCoreSet.has(c.ticker));
+      const inactiveCore = core.filter(c => !activeCoreSet.has(c.ticker));
+
+      const filterMatch = (rel) => typeFilter === "ALL" || rel.type === typeFilter;
+      const triggerCount = Object.keys(triggered).length;
+      const isTriggered = (ticker) => triggered[ticker] && triggered[ticker].length > 0;
+
+      const handleCellClick = async (ra_ticker, core_ticker) => {
+        const rel = matrix[ra_ticker]?.[core_ticker];
+        if (!rel) return;
+        const key = `${ra_ticker}-${core_ticker}`;
+        if (selectedCell === key) { setSelectedCell(null); return; }
+        setSelectedCell(key);
+        const anns = triggered[ra_ticker] || [];
+        if (anns.length > 0 && anns[0].url && !liveDetails[anns[0].url]) {
+          setLoadingDetail(true);
+          try {
+            const r = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(anns[0].url)}`);
+            if (r.ok) {
+              const j = await r.json();
+              setLiveDetails(prev => ({...prev, [anns[0].url]: j}));
+            }
+          } catch {} finally { setLoadingDetail(false); }
+        }
+      };
+
+      const scrollToRow = (ra_ticker) => {
+        const el = rowRefs.current[ra_ticker];
+        if (el) el.scrollIntoView({behavior:"smooth", block:"center"});
+      };
+
+      return (
+        <div className="fade-up">
+          {/* Alert strip */}
+          <div style={{
+            marginBottom:20, padding:"14px 18px",
+            background: triggerCount > 0 ? "rgba(240,192,64,0.08)" : "var(--bg-card)",
+            border: `1px solid ${triggerCount > 0 ? "rgba(240,192,64,0.25)" : "var(--border)"}`,
+            borderRadius:10,
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom: triggerCount > 0 ? 12 : 0}}>
+              <div style={{
+                width:8, height:8, borderRadius:"50%",
+                background: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)",
+                animation: triggerCount > 0 ? "pulse-dot 1.5s infinite" : "none",
+              }}/>
+              <span style={{fontSize:13, fontWeight:600, color: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)"}}>
+                {triggerCount === 0
+                  ? "No live read-across triggers yet today"
+                  : `${triggerCount} live read-across ${triggerCount === 1 ? "trigger" : "triggers"} today`}
+              </span>
+            </div>
+            {triggerCount > 0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {Object.entries(triggered).map(([ra_ticker, anns]) => {
+                  const raCompany = read_across.find(r => r.ticker === ra_ticker);
+                  const affectedCores = Object.keys(matrix[ra_ticker] || {});
+                  return (
+                    <div key={ra_ticker} onClick={() => scrollToRow(ra_ticker)} style={{
+                      padding:"10px 14px", background:"var(--bg-surface)",
+                      border:"1px solid var(--border)", borderRadius:8,
+                      cursor:"pointer", transition:"all 0.15s",
+                    }}
+                      onMouseOver={e=>{e.currentTarget.style.borderColor="var(--watchlist)"}}
+                      onMouseOut={e=>{e.currentTarget.style.borderColor="var(--border)"}}
+                    >
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                        <span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,color:"var(--watchlist)",background:"rgba(240,192,64,0.1)",padding:"2px 6px",borderRadius:4}}>{ra_ticker}</span>
+                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>{raCompany?.name || ra_ticker}</span>
+                        <span style={{marginLeft:"auto",fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{anns[0].time}</span>
+                      </div>
+                      <div style={{fontSize:12,color:"var(--text-secondary)",marginBottom:6}}>
+                        {anns.slice(0,3).map((a,i)=>(
+                          <div key={i} style={{marginBottom:4,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            <CategoryBadge category={a.category}/>
+                            <span>{a.headline}</span>
+                          </div>
+                        ))}
+                        {anns.length > 3 && <div style={{fontSize:11,color:"var(--text-muted)",marginTop:4}}>+ {anns.length - 3} more</div>}
+                      </div>
+                      <div style={{fontSize:11,color:"var(--text-muted)"}}>
+                        Reads across to {affectedCores.length} core {affectedCores.length === 1 ? "company" : "companies"}: {affectedCores.join(", ")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Relationship type filters */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
+            <FilterPill label="All types" active={typeFilter==="ALL"} onClick={()=>setTypeFilter("ALL")}/>
+            {Object.entries(RT).map(([k,r]) => (
+              <button key={k} onClick={()=>setTypeFilter(k)} style={{
+                display:"inline-flex",alignItems:"center",gap:6,
+                padding:"6px 14px",borderRadius:20,
+                border:`1px solid ${typeFilter===k ? r.border : "var(--border)"}`,
+                background: typeFilter===k ? r.bg : "transparent",
+                color: typeFilter===k ? r.color : "var(--text-secondary)",
+                fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer",
+              }}>
+                <div style={{width:14,height:14,borderRadius:3,background:r.bg,border:`1px solid ${r.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:8,fontWeight:700,color:r.color,fontFamily:"var(--font-mono)"}}>{r.short}</span>
+                </div>
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Matrix grid */}
+          <div style={{overflowX:"auto",borderRadius:12,border:"1px solid var(--border)",marginBottom:16}}>
+            <table style={{borderCollapse:"collapse",minWidth:"100%",fontSize:11}}>
+              <thead>
+                <tr style={{background:"var(--bg-surface)"}}>
+                  <th style={{
+                    padding:"12px 14px",textAlign:"left",
+                    borderBottom:"1px solid var(--border)",borderRight:"1px solid var(--border)",
+                    position:"sticky",left:0,background:"var(--bg-surface)",zIndex:2,minWidth:180,
+                  }}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)"}}>Read-across &#8595;  Core &#8594;</div>
+                  </th>
+                  {activeCore.map(c => (
+                    <th key={c.ticker} title={`${c.name} · ${c.sector}`} style={{
+                      padding:"10px 8px",borderBottom:"1px solid var(--border)",borderRight:"1px solid var(--border)",
+                      minWidth:64,background:"var(--bg-surface)",
+                    }}>
+                      <div style={{fontFamily:"var(--font-mono)",fontSize:10,fontWeight:700,color:"var(--accent)",letterSpacing:"0.04em"}}>{c.ticker}</div>
+                      <div style={{fontSize:9,color:"var(--text-muted)",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:56}}>{c.sector.split(" / ")[0]}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {read_across.map((ra, ri) => {
+                  const rowData = matrix[ra.ticker] || {};
+                  const triggered_here = isTriggered(ra.ticker);
+                  const rowBg = triggered_here ? "rgba(240,192,64,0.05)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+                  const stickyBg = triggered_here ? "rgba(240,192,64,0.08)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+                  return (
+                    <tr key={ra.ticker} ref={el => rowRefs.current[ra.ticker] = el} style={{background: rowBg}}>
+                      <td style={{
+                        padding:"10px 14px",borderRight:"1px solid var(--border)",
+                        borderBottom:"1px solid var(--border)",position:"sticky",left:0,zIndex:1,
+                        background: stickyBg,
+                        borderLeft: triggered_here ? "3px solid var(--watchlist)" : "3px solid transparent",
+                      }}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                          <span style={{
+                            fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,
+                            color: triggered_here ? "var(--watchlist)" : "var(--accent)",
+                            background: triggered_here ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+                            padding:"2px 6px",borderRadius:4,
+                          }}>{ra.ticker}</span>
+                          <span style={{fontSize:11,color:"var(--text-primary)"}}>{ra.name}</span>
+                          {triggered_here && (
+                            <span style={{
+                              padding:"1px 6px",borderRadius:4,
+                              background:"var(--watchlist)",color:"var(--bg-primary)",
+                              fontSize:9,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",
+                              animation:"pulse-dot 2s infinite",
+                            }}>LIVE</span>
+                          )}
+                        </div>
+                        <div style={{fontSize:10,color:"var(--text-muted)",marginTop:2,paddingLeft:2}}>{ra.sector}</div>
+                      </td>
+                      {activeCore.map(c => {
+                        const rel = rowData[c.ticker];
+                        const cellKey = `${ra.ticker}-${c.ticker}`;
+                        const isSelected = selectedCell === cellKey;
+                        const visible = rel && filterMatch(rel);
+                        const r = visible ? RT[rel.type] : null;
+                        return (
+                          <td key={c.ticker} style={{
+                            padding:"6px 8px",textAlign:"center",
+                            borderRight:"1px solid var(--border)",borderBottom:"1px solid var(--border)",
+                            cursor: visible ? "pointer" : "default",
+                            background: isSelected ? "rgba(61,184,106,0.12)" : "transparent",
+                            transition:"background 0.15s",
+                          }} onClick={()=>handleCellClick(ra.ticker, c.ticker)}>
+                            {visible && r && (
+                              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                                <div style={{
+                                  width:26,height:26,borderRadius:6,
+                                  background: triggered_here ? r.bg : (isSelected ? r.bg : "rgba(255,255,255,0.03)"),
+                                  border: `1px solid ${triggered_here ? r.border : (isSelected ? r.border : "rgba(255,255,255,0.06)")}`,
+                                  display:"flex",alignItems:"center",justifyContent:"center",
+                                  boxShadow: triggered_here ? `0 0 10px ${r.bg}` : "none",
+                                  transition:"all 0.15s",
+                                }}>
+                                  <span style={{fontSize:10,fontWeight:700,color:r.color,fontFamily:"var(--font-mono)"}}>{r.short}</span>
+                                </div>
+                                <div style={{display:"flex",gap:1.5}}>
+                                  {[1,2,3].map(s => (
+                                    <div key={s} style={{
+                                      width:4,height:4,borderRadius:"50%",
+                                      background: s <= rel.strength ? r.color : "var(--border)",
+                                      opacity: s <= rel.strength ? 1 : 0.5,
+                                    }}/>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Legend */}
+          <div style={{display:"flex",gap:16,marginBottom:24,flexWrap:"wrap",fontSize:11,color:"var(--text-muted)",alignItems:"center"}}>
+            {Object.entries(RT).map(([k,r]) => (
+              <div key={k} style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:16,height:16,borderRadius:4,background:r.bg,border:`1px solid ${r.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:8,fontWeight:700,color:r.color,fontFamily:"var(--font-mono)"}}>{r.short}</span>
+                </div>
+                <span>{r.label}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{display:"flex",gap:2}}>
+                {[1,2,3].map(s => <div key={s} style={{width:5,height:5,borderRadius:"50%",background:"var(--accent)",opacity:0.3+s*0.23}}/>)}
+              </div>
+              <span>Strength (1 to 3)</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:12,height:12,borderRadius:3,background:"rgba(240,192,64,0.15)",border:"1px solid rgba(240,192,64,0.4)"}}/>
+              <span>Live trigger today</span>
+            </div>
+          </div>
+
+          {/* Selected cell detail */}
+          {selectedCell && (() => {
+            const [ra_ticker, core_ticker] = selectedCell.split("-");
+            const rel = matrix[ra_ticker]?.[core_ticker];
+            if (!rel) return null;
+            const ra = read_across.find(r => r.ticker === ra_ticker);
+            const coreComp = core.find(c => c.ticker === core_ticker);
+            const r = RT[rel.type];
+            const liveAnns = triggered[ra_ticker] || [];
+            const topAnn = liveAnns[0];
+            const liveDetail = topAnn ? liveDetails[topAnn.url] : null;
+
+            return (
+              <div className="fade-up" style={{
+                marginBottom:24, padding:"18px 22px",
+                background:"var(--bg-card)",
+                border:`1px solid ${liveAnns.length > 0 ? "rgba(240,192,64,0.3)" : r.border}`,
+                borderRadius:12,
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+                  <span style={{
+                    fontFamily:"var(--font-mono)",fontSize:12,fontWeight:700,
+                    color: liveAnns.length > 0 ? "var(--watchlist)" : "var(--accent)",
+                    background: liveAnns.length > 0 ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+                    padding:"3px 8px",borderRadius:5,
+                  }}>{ra.ticker}</span>
+                  <span style={{fontSize:13,color:"var(--text-primary)",fontWeight:500}}>{ra.name}</span>
+                  <span style={{color:"var(--text-muted)"}}>&#8594;</span>
+                  <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--accent-glow)",padding:"3px 8px",borderRadius:5}}>{coreComp.ticker}</span>
+                  <span style={{fontSize:13,color:"var(--text-primary)",fontWeight:500}}>{coreComp.name}</span>
+                  <span style={{padding:"3px 10px",borderRadius:10,background:r.bg,border:`1px solid ${r.border}`,color:r.color,fontSize:11,fontWeight:700}}>{r.label}</span>
+                  <div style={{display:"flex",gap:3,alignItems:"center"}}>
+                    {[1,2,3].map(s => <div key={s} style={{width:6,height:6,borderRadius:"50%",background: s <= rel.strength ? r.color : "var(--border)"}}/>)}
+                  </div>
+                </div>
+
+                <div style={{marginBottom: liveAnns.length > 0 ? 18 : 0}}>
+                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",marginBottom:8}}>Read-across rationale</div>
+                  <p style={{fontSize:13,color:"var(--text-primary)",lineHeight:1.7}}>{rel.note}</p>
+                </div>
+
+                {liveAnns.length > 0 && (
+                  <div style={{paddingTop:16, borderTop:"1px dashed rgba(240,192,64,0.3)"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:"var(--watchlist)",animation:"pulse-dot 1.5s infinite"}}/>
+                      <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--watchlist)"}}>Live today · {liveAnns.length} announcement{liveAnns.length === 1 ? "" : "s"} from {ra.ticker}</span>
+                    </div>
+                    {liveAnns.map((ann, i) => (
+                      <div key={i} style={{
+                        padding:"12px 14px",
+                        background:"var(--bg-surface)",
+                        border:"1px solid var(--border)",
+                        borderRadius:8,
+                        marginBottom: i < liveAnns.length - 1 ? 8 : 0,
+                      }}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                          <span style={{fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)"}}>{ann.time}</span>
+                          <CategoryBadge category={ann.category}/>
+                          {ann.source_feed && ann.source_feed !== "RNS" && <span style={{padding:"1px 6px",borderRadius:3,fontSize:9,fontFamily:"var(--font-mono)",color:"var(--text-muted)",border:"1px solid var(--border)"}}>{ann.source_feed}</span>}
+                        </div>
+                        <div style={{fontSize:13,color:"var(--text-primary)",fontWeight:500,marginBottom:6}}>{ann.headline}</div>
+                        {i === 0 && loadingDetail && (
+                          <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+                            <span className="spinner" style={{width:12,height:12,borderWidth:1.5}}></span>
+                            <span style={{fontSize:11,color:"var(--text-muted)"}}>Loading summary...</span>
+                          </div>
+                        )}
+                        {i === 0 && liveDetail && liveDetail.ai_summary && (
+                          <div style={{marginTop:8,padding:"10px 12px",background:"var(--bg-primary)",borderRadius:6,border:"1px solid var(--border)"}}>
+                            <div style={{fontSize:10,fontWeight:700,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Summary</div>
+                            <div style={{fontSize:12,color:"var(--text-secondary)",lineHeight:1.6}}>{liveDetail.ai_summary}</div>
+                          </div>
+                        )}
+                        {i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && (
+                          <div style={{marginTop:8}}>
+                            <div style={{fontSize:10,fontWeight:700,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Key figures</div>
+                            {liveDetail.key_figures.slice(0,5).map((fig, j) => <div key={j} className="key-figure" style={{margin:"0 0 4px 0",fontSize:11}}>{fig}</div>)}
+                          </div>
+                        )}
+                        {ann.url && (
+                          <a href={ann.url} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{
+                            display:"inline-block",marginTop:10,
+                            fontSize:11,color:"var(--accent)",textDecoration:"none",
+                          }}>View full announcement &#8599;</a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Inactive core companies */}
+          {inactiveCore.length > 0 && (
+            <div style={{padding:"14px 18px",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:10}}>
+              <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",marginBottom:8}}>Core companies with no current read-across mapping</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                {inactiveCore.map(c => (
+                  <span key={c.ticker} title={`${c.name} · ${c.sector}`} style={{
+                    fontFamily:"var(--font-mono)",fontSize:10,fontWeight:600,
+                    color:"var(--text-muted)",background:"var(--bg-surface)",
+                    padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",
+                  }}>{c.ticker}</span>
+                ))}
+              </div>
+              <div style={{fontSize:10,color:"var(--text-muted)"}}>No current read-across company maps to these directly.</div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function App() {
       const [data,setData]=useState(null);const [status,setStatus]=useState("idle");
       const [filter,setFilter]=useState("all");const [categoryFilter,setCategoryFilter]=useState("all");
@@ -399,6 +787,7 @@
       const [watchlist,setWatchlist]=useState({});const [lastRefresh,setLastRefresh]=useState(null);
       const [backendUrl,setBackendUrl]=useState(API_BASE);const [configOpen,setConfigOpen]=useState(false);
       const [searchText,setSearchText]=useState("");const [sortMode,setSortMode]=useState("relevance");const intervalRef=useRef(null);
+      const [tab,setTab]=useState("feed");
 
       const fetchData=useCallback(async()=>{
         setStatus("loading");
@@ -446,7 +835,7 @@
                 <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.02em"}}><span style={{color:"var(--accent)"}}>h2</span>Radnor</h1>
                 <span style={{fontSize:11,fontWeight:600,color:"var(--accent)",background:"var(--accent-glow)",padding:"3px 10px",borderRadius:12,letterSpacing:"0.08em",textTransform:"uppercase"}}>RNS Monitor</span>
               </div>
-              <p style={{fontSize:13,color:"var(--text-muted)"}}>{data?.date||"Loading..."} · Investegate · Click any card to read the full RNS</p>
+              <p style={{fontSize:13,color:"var(--text-muted)"}}>{data?.date||"Loading..."} · Investegate · {tab==="readacross" ? "Read-across triggers and the core companies they affect" : "Click any card to read the full RNS"}</p>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <StatusDot status={status}/>
@@ -470,6 +859,22 @@
           </div>}
         </header>
 
+        {/* Tab bar */}
+        <div style={{display:"flex",gap:0,marginBottom:20,borderBottom:"1px solid var(--border)"}}>
+          {[{id:"feed",label:"Feed"},{id:"readacross",label:"Read-across"}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              padding:"10px 20px",background:"transparent",border:"none",
+              color: tab===t.id ? "var(--accent)" : "var(--text-muted)",
+              borderBottom: tab===t.id ? "2px solid var(--accent)" : "2px solid transparent",
+              fontFamily:"var(--font-sans)",fontSize:14,fontWeight:600,cursor:"pointer",
+              marginBottom:"-1px",transition:"color 0.15s",
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {tab==="readacross" && <ReadAcrossView backendUrl={backendUrl} refreshTick={lastRefresh ? lastRefresh.getTime() : 0}/>}
+
+        {tab==="feed" && <>
         {data&&<div className="fade-up" style={{display:"flex",gap:16,marginBottom:24,flexWrap:"wrap"}}>
           {[{l:"Today (cached)",v:data.total_raw,c:"var(--text-muted)"},{l:"Showing",v:anns.length,c:"var(--text-secondary)"},{l:"Watchlist",v:wlCount,c:"var(--watchlist)"},{l:"Sector",v:secCount,c:"var(--accent)"}].map(s=>
             <div key={s.l} style={{padding:"12px 18px",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:10,minWidth:100}}>
@@ -513,6 +918,7 @@
           <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>No announcements match your filters</div>
           <div style={{fontSize:13,color:"var(--text-muted)"}}>Try broadening your filters or check back later.</div>
         </div>}
+        </>}
 
         <footer style={{marginTop:40,paddingTop:20,borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text-muted)",flexWrap:"wrap",gap:8}}>
           <span>h2Radnor Capital Markets · 68 King William Street, London</span>
