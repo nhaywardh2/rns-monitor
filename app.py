@@ -127,53 +127,70 @@ async def auth_middleware(request: Request, call_next):
 
 WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
 
-DEFAULT_WATCHLIST = {
-    "HSW":  {"name": "Hostelworld Group",               "sector": "Online travel / hostels"},
-    "VEIL": {"name": "Vietnam Enterprise Investments",   "sector": "Emerging markets investment trust"},
-    "PSN":  {"name": "Persimmon",                        "sector": "Housebuilding"},
-    "FOXT": {"name": "Foxtons Group",                    "sector": "Estate agency / lettings"},
-    "PHP":  {"name": "Primary Health Properties",        "sector": "Healthcare REIT"},
-    "CML":  {"name": "CML Microsystems",                 "sector": "Semiconductors / RF technology"},
-    "GTLY": {"name": "Gateley Holdings",                 "sector": "Legal / professional services"},
-    "FNTL": {"name": "Fintel",                           "sector": "Fintech / financial services distribution"},
-    "BMY":  {"name": "Bloomsbury Publishing",            "sector": "Publishing"},
-    "SEE":  {"name": "Seeing Machines",                  "sector": "Driver monitoring / AI technology"},
-    "PPHE": {"name": "PPHE Hotel Group",                 "sector": "Hospitality / hotels"},
-    "ROSE": {"name": "Rosebank Industries",              "sector": "Industrials / acquisition vehicle"},
-    "ALU":  {"name": "Alumasc Group",                    "sector": "Building products / construction"},
-    "BYG":  {"name": "Big Yellow Group",                 "sector": "Self-storage REIT"},
-    "CPP":  {"name": "CPP Group",                        "sector": "Insurance / assistance products"},
-    "HFG":  {"name": "Hilton Foods",                     "sector": "Food production / FMCG"},
-    "IDOX": {"name": "Idox",                             "sector": "GovTech / software"},
-    "IPF":  {"name": "International Personal Finance",   "sector": "Consumer finance / lending"},
-    "IRES": {"name": "Irish Residential Properties REIT","sector": "Residential property REIT"},
-    "MTEC": {"name": "Made Tech Group",                  "sector": "Technology / digital services"},
-    "NRR":  {"name": "NewRiver REIT",                    "sector": "Retail property REIT"},
-    "NFG":  {"name": "Next 15 Group",                    "sector": "Marketing / communications"},
-    "REC":  {"name": "Record",                           "sector": "Currency management / financial services"},
-    "TRI":  {"name": "Trifast",                          "sector": "Industrial fasteners / manufacturing"},
-    "CRST": {"name": "Crest Nicholson",                   "sector": "Housebuilding"},
-    "BTRW": {"name": "Barratt Redrow",                    "sector": "Housebuilding"},
-    "TW.":  {"name": "Taylor Wimpey",                     "sector": "Housebuilding"},
-    "GRI":  {"name": "Grainger",                          "sector": "Residential property / REIT"},
-    "KNOS": {"name": "Kainos Group",                      "sector": "GovTech / digital transformation"},
-    "BBOX": {"name": "Tritax Big Box REIT",               "sector": "Logistics REIT"},
-    "SAVS": {"name": "Savills",                           "sector": "Property services / estate agency"},
-    "LSL":  {"name": "LSL Property Services",             "sector": "Estate agency / surveying"},
-    "ALFA": {"name": "Alfa Financial Software",           "sector": "Specialist software"},
-    "WTB":  {"name": "Whitbread",                         "sector": "Hospitality / hotels"},
-    "JET2": {"name": "Jet2",                              "sector": "Leisure travel / airline"},
-    "SUS":  {"name": "S&U",                               "sector": "Consumer finance / motor lending"},
-    "SGRO": {"name": "SEGRO",                             "sector": "Industrial REIT"},
-    "SAFE": {"name": "Safestore Holdings",                "sector": "Self-storage REIT"},
+# Tickers tracked as read-across signals to the core watchlist.
+# All other watchlist tickers are treated as core by default.
+READ_ACROSS_TICKERS = {
+    "CRST", "BTRW", "TW.", "GRI", "KNOS", "BBOX", "SAVS", "LSL",
+    "ALFA", "WTB", "JET2", "SUS", "SGRO", "SAFE",
 }
+
+DEFAULT_WATCHLIST = {
+    # Core watchlist — companies h2Radnor directly advises or actively covers
+    "HSW":  {"name": "Hostelworld Group",                "sector": "Online travel / hostels",              "tier": "core"},
+    "VEIL": {"name": "Vietnam Enterprise Investments",   "sector": "Emerging markets investment trust",    "tier": "core"},
+    "PSN":  {"name": "Persimmon",                        "sector": "Housebuilding",                        "tier": "core"},
+    "FOXT": {"name": "Foxtons Group",                    "sector": "Estate agency / lettings",             "tier": "core"},
+    "PHP":  {"name": "Primary Health Properties",        "sector": "Healthcare REIT",                      "tier": "core"},
+    "CML":  {"name": "CML Microsystems",                 "sector": "Semiconductors / RF technology",       "tier": "core"},
+    "GTLY": {"name": "Gateley Holdings",                 "sector": "Legal / professional services",        "tier": "core"},
+    "FNTL": {"name": "Fintel",                           "sector": "Fintech / financial services distribution", "tier": "core"},
+    "BMY":  {"name": "Bloomsbury Publishing",            "sector": "Publishing",                           "tier": "core"},
+    "SEE":  {"name": "Seeing Machines",                  "sector": "Driver monitoring / AI technology",    "tier": "core"},
+    "PPHE": {"name": "PPHE Hotel Group",                 "sector": "Hospitality / hotels",                 "tier": "core"},
+    "ROSE": {"name": "Rosebank Industries",              "sector": "Industrials / acquisition vehicle",    "tier": "core"},
+    "ALU":  {"name": "Alumasc Group",                    "sector": "Building products / construction",     "tier": "core"},
+    "BYG":  {"name": "Big Yellow Group",                 "sector": "Self-storage REIT",                    "tier": "core"},
+    "CPP":  {"name": "CPP Group",                        "sector": "Insurance / assistance products",      "tier": "core"},
+    "HFG":  {"name": "Hilton Foods",                     "sector": "Food production / FMCG",               "tier": "core"},
+    "IDOX": {"name": "Idox",                             "sector": "GovTech / software",                   "tier": "core"},
+    "IPF":  {"name": "International Personal Finance",   "sector": "Consumer finance / lending",           "tier": "core"},
+    "IRES": {"name": "Irish Residential Properties REIT","sector": "Residential property REIT",            "tier": "core"},
+    "MTEC": {"name": "Made Tech Group",                  "sector": "Technology / digital services",        "tier": "core"},
+    "NRR":  {"name": "NewRiver REIT",                    "sector": "Retail property REIT",                 "tier": "core"},
+    "NFG":  {"name": "Next 15 Group",                    "sector": "Marketing / communications",           "tier": "core"},
+    "REC":  {"name": "Record",                           "sector": "Currency management / financial services", "tier": "core"},
+    "TRI":  {"name": "Trifast",                          "sector": "Industrial fasteners / manufacturing", "tier": "core"},
+    # Read-across — tracked for read-through signals to core watchlist
+    "CRST": {"name": "Crest Nicholson",                  "sector": "Housebuilding",                        "tier": "read_across"},
+    "BTRW": {"name": "Barratt Redrow",                   "sector": "Housebuilding",                        "tier": "read_across"},
+    "TW.":  {"name": "Taylor Wimpey",                    "sector": "Housebuilding",                        "tier": "read_across"},
+    "GRI":  {"name": "Grainger",                         "sector": "Residential property / REIT",          "tier": "read_across"},
+    "KNOS": {"name": "Kainos Group",                     "sector": "GovTech / digital transformation",     "tier": "read_across"},
+    "BBOX": {"name": "Tritax Big Box REIT",              "sector": "Logistics REIT",                       "tier": "read_across"},
+    "SAVS": {"name": "Savills",                          "sector": "Property services / estate agency",    "tier": "read_across"},
+    "LSL":  {"name": "LSL Property Services",            "sector": "Estate agency / surveying",            "tier": "read_across"},
+    "ALFA": {"name": "Alfa Financial Software",          "sector": "Specialist software",                  "tier": "read_across"},
+    "WTB":  {"name": "Whitbread",                        "sector": "Hospitality / hotels",                 "tier": "read_across"},
+    "JET2": {"name": "Jet2",                             "sector": "Leisure travel / airline",             "tier": "read_across"},
+    "SUS":  {"name": "S&U",                              "sector": "Consumer finance / motor lending",     "tier": "read_across"},
+    "SGRO": {"name": "SEGRO",                            "sector": "Industrial REIT",                      "tier": "read_across"},
+    "SAFE": {"name": "Safestore Holdings",               "sector": "Self-storage REIT",                    "tier": "read_across"},
+}
+
+def _ensure_tiers(wl: dict) -> dict:
+    """Ensure every watchlist entry has a 'tier' field (backward compat for old JSON files)."""
+    for ticker, info in wl.items():
+        if "tier" not in info:
+            info["tier"] = "read_across" if ticker in READ_ACROSS_TICKERS else "core"
+    return wl
 
 def load_watchlist() -> dict:
     """Load watchlist from JSON file, falling back to defaults if file doesn't exist."""
     if WATCHLIST_FILE.exists():
         try:
             with open(WATCHLIST_FILE, "r") as f:
-                return json.load(f)
+                wl = json.load(f)
+                return _ensure_tiers(wl)
         except (json.JSONDecodeError, IOError):
             pass
     # First run or corrupted file — save defaults and return them
@@ -189,6 +206,101 @@ def save_watchlist(wl: dict):
         print(f"Warning: could not save watchlist: {e}")
 
 WATCHLIST = load_watchlist()
+
+# ── Read-Across Matrix ───────────────────────────────────────────────────────
+# When a read-across company announces something, these are the core watchlist
+# companies affected, the type of relationship, and why it matters.
+
+REL_TYPES = {
+    "DIRECT":   {"label": "Direct peer",   "short": "D", "color": "#3db86a", "bg": "rgba(61,184,106,0.18)",  "border": "rgba(61,184,106,0.35)"},
+    "SUPPLY":   {"label": "Supply chain",  "short": "S", "color": "#f0c040", "bg": "rgba(240,192,64,0.18)",  "border": "rgba(240,192,64,0.35)"},
+    "MACRO":    {"label": "Macro / rates", "short": "M", "color": "#5ba8f7", "bg": "rgba(91,168,247,0.18)",  "border": "rgba(91,168,247,0.35)"},
+    "THEMATIC": {"label": "Thematic",      "short": "T", "color": "#c084fc", "bg": "rgba(192,132,252,0.18)", "border": "rgba(192,132,252,0.35)"},
+}
+
+READ_ACROSS_MATRIX = {
+    "CRST": {
+        "PSN":  {"type": "DIRECT",   "strength": 3, "note": "Direct housebuilding peer — completions volume, ASP, and margin commentary all read directly across to PSN"},
+        "ALU":  {"type": "SUPPLY",   "strength": 2, "note": "Alumasc supplies building products to volume housebuilders; CRST build rates affect ALU demand pipeline"},
+        "FOXT": {"type": "MACRO",    "strength": 2, "note": "Shared housing market exposure — transaction volumes, Help to Buy withdrawal, mortgage rate sensitivity"},
+        "GTLY": {"type": "SUPPLY",   "strength": 1, "note": "Gateley provides legal and conveyancing services to housebuilders and homebuyers; CRST volumes signal workload"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "New build supply affects PRS rental demand and residential property values"},
+    },
+    "BTRW": {
+        "PSN":  {"type": "DIRECT",   "strength": 3, "note": "Largest UK housebuilder post-merger — BTRW is the primary benchmark for PSN on completions, ASP, margin, and land bank"},
+        "ALU":  {"type": "SUPPLY",   "strength": 2, "note": "Alumasc building products; BTRW is one of the largest volume purchasers in the sector"},
+        "FOXT": {"type": "MACRO",    "strength": 2, "note": "Housing market transaction volumes and pricing sentiment — Foxtons mortgage completions directly linked"},
+        "GTLY": {"type": "SUPPLY",   "strength": 1, "note": "Conveyancing and development legal work reads through to Gateley pipeline"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "Residential supply/demand balance; new build completions vs PRS demand"},
+    },
+    "TW.": {
+        "PSN":  {"type": "DIRECT",   "strength": 3, "note": "Large-cap housebuilding benchmark — TW. guidance and ASP commentary is the clearest read-across for PSN"},
+        "ALU":  {"type": "SUPPLY",   "strength": 2, "note": "Building products demand linked to Taylor Wimpey build volumes"},
+        "FOXT": {"type": "MACRO",    "strength": 2, "note": "Shared housing market conditions — both sensitive to Help to Buy, mortgage affordability, land availability"},
+        "GTLY": {"type": "SUPPLY",   "strength": 1, "note": "Legal services for housebuilding transactions and land acquisition"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "New build completions affect rental market supply and demand"},
+    },
+    "GRI": {
+        "IRES": {"type": "DIRECT",   "strength": 3, "note": "Direct peer — both are listed UK/European residential REITs focused on the private rented sector; rental growth, occupancy, and cost of debt commentary all read across"},
+        "FOXT": {"type": "MACRO",    "strength": 2, "note": "Both exposed to London and regional rental market dynamics — GRI occupancy and rental reversion signals Foxtons lettings pipeline"},
+        "BYG":  {"type": "MACRO",    "strength": 1, "note": "Shared REIT sector sensitivity to interest rates and cost of capital"},
+        "PHP":  {"type": "MACRO",    "strength": 1, "note": "REIT sector — rate environment affects all listed property companies"},
+        "NRR":  {"type": "MACRO",    "strength": 1, "note": "REIT sector rate and refinancing read-across"},
+        "PSN":  {"type": "MACRO",    "strength": 1, "note": "Residential supply pipeline; new build starts affect PRS demand trajectory"},
+    },
+    "KNOS": {
+        "IDOX": {"type": "DIRECT",   "strength": 3, "note": "Direct GovTech peer — both serve UK public sector digital transformation; Kainos contract wins and budget commentary read directly across to Idox pipeline"},
+        "MTEC": {"type": "DIRECT",   "strength": 3, "note": "Direct peer — both are UK government digital delivery partners; Kainos results signal public sector IT spend environment for Made Tech"},
+    },
+    "BBOX": {
+        "NRR":  {"type": "MACRO",    "strength": 2, "note": "REIT sector — cost of capital, yield movements, and refinancing conditions affect all listed property vehicles"},
+        "BYG":  {"type": "MACRO",    "strength": 2, "note": "REIT sector rate sensitivity; BBOX commentary on financing conditions reads across"},
+        "PHP":  {"type": "MACRO",    "strength": 1, "note": "Long-income REIT sector — interest rate and inflation-linked income read-across"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "REIT sector cost of capital and debt market conditions"},
+    },
+    "SAVS": {
+        "FOXT": {"type": "DIRECT",   "strength": 3, "note": "Property services peer — SAVS is higher-end and global vs Foxtons London residential, but UK transaction volume commentary reads directly across"},
+        "PSN":  {"type": "MACRO",    "strength": 2, "note": "UK housing market — Savills residential transaction volumes and buyer sentiment signal housebuilder demand"},
+        "NRR":  {"type": "MACRO",    "strength": 1, "note": "Commercial property market sentiment affects retail REIT asset valuations"},
+        "GTLY": {"type": "THEMATIC", "strength": 1, "note": "Both benefit from property market activity — legal services (GTLY) and advisory services (SAVS) move together"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "Residential property market health"},
+    },
+    "LSL": {
+        "FOXT": {"type": "DIRECT",   "strength": 3, "note": "Direct estate agency peer — both UK residential sales and lettings; LSL includes Your Move and Reeds Rains, overlapping Foxtons geography in London"},
+        "PSN":  {"type": "MACRO",    "strength": 2, "note": "UK housing market transaction volumes — LSL completions data is a live indicator for housebuilder demand"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "Lettings market — rental demand and supply dynamics"},
+        "GTLY": {"type": "MACRO",    "strength": 1, "note": "Property transaction volumes drive both legal and agency revenue"},
+    },
+    "ALFA": {
+        "FNTL": {"type": "THEMATIC", "strength": 2, "note": "B2B financial services technology — ALFA serves asset finance software, Fintel serves IFA distribution tech; both are niche fintech platforms with sticky recurring revenue"},
+        "IPF":  {"type": "THEMATIC", "strength": 1, "note": "Consumer/specialist finance sector — technology investment trends and FCA regulatory environment read across"},
+        "CPP":  {"type": "THEMATIC", "strength": 1, "note": "Financial services technology and distribution infrastructure"},
+    },
+    "WTB": {
+        "PPHE": {"type": "DIRECT",   "strength": 3, "note": "Premier Inn is the UK hotel sector benchmark — WTB RevPAR, occupancy, and cost commentary reads directly across to PPHE despite PPHE's upscale positioning"},
+        "HSW":  {"type": "THEMATIC", "strength": 2, "note": "Both exposed to leisure and business travel demand cycles — WTB UK occupancy trends signal broader accommodation booking environment for Hostelworld"},
+        "NRR":  {"type": "MACRO",    "strength": 1, "note": "Consumer-facing leisure and hospitality spending trends affect retail/leisure property"},
+    },
+    "JET2": {
+        "HSW":  {"type": "THEMATIC", "strength": 3, "note": "Leisure travel demand — JET2 forward booking data and customer pricing trends are the strongest read-across for Hostelworld accommodation demand; same traveller cohort"},
+        "PPHE": {"type": "THEMATIC", "strength": 2, "note": "Both exposed to UK outbound and domestic leisure travel; JET2 passenger volumes signal PPHE city and resort occupancy"},
+    },
+    "SUS": {
+        "IPF":  {"type": "DIRECT",   "strength": 3, "note": "Direct consumer finance peer — both are specialist non-standard lenders; SUS focuses on motor and bridging finance, IPF on home credit; FCA regulatory tone and consumer credit trends read across"},
+        "CPP":  {"type": "THEMATIC", "strength": 2, "note": "Both serve financially non-prime consumers; shared exposure to consumer stress, arrears trends, and FCA regulatory environment"},
+        "FNTL": {"type": "THEMATIC", "strength": 1, "note": "Financial services distribution and regulatory read-across"},
+    },
+    "SGRO": {
+        "NRR":  {"type": "MACRO",    "strength": 2, "note": "REIT sector — cost of capital, debt refinancing, and yield compression all read across from SEGRO's financing disclosures"},
+        "BYG":  {"type": "MACRO",    "strength": 2, "note": "REIT sector rate sensitivity — SGRO is a large-cap REIT bellwether"},
+        "PHP":  {"type": "MACRO",    "strength": 1, "note": "Long-income REIT sector financing conditions"},
+        "IRES": {"type": "MACRO",    "strength": 1, "note": "REIT sector debt markets and cost of capital"},
+    },
+    "SAFE": {
+        "BYG":  {"type": "DIRECT",   "strength": 3, "note": "Direct peer — Safestore and Big Yellow are the two main listed UK self-storage REITs; RevPASF, occupancy, and rate commentary reads directly across"},
+        "NRR":  {"type": "MACRO",    "strength": 1, "note": "REIT sector rates and refinancing environment"},
+    },
+}
 
 # ── Daily Announcement Cache ─────────────────────────────────────────────────
 # Stores all announcements seen today. Merges with fresh scrapes so earlier
@@ -1197,6 +1309,46 @@ async def generate_outreach_emails(req: OutreachRequest):
     """Generate investor outreach email variants for a given announcement."""
     return await generate_outreach(req)
 
+@app.get("/api/readacross")
+async def get_readacross():
+    """Return the read-across matrix plus live-triggered read-across companies based on today's cache.
+    A read-across company is 'triggered' if it has any announcement in today's cache."""
+    # Pull today's announcements from the daily cache
+    today_anns = [Announcement(**v) for v in daily_cache.announcements.values()]
+
+    # Group triggered read-across announcements by ticker
+    triggered: dict[str, list[dict]] = {}
+    for ann in today_anns:
+        if ann.ticker and ann.ticker in READ_ACROSS_MATRIX:
+            triggered.setdefault(ann.ticker, []).append(ann.model_dump())
+
+    # Split watchlist by tier
+    core_list, read_across_list = [], []
+    for ticker, info in WATCHLIST.items():
+        tier = info.get("tier", "core")
+        entry = {"ticker": ticker, **info}
+        if tier == "read_across":
+            read_across_list.append(entry)
+        else:
+            core_list.append(entry)
+
+    # Determine which core companies are affected today (derived from triggered read-across + matrix)
+    affected_core: dict[str, list[str]] = {}  # core_ticker -> list of read-across tickers triggering it
+    for ra_ticker in triggered.keys():
+        for core_ticker in READ_ACROSS_MATRIX.get(ra_ticker, {}).keys():
+            affected_core.setdefault(core_ticker, []).append(ra_ticker)
+
+    return {
+        "matrix": READ_ACROSS_MATRIX,
+        "rel_types": REL_TYPES,
+        "core": core_list,
+        "read_across": read_across_list,
+        "triggered": triggered,
+        "affected_core": affected_core,
+        "cache_date": daily_cache.cache_date,
+        "generated_at": datetime.now().isoformat(),
+    }
+
 @app.get("/api/rns/{ticker}")
 async def get_rns_by_ticker(ticker: str):
     ticker = ticker.upper()
@@ -1205,8 +1357,10 @@ async def get_rns_by_ticker(ticker: str):
             "announcements": [a for a in raw if a.ticker == ticker], "errors": errors}
 
 @app.post("/api/watchlist/add")
-async def add_to_watchlist(ticker: str, name: str, sector: str = ""):
-    WATCHLIST[ticker.upper()] = {"name": name, "sector": sector}
+async def add_to_watchlist(ticker: str, name: str, sector: str = "", tier: str = "core"):
+    if tier not in ("core", "read_across"):
+        tier = "core"
+    WATCHLIST[ticker.upper()] = {"name": name, "sector": sector, "tier": tier}
     save_watchlist(WATCHLIST)
     return {"status": "added", "ticker": ticker.upper(), "watchlist": WATCHLIST}
 
