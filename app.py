@@ -1251,7 +1251,7 @@ async def scrape_investegate():
 
 # Categories excluded from the default feed (watchlist company announcements in these
 # categories are always kept). Keeps the morning feed focused on material news.
-NOISE_CATEGORIES = {"Fundraise"}
+NOISE_CATEGORIES = {"Fundraise", "Buyback"}
 
 def is_noise_category(ann):
     """True if this announcement is in a noisy category and the company is not on the watchlist."""
