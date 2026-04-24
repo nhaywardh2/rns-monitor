@@ -644,9 +644,12 @@ def categorise(headline, source_feed="RNS"):
     if any(w in h for w in ["results", "interim", "half-year", "preliminary", "full year", "full-year"]): return "Results"
     if any(w in h for w in ["trading update", "trading statement", "q1 trading", "q2 trading", "q3 trading", "q4 trading", "pre-close"]): return "Trading Update"
     if any(w in h for w in ["company update", "operational update", "business update", "strategic update", "strategic review", "strategy", "outlook", "guidance", "notice of results"]): return "Company Update"
-    if any(w in h for w in ["acquisition", "merger", "disposal", "takeover", "offer", "bid", "scheme of arrangement"]): return "M&A"
     if any(w in h for w in ["contract", "partnership", "agreement", "collaboration", "awarded", "mandate", "engagement", "deal", "renew"]): return "Contract"
-    if any(w in h for w in ["placing", "rights issue", "fundrais", "share issue", "buyback", "share purchase", "repurchase", "capital raise", "transaction in own shares"]): return "Fundraise"
+    # Buyback and Fundraise checked BEFORE M&A so phrases like "open offer" and "primary bid"
+    # (fundraise mechanisms) don't get mis-tagged as M&A on the "offer" or "bid" keyword.
+    if any(w in h for w in ["buyback", "buy-back", "buy back", "share purchase", "share repurchase", "repurchase of shares", "transaction in own shares"]): return "Buyback"
+    if any(w in h for w in ["placing", "rights issue", "fundrais", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise"]): return "Fundraise"
+    if any(w in h for w in ["acquisition", "merger", "disposal", "takeover", "offer", "bid", "scheme of arrangement"]): return "M&A"
     if any(w in h for w in ["appointment", "resignation", "board change", "non-executive", "chief executive", "cfo", "ceo"]): return "Board Change"
     if any(w in h for w in ["holding(s) in company", "tr-1", "notification of major", "major shareholding", "significant shareholding"]): return "Shareholding"
     if any(w in h for w in ["director", "pdmr"]): return "Director Dealing"
@@ -1246,8 +1249,19 @@ async def scrape_investegate():
 
     return all_today, total_cached, errors
 
+# Categories excluded from the default feed (watchlist company announcements in these
+# categories are always kept). Keeps the morning feed focused on material news.
+NOISE_CATEGORIES = {"Fundraise"}
+
+def is_noise_category(ann):
+    """True if this announcement is in a noisy category and the company is not on the watchlist."""
+    return ann.category in NOISE_CATEGORIES and not ann.is_watchlist
+
 def filter_announcements(anns):
-    return [a for a in anns if not is_excluded_company(a.company) and is_material_type(a.headline)]
+    return [a for a in anns
+            if not is_excluded_company(a.company)
+            and is_material_type(a.headline)
+            and not is_noise_category(a)]
 
 def rank_announcements(anns):
     def sk(a):
@@ -1274,9 +1288,24 @@ async def get_watchlist():
     return {"watchlist": WATCHLIST}
 
 @app.get("/api/rns", response_model=ScrapeResponse)
-async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query(False), limit: int = Query(500)):
+async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query(False), limit: int = Query(500), include_fundraise: bool = Query(False)):
     raw, total_raw, errors = await scrape_investegate()
-    filtered = [a for a in raw if not is_excluded_company(a.company)] if include_all else filter_announcements(raw)
+    if include_all:
+        # include_all bypasses material-type filtering but still drops noise categories
+        # unless explicitly overridden via include_fundraise=true
+        filtered = [a for a in raw if not is_excluded_company(a.company)]
+        if not include_fundraise:
+            filtered = [a for a in filtered if not is_noise_category(a)]
+    else:
+        filtered = filter_announcements(raw)
+        if include_fundraise:
+            # Re-add watchlist-only Fundraise allowed by default filter; also add non-watchlist ones
+            extras = [a for a in raw
+                      if not is_excluded_company(a.company)
+                      and is_material_type(a.headline)
+                      and a.category in NOISE_CATEGORIES
+                      and not a.is_watchlist]
+            filtered = filtered + extras
     if watchlist_only: filtered = [a for a in filtered if a.is_watchlist]
     ranked = rank_announcements(filtered)
     return ScrapeResponse(
