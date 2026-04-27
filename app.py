@@ -397,13 +397,31 @@ EXCLUDED_COMPANIES = {
 }
 
 EXCLUDED_TYPES = [
+    # Pure noise types — never material
     "nav", "form 8.3", "form 8 ", "form8", "block listing",
     "total voting rights", "issue of equity",
     "prospectus", "circular",
     "agm", "egm", "annual general meeting", "extraordinary general meeting",
-    "share incentive plan", "ltip",
+    "share incentive plan", "ltip", "lti award", "rsu award",
     "admission to trading", "final terms", "exercise of warrants",
     "annual and sustainability", "annual financial report",
+    # Fund / investment trust noise
+    "factsheet", "monthly factsheet", "monthly update", "portfolio update",
+    "net asset value", "monthly nav", "weekly nav",
+    "investment update", "portfolio holdings",
+    # Scheme / regulatory boilerplate
+    "scheme document", "rule 2.7", "rule 2.10", "rule 8 ", "rule 19",
+    "scheme of arrangement document",
+    "publication of", "posting of", "availability of",
+    # Replacement / amendment / correction notices (just re-issued earlier announcements)
+    "replacement:", "amendment:", "correction:", "additional information:",
+    "re:", "re :",
+    # Holiday / calendar boilerplate
+    "notice of results", "notice of agm", "notice of meeting",
+    "financial calendar",
+    # Listing housekeeping
+    "redemption", "cancellation of shares", "cancellation of listing",
+    "delisting", "share consolidation", "stock split",
 ]
 
 MATERIAL_TYPES = [
@@ -641,20 +659,66 @@ def is_sector_relevant(company, headline):
 
 def categorise(headline, source_feed="RNS"):
     h = headline.lower()
-    if any(w in h for w in ["results", "interim", "half-year", "preliminary", "full year", "full-year"]): return "Results"
-    if any(w in h for w in ["trading update", "trading statement", "q1 trading", "q2 trading", "q3 trading", "q4 trading", "pre-close"]): return "Trading Update"
-    if any(w in h for w in ["company update", "operational update", "business update", "strategic update", "strategic review", "strategy", "outlook", "guidance", "notice of results"]): return "Company Update"
-    if any(w in h for w in ["contract", "partnership", "agreement", "collaboration", "awarded", "mandate", "engagement", "deal", "renew"]): return "Contract"
-    # Buyback and Fundraise checked BEFORE M&A so phrases like "open offer" and "primary bid"
-    # (fundraise mechanisms) don't get mis-tagged as M&A on the "offer" or "bid" keyword.
+    # Results — expanded to catch quarterly reports, half-yearly, interim management statements
+    if any(w in h for w in [
+        "results", "interim", "half-year", "half year", "half-yearly", "half yearly",
+        "preliminary", "prelims", "full year", "full-year", "fy results",
+        "quarterly report", "q1 report", "q2 report", "q3 report", "q4 report",
+        "first quarter", "second quarter", "third quarter", "fourth quarter",
+        "annual report", "annual results",
+        "interim management statement", "ims",
+    ]): return "Results"
+    # Trading Update — expanded to catch shorter-form Q-update headlines
+    if any(w in h for w in [
+        "trading update", "trading statement", "pre-close", "pre close",
+        "q1 trading", "q2 trading", "q3 trading", "q4 trading",
+        "q1 update", "q2 update", "q3 update", "q4 update",
+        "first quarter trading", "second quarter trading", "third quarter trading", "fourth quarter trading",
+        "h1 trading", "h2 trading", "year-end trading", "year end trading",
+    ]): return "Trading Update"
+    # Company Update — broader operational and strategic update phrasings
+    if any(w in h for w in [
+        "company update", "operational update", "business update", "operational performance",
+        "strategic update", "strategic review", "strategy update", "strategy",
+        "outlook", "guidance", "guidance upgrade", "guidance update",
+        "ahead of expectations", "ahead of market", "below expectations", "in line with expectations",
+        "profit warning", "earnings update", "performance update",
+        "year-end update", "year end update", "month-end update", "month end update",
+        "interim update", "trading and operational",
+        "response to press", "response to media", "response to speculation",
+    ]): return "Company Update"
+    # Contract — broadened
+    if any(w in h for w in [
+        "contract", "partnership", "agreement", "collaboration",
+        "awarded", "mandate", "engagement", "deal", "renew", "renewal",
+        "new client", "new customer", "framework agreement", "extension",
+        "memorandum of understanding", "mou ", "letter of intent", "loi ",
+    ]): return "Contract"
+    # Buyback — separated from Fundraise so genuine capital returns aren't lumped with raises
     if any(w in h for w in ["buyback", "buy-back", "buy back", "share purchase", "share repurchase", "repurchase of shares", "transaction in own shares"]): return "Buyback"
+    # Fundraise — runs before M&A so 'open offer' / 'primary bid' phrasing doesn't mis-tag as M&A
     if any(w in h for w in ["placing", "rights issue", "fundrais", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise"]): return "Fundraise"
-    if any(w in h for w in ["acquisition", "merger", "disposal", "takeover", "offer", "bid", "scheme of arrangement"]): return "M&A"
-    if any(w in h for w in ["appointment", "resignation", "board change", "non-executive", "chief executive", "cfo", "ceo"]): return "Board Change"
+    # M&A
+    if any(w in h for w in [
+        "acquisition", "merger", "disposal", "takeover", "offer", "bid",
+        "scheme of arrangement", "recommended offer", "recommended cash offer",
+        "possible offer", "completion of acquisition", "completion of disposal",
+    ]): return "M&A"
+    # Board Change
+    if any(w in h for w in [
+        "appointment", "resignation", "board change", "non-executive",
+        "chief executive", "cfo", "ceo", "chairman", "chair appointment",
+        "boardroom change", "succession", "stepping down", "steps down",
+        "joins the board", "leaves the board", "new director",
+    ]): return "Board Change"
+    # Shareholding
     if any(w in h for w in ["holding(s) in company", "tr-1", "notification of major", "major shareholding", "significant shareholding"]): return "Shareholding"
-    if any(w in h for w in ["director", "pdmr"]): return "Director Dealing"
-    if any(w in h for w in ["regulatory", "fca", "compliance", "sanction"]): return "Regulatory"
-    if any(w in h for w in ["dividend", "distribution"]): return "Dividend"
+    # Director Dealing
+    if any(w in h for w in ["director", "pdmr", "person discharging", "directors' dealings"]): return "Director Dealing"
+    # Regulatory
+    if any(w in h for w in ["regulatory", "fca", "compliance", "sanction", "investigation", "enforcement"]): return "Regulatory"
+    # Dividend
+    if any(w in h for w in ["dividend", "distribution", "interim dividend", "final dividend", "special dividend"]): return "Dividend"
     # Non-regulatory sources get their own category if not matched above
     if source_feed in ("UKN", "GNW", "PRN", "MFN", "EQS"):
         return "Non-Reg"
@@ -1251,7 +1315,9 @@ async def scrape_investegate():
 
 # Categories excluded from the default feed (watchlist company announcements in these
 # categories are always kept). Keeps the morning feed focused on material news.
-NOISE_CATEGORIES = {"Fundraise", "Buyback"}
+# "Other" lands here too — once the categoriser has had a fair shot, anything still
+# in Other from a non-watchlist company is almost certainly low signal.
+NOISE_CATEGORIES = {"Fundraise", "Buyback", "Other"}
 
 def is_noise_category(ann):
     """True if this announcement is in a noisy category and the company is not on the watchlist."""
