@@ -1232,78 +1232,101 @@ async def scrape_investegate():
             page_rows = parse_rows(html)
             raw.extend(page_rows)
 
-    # Supplement with RSS feeds for watchlist companies ONLY for announcements
-    # genuinely FROM that company (validated by checking ticker appears in URL)
+    # Supplement with direct company-page fetches for watchlist companies.
+    # This catches announcements from smaller companies that don't appear on
+    # any of the seven index pages (FTSE 100 / 250 / AIM / Aquis / techMark / homepage / today).
+    # Pure HTML parsing — no XML/RSS/lxml dependency, no silent failures.
+    #
+    # Investegate company pages use a 4-column table:
+    # Cell 0: Date (e.g. "17 Apr 2026")
+    # Cell 1: Time (e.g. "07:00 AM")
+    # Cell 2: Source (e.g. "RNS")
+    # Cell 3: Announcement (with link)
     async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
-        async def fetch_rss(ticker, info):
+        async def fetch_company_page(ticker, info):
             found = []
+            today_str = date.today().strftime("%d/%m/%Y")
             try:
-                rss_url = f"https://www.investegate.co.uk/Index.aspx?action=RSS&company={ticker}"
-                resp = await client.get(rss_url)
+                # Investegate company pages: e.g. https://www.investegate.co.uk/company/NRR
+                # Tickers with trailing dot (TW., JD., JET2 etc.) are kept as-is — the dot
+                # is part of the LSE symbol and Investegate URL slugs preserve it.
+                page_url = f"https://www.investegate.co.uk/company/{ticker}"
+                resp = await client.get(page_url)
                 if resp.status_code != 200:
+                    errors.append(f"Company page {ticker}: HTTP {resp.status_code}")
                     return found
-                rss_soup = BeautifulSoup(resp.text, "xml")
-                items = rss_soup.find_all("item")
-                for item in items:
-                    title = item.find("title")
-                    link = item.find("link")
-                    pub_date = item.find("pubDate")
-                    if not title:
+                soup = BeautifulSoup(resp.text, "html.parser")
+
+                for row in soup.find_all("tr"):
+                    cells = row.find_all("td")
+                    if len(cells) < 4:
                         continue
-                    headline = title.get_text(strip=True)
-                    if not headline:
+                    try:
+                        date_raw = cells[0].get_text(strip=True)
+                        time_raw = cells[1].get_text(strip=True)
+                        source_feed = cells[2].get_text(strip=True) or "RNS"
+                        headline_cell = cells[3]
+
+                        # Filter to today's announcements only
+                        if not is_today(date_raw):
+                            continue
+
+                        # Parse time — combine date and time so existing helper recognises the format
+                        combined = f"{date_raw} {time_raw}"
+                        time_display = parse_investegate_time(combined)
+                        if not time_display:
+                            continue
+
+                        headline = headline_cell.get_text(strip=True)
+                        if not headline:
+                            continue
+
+                        link_tag = headline_cell.find("a", href=True)
+                        url = None
+                        if link_tag:
+                            href = link_tag["href"]
+                            url = href if href.startswith("http") else f"https://www.investegate.co.uk{href}"
+
+                        # Defensive: only keep rows whose URL slug contains this ticker.
+                        # Stops cross-referenced "related announcements" sneaking in.
+                        if url:
+                            url_lower = url.lower()
+                            ticker_slug = ticker.lower()
+                            if f"--{ticker_slug}/" not in url_lower:
+                                continue
+
+                        dedup_key = f"{info['name']}|{headline}"
+                        if dedup_key in seen_keys:
+                            continue
+                        seen_keys.add(dedup_key)
+
+                        # Detect non-RNS source feeds from URL pattern (overrides cell text if URL is more specific)
+                        sf = source_feed
+                        if url:
+                            url_lower = url.lower()
+                            if "/gnw/" in url_lower: sf = "GNW"
+                            elif "/ukn/" in url_lower: sf = "UKN"
+                            elif "/prn/" in url_lower: sf = "PRN"
+                            elif "/mfn/" in url_lower: sf = "MFN"
+                            elif "/eqs/" in url_lower: sf = "EQS"
+
+                        found.append(Announcement(
+                            time=time_display, company=info["name"], ticker=ticker,
+                            headline=headline, category=categorise(headline, sf), url=url,
+                            source_feed=sf, is_watchlist=True, sector_relevant=True,
+                            source="investegate-company", date_str=today_str,
+                        ))
+                    except (IndexError, AttributeError):
                         continue
-
-                    url = link.get_text(strip=True) if link else None
-
-                    # CRITICAL: only include if the URL contains this company's ticker
-                    # Investegate URLs: /announcement/rns/company-name--TICKER/headline/id
-                    # This filters out "related" announcements from other companies
-                    if not url:
-                        continue
-                    url_lower = url.lower()
-                    ticker_lower = ticker.lower()
-                    if f"--{ticker_lower}/" not in url_lower:
-                        continue
-
-                    # Check if from today
-                    date_text = pub_date.get_text(strip=True) if pub_date else ""
-                    today = date.today()
-                    month_abbrevs = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
-                    today_check = f"{today.day} {month_abbrevs[today.month]} {today.year}"
-                    if today_check not in date_text:
-                        continue
-
-                    time_match = re.search(r'(\d{2}):(\d{2})', date_text)
-                    time_display = f"{time_match.group(1)}:{time_match.group(2)}" if time_match else "00:00"
-
-                    dedup_key = f"{info['name']}|{headline}"
-                    if dedup_key in seen_keys:
-                        continue
-                    seen_keys.add(dedup_key)
-
-                    sf = "RNS"
-                    if "/gnw/" in url_lower: sf = "GNW"
-                    elif "/ukn/" in url_lower: sf = "UKN"
-                    elif "/prn/" in url_lower: sf = "PRN"
-                    elif "/mfn/" in url_lower: sf = "MFN"
-                    elif "/eqs/" in url_lower: sf = "EQS"
-
-                    found.append(Announcement(
-                        time=time_display, company=info["name"], ticker=ticker,
-                        headline=headline, category=categorise(headline, sf), url=url,
-                        source_feed=sf, is_watchlist=True, sector_relevant=True,
-                        source="investegate-rss", date_str=date.today().strftime("%d/%m/%Y"),
-                    ))
-            except Exception:
-                pass
+            except Exception as e:
+                errors.append(f"Company page {ticker}: {type(e).__name__}: {str(e)[:100]}")
             return found
 
-        rss_results = await asyncio.gather(
-            *[fetch_rss(t, i) for t, i in WATCHLIST.items()]
+        company_results = await asyncio.gather(
+            *[fetch_company_page(t, i) for t, i in WATCHLIST.items()]
         )
-        for rss_anns in rss_results:
-            raw.extend(rss_anns)
+        for company_anns in company_results:
+            raw.extend(company_anns)
 
     total_raw = len(raw)
 
