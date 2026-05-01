@@ -789,6 +789,17 @@
       const [backendUrl,setBackendUrl]=useState(API_BASE);const [configOpen,setConfigOpen]=useState(false);
       const [searchText,setSearchText]=useState("");const [sortMode,setSortMode]=useState("relevance");const intervalRef=useRef(null);
       const [tab,setTab]=useState("feed");
+      const [excludedCats,setExcludedCats]=useState(new Set());
+      const [sourceFilter,setSourceFilter]=useState("all"); // all | rns | nonreg
+
+      const NONREG_SOURCES = ["GNW","UKN","PRN","MFN","EQS"];
+      const toggleExcludeCat=(cat)=>{
+        setExcludedCats(prev=>{
+          const next=new Set(prev);
+          if(next.has(cat))next.delete(cat); else next.add(cat);
+          return next;
+        });
+      };
 
       const fetchData=useCallback(async()=>{
         setStatus("loading");
@@ -809,8 +820,13 @@
 
       let anns=data?.announcements||[];
       if(filter==="watchlist")anns=anns.filter(a=>a.is_watchlist);
-      if(filter==="sector")anns=anns.filter(a=>a.sector_relevant);
+      else if(filter==="core")anns=anns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="core");
+      else if(filter==="read_across")anns=anns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="read_across");
+      else if(filter==="sector")anns=anns.filter(a=>a.sector_relevant);
       if(categoryFilter!=="all")anns=anns.filter(a=>a.category===categoryFilter);
+      if(excludedCats.size>0)anns=anns.filter(a=>!excludedCats.has(a.category));
+      if(sourceFilter==="rns")anns=anns.filter(a=>!a.source_feed||a.source_feed==="RNS");
+      else if(sourceFilter==="nonreg")anns=anns.filter(a=>NONREG_SOURCES.includes(a.source_feed));
       if(searchText){const q=searchText.toLowerCase();anns=anns.filter(a=>a.company.toLowerCase().includes(q)||a.headline.toLowerCase().includes(q)||(a.ticker||"").toLowerCase().includes(q));}
 
       // Sort: relevance (default from backend) or latest-first by time
@@ -824,7 +840,11 @@
 
       const allAnns=data?.announcements||[];
       const wlCount=allAnns.filter(a=>a.is_watchlist).length;
+      const coreCount=allAnns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="core").length;
+      const raCount=allAnns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="read_across").length;
       const secCount=allAnns.filter(a=>a.sector_relevant).length;
+      const rnsCount=allAnns.filter(a=>!a.source_feed||a.source_feed==="RNS").length;
+      const nonregCount=allAnns.filter(a=>NONREG_SOURCES.includes(a.source_feed)).length;
       const catCounts={};allAnns.forEach(a=>{catCounts[a.category]=(catCounts[a.category]||0)+1;});
       const sortedCats=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).map(([c])=>c);
 
@@ -887,15 +907,36 @@
         <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
           <FilterPill label="All" active={filter==="all"} onClick={()=>setFilter("all")} count={allAnns.length}/>
           <FilterPill label="Watchlist" active={filter==="watchlist"} onClick={()=>setFilter("watchlist")} count={wlCount}/>
+          <FilterPill label="Core" active={filter==="core"} onClick={()=>setFilter("core")} count={coreCount}/>
+          <FilterPill label="Read-across" active={filter==="read_across"} onClick={()=>setFilter("read_across")} count={raCount}/>
           <FilterPill label="Sector relevant" active={filter==="sector"} onClick={()=>setFilter("sector")} count={secCount}/>
           <span style={{width:1,background:"var(--border)",alignSelf:"stretch",margin:"4px 4px"}}/>
           <FilterPill label="&#9650; Relevance" active={sortMode==="relevance"} onClick={()=>setSortMode("relevance")}/>
           <FilterPill label="&#9660; Latest first" active={sortMode==="latest"} onClick={()=>setSortMode("latest")}/>
         </div>
-        <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
-          <FilterPill label="All types" active={categoryFilter==="all"} onClick={()=>setCategoryFilter("all")}/>
-          {sortedCats.map(cat=><FilterPill key={cat} label={cat} active={categoryFilter===cat} onClick={()=>setCategoryFilter(cat===categoryFilter?"all":cat)} count={catCounts[cat]}/>)}
+        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,color:"var(--text-muted)",fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:4}}>Source</span>
+          <FilterPill label="All sources" active={sourceFilter==="all"} onClick={()=>setSourceFilter("all")} count={allAnns.length}/>
+          <FilterPill label="RNS only" active={sourceFilter==="rns"} onClick={()=>setSourceFilter("rns")} count={rnsCount}/>
+          <FilterPill label="Non-Reg only" active={sourceFilter==="nonreg"} onClick={()=>setSourceFilter("nonreg")} count={nonregCount}/>
         </div>
+        <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,color:"var(--text-muted)",fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:4}}>Categories</span>
+          <FilterPill label="All types" active={categoryFilter==="all"&&excludedCats.size===0} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}/>
+          {sortedCats.map(cat=>{
+            const isExcluded=excludedCats.has(cat);
+            const isActive=categoryFilter===cat;
+            return <span key={cat} style={{display:"inline-flex",alignItems:"stretch",borderRadius:20,overflow:"hidden",border:`1px solid ${isExcluded?"rgba(239,68,68,0.5)":isActive?"var(--accent)":"var(--border)"}`,background:isExcluded?"rgba(239,68,68,0.08)":isActive?"var(--accent-glow)":"transparent",opacity:isExcluded?0.6:1}}>
+              <button onClick={()=>{if(isExcluded){toggleExcludeCat(cat);}else{setCategoryFilter(cat===categoryFilter?"all":cat);}}} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 10px 6px 14px",border:"none",background:"transparent",color:isExcluded?"var(--danger)":isActive?"var(--accent)":"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer",textDecoration:isExcluded?"line-through":"none",whiteSpace:"nowrap"}}>{cat}<span style={{background:isExcluded?"rgba(239,68,68,0.2)":isActive?"var(--accent)":"var(--border)",color:isExcluded?"var(--danger)":isActive?"var(--bg-primary)":"var(--text-secondary)",fontSize:11,fontWeight:600,padding:"1px 7px",borderRadius:10,fontFamily:"var(--font-mono)"}}>{catCounts[cat]}</span></button>
+              {!isExcluded&&<button onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);if(categoryFilter===cat)setCategoryFilter("all");}} title="Hide this category" style={{padding:"0 10px 0 6px",border:"none",borderLeft:"1px solid var(--border)",background:"transparent",color:"var(--text-muted)",fontSize:11,cursor:"pointer",fontFamily:"var(--font-mono)"}}
+                onMouseOver={e=>{e.currentTarget.style.color="var(--danger)"}}
+                onMouseOut={e=>{e.currentTarget.style.color="var(--text-muted)"}}
+              >&#10005;</button>}
+              {isExcluded&&<button onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);}} title="Restore this category" style={{padding:"0 10px 0 6px",border:"none",borderLeft:"1px solid rgba(239,68,68,0.3)",background:"transparent",color:"var(--danger)",fontSize:11,cursor:"pointer",fontFamily:"var(--font-mono)",fontWeight:600}}>&#8634;</button>}
+            </span>;
+          })}
+        </div>
+        <div style={{fontSize:10,color:"var(--text-muted)",marginBottom:20,fontStyle:"italic"}}>Click a category to show only that type. Click &#10005; to hide a category from view.</div>
 
         {data?.errors?.length>0&&<div style={{marginBottom:16,padding:"10px 16px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,fontSize:12,color:"var(--danger)"}}>{data.errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
 
