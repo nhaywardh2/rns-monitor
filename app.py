@@ -1315,9 +1315,10 @@ async def scrape_investegate():
 
 # Categories excluded from the default feed (watchlist company announcements in these
 # categories are always kept). Keeps the morning feed focused on material news.
-# "Other" lands here too — once the categoriser has had a fair shot, anything still
-# in Other from a non-watchlist company is almost certainly low signal.
-NOISE_CATEGORIES = {"Fundraise", "Buyback", "Other"}
+# Note: "Other" is intentionally NOT in this set — better to surface uncategorised
+# announcements and let the user filter them out via the category pills than to
+# silently drop genuine company updates that just didn't match any keyword.
+NOISE_CATEGORIES = {"Fundraise", "Buyback"}
 
 def is_noise_category(ann):
     """True if this announcement is in a noisy category and the company is not on the watchlist."""
@@ -1354,7 +1355,7 @@ async def get_watchlist():
     return {"watchlist": WATCHLIST}
 
 @app.get("/api/rns", response_model=ScrapeResponse)
-async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query(False), limit: int = Query(500), include_fundraise: bool = Query(False)):
+async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query(False), limit: int = Query(2000), include_fundraise: bool = Query(False)):
     raw, total_raw, errors = await scrape_investegate()
     if include_all:
         # include_all bypasses material-type filtering but still drops noise categories
@@ -1381,7 +1382,7 @@ async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query
     )
 
 @app.get("/api/rns/all", response_model=ScrapeResponse)
-async def get_rns_unfiltered(limit: int = Query(500)):
+async def get_rns_unfiltered(limit: int = Query(2000)):
     raw, total_raw, errors = await scrape_investegate()
     return ScrapeResponse(
         announcements=raw[:limit], total_raw=total_raw, total_filtered=total_raw,
