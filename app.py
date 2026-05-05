@@ -349,10 +349,22 @@ class DailyCache:
             self._save()
 
     def merge(self, new_announcements: list) -> list:
-        """Merge new scrape results into the cache, return the full combined list."""
+        """Merge new scrape results into the cache, return the full combined list.
+        First reindexes existing cache entries under the normalised key so any
+        legacy duplicates from earlier scrapes collapse on the next run."""
         self._check_date()
+        # Reindex existing entries so old per-company-name keys collapse into ticker-based keys
+        reindexed = {}
+        for v in self.announcements.values():
+            ann = Announcement(**v) if not isinstance(v, Announcement) else v
+            new_key = make_dedup_key(ann.ticker, ann.company, ann.headline)
+            # If two old entries collapse to the same new key, keep the newer one
+            # (we have no timestamp on the dict value, so last write wins)
+            reindexed[new_key] = v
+        self.announcements = reindexed
+        # Now merge in the fresh results — they take precedence over any older copy
         for ann in new_announcements:
-            key = f"{ann.company}|{ann.headline}"
+            key = make_dedup_key(ann.ticker, ann.company, ann.headline)
             self.announcements[key] = ann.model_dump()
         self.last_scrape = datetime.now()
         self._save()
@@ -630,6 +642,22 @@ async def generate_outreach(req: OutreachRequest) -> OutreachResponse:
     return OutreachResponse(variants=variants, generated_at=datetime.now().isoformat())
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def make_dedup_key(ticker, company, headline):
+    """Build a normalised dedup key so the same announcement can't slip through under
+    two slightly-different company-name strings or headline whitespace variants.
+
+    Uses ticker as the primary identifier when available — it's the only stable
+    cross-source signal. Falls back to a normalised company name otherwise.
+    """
+    # Normalise headline: lowercase, collapse all whitespace
+    h = re.sub(r'\s+', ' ', (headline or "").strip().lower())
+    if ticker:
+        return f"T:{ticker.upper()}|{h}"
+    # No ticker — strip parenthetical tickers and extra whitespace from company name
+    c = re.sub(r'\([A-Z0-9\.]{2,6}\)', '', (company or "")).strip().lower()
+    c = re.sub(r'\s+', ' ', c)
+    return f"C:{c}|{h}"
 
 def extract_ticker(company_text):
     matches = re.findall(r'\(([A-Z0-9\.]{2,6})\)', company_text)
@@ -1195,8 +1223,9 @@ async def scrape_investegate():
                     href = link_tag["href"]
                     url = href if href.startswith("http") else f"https://www.investegate.co.uk{href}"
 
-                # Dedup key: company + headline (same announcement won't appear twice)
-                dedup_key = f"{company_name}|{headline}"
+                # Dedup key: ticker-based (or normalised name fallback) so the same
+                # announcement scraped from multiple sources collapses to one row
+                dedup_key = make_dedup_key(ticker, company_name, headline)
                 if dedup_key in seen_keys:
                     continue
                 seen_keys.add(dedup_key)
@@ -1295,7 +1324,7 @@ async def scrape_investegate():
                             if f"--{ticker_slug}/" not in url_lower:
                                 continue
 
-                        dedup_key = f"{info['name']}|{headline}"
+                        dedup_key = make_dedup_key(ticker, info['name'], headline)
                         if dedup_key in seen_keys:
                             continue
                         seen_keys.add(dedup_key)
