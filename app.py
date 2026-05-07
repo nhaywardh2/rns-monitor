@@ -7,6 +7,8 @@ import re
 import json
 import asyncio
 import os
+import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, date
 from typing import Optional
 from pathlib import Path
@@ -24,8 +26,50 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # Empty = no password require
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # For outreach draft generation
 PORT = int(os.environ.get("PORT", "8000"))
 HOST = os.environ.get("HOST", "0.0.0.0")
+# How often the background task re-scrapes Investegate, in seconds.
+# 120s (2 min) is a good balance between freshness and load on Investegate.
+SCRAPE_INTERVAL_SECONDS = int(os.environ.get("SCRAPE_INTERVAL_SECONDS", "120"))
 
-app = FastAPI(title="h2Radnor RNS Monitor", version="2.0.0")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("rns-monitor")
+
+# Background scraper task handle, populated in the lifespan handler
+_background_task: Optional[asyncio.Task] = None
+
+async def _periodic_scrape_loop():
+    """Background loop that scrapes Investegate continuously and keeps the cache warm.
+    Runs immediately on startup, then every SCRAPE_INTERVAL_SECONDS thereafter."""
+    log.info(f"Background scraper starting (interval: {SCRAPE_INTERVAL_SECONDS}s)")
+    while True:
+        try:
+            await scrape_investegate()
+            log.info(f"Background scrape complete. Cache has {daily_cache.count} announcements.")
+        except asyncio.CancelledError:
+            log.info("Background scraper cancelled — shutting down.")
+            raise
+        except Exception as e:
+            log.exception(f"Background scrape failed: {e}")
+        try:
+            await asyncio.sleep(SCRAPE_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            raise
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """FastAPI lifespan: spin up the background scraper on startup and tear it down on shutdown."""
+    global _background_task
+    _background_task = asyncio.create_task(_periodic_scrape_loop())
+    try:
+        yield
+    finally:
+        if _background_task and not _background_task.done():
+            _background_task.cancel()
+            try:
+                await _background_task
+            except asyncio.CancelledError:
+                pass
+
+app = FastAPI(title="h2Radnor RNS Monitor", version="2.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -312,6 +356,7 @@ class DailyCache:
         self.announcements: dict[str, dict] = {}
         self.cache_date: Optional[str] = None
         self.last_scrape: Optional[datetime] = None
+        self.last_errors: list[str] = []
         self._load()
 
     def _load(self):
@@ -409,31 +454,20 @@ EXCLUDED_COMPANIES = {
 }
 
 EXCLUDED_TYPES = [
-    # Pure noise types — never material
-    "nav", "form 8.3", "form 8 ", "form8", "block listing",
-    "total voting rights", "issue of equity",
-    "prospectus", "circular",
-    "agm", "egm", "annual general meeting", "extraordinary general meeting",
-    "share incentive plan", "ltip", "lti award", "rsu award",
-    "admission to trading", "final terms", "exercise of warrants",
-    "annual and sustainability", "annual financial report",
-    # Fund / investment trust noise
-    "factsheet", "monthly factsheet", "monthly update", "portfolio update",
-    "net asset value", "monthly nav", "weekly nav",
-    "investment update", "portfolio holdings",
-    # Scheme / regulatory boilerplate
-    "scheme document", "rule 2.7", "rule 2.10", "rule 8 ", "rule 19",
-    "scheme of arrangement document",
-    "publication of", "posting of", "availability of",
-    # Replacement / amendment / correction notices (just re-issued earlier announcements)
+    # Pure noise — drop entirely, even for watchlist companies. These are administrative
+    # filings or fund-trust boilerplate where there's no plausible IR signal.
+    # Most other regulatory boilerplate (block listing, TVR, Form 8, scheme docs etc.)
+    # is now categorised as "Admin" so watchlist override still surfaces them.
+    "factsheet", "monthly factsheet", "portfolio update", "portfolio holdings",
+    "net asset value", "monthly nav", "weekly nav", "daily nav",
+    "monthly update", "investment update",
+    # Re-issues / corrections — same content as the original announcement, just reposted
     "replacement:", "amendment:", "correction:", "additional information:",
     "re:", "re :",
-    # Holiday / calendar boilerplate
-    "notice of results", "notice of agm", "notice of meeting",
-    "financial calendar",
-    # Listing housekeeping
-    "redemption", "cancellation of shares", "cancellation of listing",
-    "delisting", "share consolidation", "stock split",
+    # Calendar admin where no actual announcement is being made
+    "notice of results", "notice of agm", "notice of meeting", "financial calendar",
+    # Confirmation of cancellation / redemption of shares (different from delisting itself)
+    "cancellation of shares", "redemption",
 ]
 
 MATERIAL_TYPES = [
@@ -687,6 +721,19 @@ def is_sector_relevant(company, headline):
 
 def categorise(headline, source_feed="RNS"):
     h = headline.lower()
+    # Early disambiguation: compound phrases that contain keywords from other buckets.
+    # "Voting Results" contains 'results' but is admin. "Interim Dividend" contains 'interim'.
+    # Without this pre-check the broad keyword cascade below would mis-tag them.
+    if any(w in h for w in [
+        "voting results", "result of agm", "result of egm", "result of meeting",
+        "agm voting", "agm statement", "results of agm", "results of egm",
+    ]):
+        return "Admin"
+    if any(w in h for w in [
+        "interim dividend", "final dividend", "special dividend", "quarterly dividend",
+        "dividend declaration", "dividend payment", "dividend timetable", "ex-dividend",
+    ]):
+        return "Dividend"
     # Results — expanded to catch quarterly reports, half-yearly, interim management statements
     if any(w in h for w in [
         "results", "interim", "half-year", "half year", "half-yearly", "half yearly",
@@ -747,6 +794,30 @@ def categorise(headline, source_feed="RNS"):
     if any(w in h for w in ["regulatory", "fca", "compliance", "sanction", "investigation", "enforcement"]): return "Regulatory"
     # Dividend
     if any(w in h for w in ["dividend", "distribution", "interim dividend", "final dividend", "special dividend"]): return "Dividend"
+    # Admin — formal regulatory and listing-related boilerplate that's typically non-material.
+    # Runs AFTER all material category checks so anything containing both material and admin keywords (e.g. "Result of Q3" containing both Results and "result of") falls into the material bucket first.
+    if any(w in h for w in [
+        "block listing", "block-listing",
+        "total voting rights", "tvr ", "issued share capital",
+        "form 8.3", "form 8.5", "form 8 ", "rule 8.3", "rule 8.5", "rule 8 ",
+        "statement of capital",
+        "notification of investments", "notification of holdings",
+        "compulsory acquisition",
+        "stabilisation notice", "pricing notice", "settlement notice",
+        "publication of", "document available", "availability of", "documents available",
+        "result of agm", "result of egm", "result of meeting", "voting results", "agm voting", "agm statement",
+        "person closely associated", "pca dealing",
+        "exercise of warrants", "exercise of options", "exercise of share options",
+        "share incentive plan", "ltip", "lti award", "rsu award",
+        "annual financial report",
+        "share consolidation", "stock split",
+        "notice of redemption",
+        "delisting", "cancellation of listing",
+        "scheme document", "publication of scheme",
+        "admission to trading", "final terms",
+        "prospectus", "circular",
+        "agm", "egm", "annual general meeting", "extraordinary general meeting",
+    ]): return "Admin"
     # Non-regulatory sources get their own category if not matched above
     if source_feed in ("UKN", "GNW", "PRN", "MFN", "EQS"):
         return "Non-Reg"
@@ -1363,6 +1434,9 @@ async def scrape_investegate():
     all_today = daily_cache.merge(raw)
     total_cached = len(all_today)
 
+    # Persist errors on the cache so /api/rns can surface them between background scrapes
+    daily_cache.last_errors = errors
+
     return all_today, total_cached, errors
 
 # Categories excluded from the default feed (watchlist company announcements in these
@@ -1370,7 +1444,14 @@ async def scrape_investegate():
 # Note: "Other" is intentionally NOT in this set — better to surface uncategorised
 # announcements and let the user filter them out via the category pills than to
 # silently drop genuine company updates that just didn't match any keyword.
-NOISE_CATEGORIES = {"Fundraise", "Buyback"}
+NOISE_CATEGORIES = {
+    "Fundraise",         # placings, rights issues, capital raises (mostly noise unless covered)
+    "Buyback",           # transactions in own shares (procedural, not material to non-holders)
+    "Director Dealing",  # PDMR transactions (hundreds per day, rarely material)
+    "Shareholding",      # TR-1 holdings notifications (lots of fund rebalancing noise)
+    "Admin",             # block listings, voting rights, scheme docs, AGM results, etc.
+    "Dividend",          # dividend declarations (usually announced with results anyway)
+}
 
 def is_noise_category(ann):
     """True if this announcement is in a noisy category and the company is not on the watchlist."""
@@ -1395,20 +1476,48 @@ def rank_announcements(anns):
 
 @app.get("/api/health")
 async def health():
+    bg_state = "not_started"
+    if _background_task is not None:
+        if _background_task.done():
+            bg_state = "stopped"
+        else:
+            bg_state = "running"
     return {
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
         "cache_size": daily_cache.count,
         "last_scrape": daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else None,
+        "background_scraper": bg_state,
+        "scrape_interval_seconds": SCRAPE_INTERVAL_SECONDS,
+        "last_errors_count": len(daily_cache.last_errors),
     }
 
 @app.get("/api/watchlist")
 async def get_watchlist():
     return {"watchlist": WATCHLIST}
 
+async def _ensure_cache_warm(force: bool = False):
+    """Ensure the daily cache has been populated at least once. The background scraper
+    keeps it warm in steady state. Only triggers a synchronous scrape if the server has
+    never scraped at all (cold start) or if force=True is passed. A cache that has been
+    scraped and legitimately found 0 announcements (quiet day, source down) is left alone."""
+    if force or daily_cache.last_scrape is None:
+        await scrape_investegate()
+
 @app.get("/api/rns", response_model=ScrapeResponse)
-async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query(False), limit: int = Query(2000), include_fundraise: bool = Query(False)):
-    raw, total_raw, errors = await scrape_investegate()
+async def get_rns(
+    watchlist_only: bool = Query(False),
+    include_all: bool = Query(False),
+    limit: int = Query(2000),
+    include_fundraise: bool = Query(False),
+    force: bool = Query(False, description="Bypass cache and trigger a fresh scrape"),
+):
+    """Read announcements from the daily cache (kept warm by the background scraper).
+    Returns instantly when the cache is populated. Cold-cache and force=true paths
+    fall back to a synchronous scrape."""
+    await _ensure_cache_warm(force=force)
+    raw = [Announcement(**v) for v in daily_cache.announcements.values()]
+    total_raw = len(raw)
     if include_all:
         # include_all bypasses material-type filtering but still drops noise categories
         # unless explicitly overridden via include_fundraise=true
@@ -1418,7 +1527,6 @@ async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query
     else:
         filtered = filter_announcements(raw)
         if include_fundraise:
-            # Re-add watchlist-only Fundraise allowed by default filter; also add non-watchlist ones
             extras = [a for a in raw
                       if not is_excluded_company(a.company)
                       and is_material_type(a.headline)
@@ -1427,19 +1535,24 @@ async def get_rns(watchlist_only: bool = Query(False), include_all: bool = Query
             filtered = filtered + extras
     if watchlist_only: filtered = [a for a in filtered if a.is_watchlist]
     ranked = rank_announcements(filtered)
+    scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
     return ScrapeResponse(
         announcements=ranked[:limit], total_raw=total_raw, total_filtered=len(filtered),
-        scraped_at=datetime.now().isoformat(), date=date.today().strftime("%A %d %B %Y"),
-        source="investegate", errors=errors,
+        scraped_at=scraped_at, date=date.today().strftime("%A %d %B %Y"),
+        source="investegate", errors=list(daily_cache.last_errors),
     )
 
 @app.get("/api/rns/all", response_model=ScrapeResponse)
-async def get_rns_unfiltered(limit: int = Query(2000)):
-    raw, total_raw, errors = await scrape_investegate()
+async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False)):
+    """Like /api/rns but with no category/material filtering. Reads from cache."""
+    await _ensure_cache_warm(force=force)
+    raw = [Announcement(**v) for v in daily_cache.announcements.values()]
+    total_raw = len(raw)
+    scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
     return ScrapeResponse(
         announcements=raw[:limit], total_raw=total_raw, total_filtered=total_raw,
-        scraped_at=datetime.now().isoformat(), date=date.today().strftime("%A %d %B %Y"),
-        source="investegate", errors=errors,
+        scraped_at=scraped_at, date=date.today().strftime("%A %d %B %Y"),
+        source="investegate", errors=list(daily_cache.last_errors),
     )
 
 @app.get("/api/rns/detail", response_model=DetailResponse)
@@ -1461,6 +1574,8 @@ async def generate_outreach_emails(req: OutreachRequest):
 async def get_readacross():
     """Return the read-across matrix plus live-triggered read-across companies based on today's cache.
     A read-across company is 'triggered' if it has any announcement in today's cache."""
+    # Cold-start safety: if cache is empty, kick off a synchronous scrape so first call returns data
+    await _ensure_cache_warm()
     # Pull today's announcements from the daily cache
     today_anns = [Announcement(**v) for v in daily_cache.announcements.values()]
 
@@ -1480,8 +1595,8 @@ async def get_readacross():
         else:
             core_list.append(entry)
 
-    # Determine which core companies are affected today (derived from triggered read-across + matrix)
-    affected_core: dict[str, list[str]] = {}  # core_ticker -> list of read-across tickers triggering it
+    # Determine which core companies are affected today
+    affected_core: dict[str, list[str]] = {}
     for ra_ticker in triggered.keys():
         for core_ticker in READ_ACROSS_MATRIX.get(ra_ticker, {}).keys():
             affected_core.setdefault(core_ticker, []).append(ra_ticker)
@@ -1500,9 +1615,10 @@ async def get_readacross():
 @app.get("/api/rns/{ticker}")
 async def get_rns_by_ticker(ticker: str):
     ticker = ticker.upper()
-    raw, _, errors = await scrape_investegate()
+    await _ensure_cache_warm()
+    raw = [Announcement(**v) for v in daily_cache.announcements.values()]
     return {"ticker": ticker, "company": WATCHLIST.get(ticker, {}).get("name", "Unknown"),
-            "announcements": [a for a in raw if a.ticker == ticker], "errors": errors}
+            "announcements": [a for a in raw if a.ticker == ticker], "errors": list(daily_cache.last_errors)}
 
 @app.post("/api/watchlist/add")
 async def add_to_watchlist(ticker: str, name: str, sector: str = "", tier: str = "core"):
