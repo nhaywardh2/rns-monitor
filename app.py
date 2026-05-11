@@ -512,6 +512,8 @@ class ScrapeResponse(BaseModel):
     date: str
     source: str
     errors: list[str] = []
+    # Categories the UI should default-hide. Client may toggle these on per-category.
+    default_hidden_categories: list[str] = []
 
 class DetailResponse(BaseModel):
     url: str
@@ -1509,30 +1511,31 @@ async def get_rns(
     watchlist_only: bool = Query(False),
     include_all: bool = Query(False),
     limit: int = Query(2000),
-    include_fundraise: bool = Query(False),
+    include_fundraise: bool = Query(False, description="Legacy alias — noise filtering is now client-side"),
     force: bool = Query(False, description="Bypass cache and trigger a fresh scrape"),
 ):
     """Read announcements from the daily cache (kept warm by the background scraper).
     Returns instantly when the cache is populated. Cold-cache and force=true paths
-    fall back to a synchronous scrape."""
+    fall back to a synchronous scrape.
+
+    Category-based noise filtering (Director Dealing, Shareholding, Admin, etc.) is now
+    handled client-side. The server returns everything except mining/oil/gas companies
+    and lets the UI manage category visibility, which means the user can unhide any
+    category with one click via the existing category pills.
+
+    `include_all=true` additionally bypasses the headline-level material-type filter
+    (EXCLUDED_TYPES); without it, factsheets, NAVs, and reissue notices are dropped."""
     await _ensure_cache_warm(force=force)
     raw = [Announcement(**v) for v in daily_cache.announcements.values()]
     total_raw = len(raw)
     if include_all:
-        # include_all bypasses material-type filtering but still drops noise categories
-        # unless explicitly overridden via include_fundraise=true
+        # Just exclude mining/oil/gas — let the client decide what to hide
         filtered = [a for a in raw if not is_excluded_company(a.company)]
-        if not include_fundraise:
-            filtered = [a for a in filtered if not is_noise_category(a)]
     else:
-        filtered = filter_announcements(raw)
-        if include_fundraise:
-            extras = [a for a in raw
-                      if not is_excluded_company(a.company)
-                      and is_material_type(a.headline)
-                      and a.category in NOISE_CATEGORIES
-                      and not a.is_watchlist]
-            filtered = filtered + extras
+        # Apply EXCLUDED_TYPES headline-level filter; still no category-level filter
+        filtered = [a for a in raw
+                    if not is_excluded_company(a.company)
+                    and is_material_type(a.headline)]
     if watchlist_only: filtered = [a for a in filtered if a.is_watchlist]
     ranked = rank_announcements(filtered)
     scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
@@ -1540,11 +1543,13 @@ async def get_rns(
         announcements=ranked[:limit], total_raw=total_raw, total_filtered=len(filtered),
         scraped_at=scraped_at, date=date.today().strftime("%A %d %B %Y"),
         source="investegate", errors=list(daily_cache.last_errors),
+        default_hidden_categories=sorted(NOISE_CATEGORIES),
     )
 
 @app.get("/api/rns/all", response_model=ScrapeResponse)
 async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False)):
-    """Like /api/rns but with no category/material filtering. Reads from cache."""
+    """Like /api/rns but with no headline-level or category-level filtering at all.
+    Reads from cache."""
     await _ensure_cache_warm(force=force)
     raw = [Announcement(**v) for v in daily_cache.announcements.values()]
     total_raw = len(raw)
@@ -1553,6 +1558,7 @@ async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False
         announcements=raw[:limit], total_raw=total_raw, total_filtered=total_raw,
         scraped_at=scraped_at, date=date.today().strftime("%A %d %B %Y"),
         source="investegate", errors=list(daily_cache.last_errors),
+        default_hidden_categories=sorted(NOISE_CATEGORIES),
     )
 
 @app.get("/api/rns/detail", response_model=DetailResponse)
