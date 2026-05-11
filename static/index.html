@@ -12,36 +12,160 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg-primary: #0a0f0d; --bg-card: #111a15; --bg-card-hover: #162019;
-      --bg-surface: #0e1511; --bg-detail: #0d1610;
-      --border: #1e2e24; --border-active: #2d4a36;
-      --text-primary: #e8ede9; --text-secondary: #8a9e8f; --text-muted: #5a6e5f;
-      --accent: #3db86a; --accent-dim: #2a7d49; --accent-glow: rgba(61,184,106,0.12);
-      --watchlist: #f0c040; --watchlist-bg: rgba(240,192,64,0.08);
-      --results: #5ba8f7; --trading: #a78bfa; --ma: #f97066; --fundraise: #34d399;
-      --director: #fbbf24; --company-update: #60a5fa; --contract: #2dd4bf;
-      --board-change: #c084fc; --regulatory: #fb923c; --dividend: #a3e635;
-      --other: #8a9e8f; --danger: #ef4444;
+      /* Terminal-density palette — slightly neutralised from the previous green-tinted blacks */
+      --bg-primary: #07090a;       /* outermost background */
+      --bg-sidebar: #0b0f10;       /* left filter rail */
+      --bg-toolbar: #0a0e0f;       /* top status strip */
+      --bg-card: #0e1314;          /* announcement row */
+      --bg-card-hover: #131a1c;
+      --bg-card-active: #16201f;   /* expanded card */
+      --bg-surface: #0c1112;       /* misc panels */
+      --bg-detail: #0a0e0f;
+      --border: #1a2326;
+      --border-strong: #243036;
+      --border-active: #2d4a36;
+      --text-primary: #d4dcd6;
+      --text-secondary: #7a8c80;
+      --text-muted: #4a5a52;
+      --text-dim: #34423b;
+      --accent: #3db86a;
+      --accent-dim: #2a7d49;
+      --accent-glow: rgba(61,184,106,0.10);
+      --watchlist: #f0c040;
+      --watchlist-bg: rgba(240,192,64,0.06);
+      --watchlist-border: rgba(240,192,64,0.22);
+      --core: #f0c040;
+      --readacross: #f59e0b;
+      /* Category accent colours — kept restrained */
+      --results: #5ba8f7;
+      --trading: #a78bfa;
+      --ma: #f97066;
+      --fundraise: #34d399;
+      --director: #fbbf24;
+      --company-update: #60a5fa;
+      --contract: #2dd4bf;
+      --board-change: #c084fc;
+      --regulatory: #fb923c;
+      --dividend: #a3e635;
+      --shareholding: #f472b6;
+      --buyback: #22d3ee;
+      --admin: #94a3b8;
+      --nonreg: #38bdf8;
+      --other: #8a9e8f;
+      --danger: #ef4444;
       --font-sans: 'DM Sans', -apple-system, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+      --sidebar-w: 224px;
+      --toolbar-h: 48px;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); min-height:100vh; }
-    ::-webkit-scrollbar { width:6px; }
-    ::-webkit-scrollbar-track { background:var(--bg-primary); }
-    ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    html, body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); min-height:100vh; }
+    body { font-size:13px; line-height:1.4; -webkit-font-smoothing:antialiased; }
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border); border-radius:0; }
+    ::-webkit-scrollbar-thumb:hover { background:var(--border-strong); }
+
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.35} }
     @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
     @keyframes spin { to{transform:rotate(360deg)} }
-    .fade-up { animation:fadeUp 0.4s ease-out both; }
-    .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-card-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:shimmer 1.8s ease-in-out infinite; border-radius:6px; }
-    .spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
-    .detail-body { font-size:13px; line-height:1.75; color:var(--text-secondary); white-space:normal; word-wrap:break-word; max-height:500px; overflow-y:auto; padding:12px 0; }
-    .detail-body p { margin:0 0 12px 0; }
-    .detail-body::-webkit-scrollbar { width:4px; }
-    .detail-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-    .key-figure { display:block; padding:8px 12px; margin:0 0 6px 0; background:rgba(61,184,106,0.06); border:1px solid rgba(61,184,106,0.12); border-radius:8px; font-size:12px; color:var(--accent); line-height:1.6; word-wrap:break-word; }
+    .fade-in { animation:fadeIn 0.18s ease-out both; }
+    .fade-up { animation:fadeIn 0.22s ease-out both; }  /* legacy alias, kept for older components */
+    .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-card-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:shimmer 1.8s ease-in-out infinite; }
+    .spinner { width:14px; height:14px; border:1.5px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
+
+    /* Top toolbar */
+    .toolbar { position:sticky; top:0; z-index:50; height:var(--toolbar-h); background:var(--bg-toolbar); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 14px; gap:14px; }
+    .brand { font-size:14px; font-weight:700; letter-spacing:-0.02em; }
+    .brand span { color:var(--accent); }
+    .toolbar-tag { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); padding:2px 8px; border:1px solid var(--border); border-radius:0; }
+    .toolbar-meta { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+    .toolbar-spacer { flex:1; }
+    .toolbar-btn { background:transparent; border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:11px; font-weight:500; padding:6px 12px; cursor:pointer; transition:all 0.15s; }
+    .toolbar-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .toolbar-btn.primary { background:var(--accent); color:var(--bg-primary); border-color:var(--accent); font-weight:600; }
+    .toolbar-btn.primary:hover { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--bg-primary); }
+    .toolbar-btn.icon { padding:6px 10px; }
+    .toolbar-tab { background:transparent; border:none; color:var(--text-muted); font-family:var(--font-sans); font-size:12px; font-weight:600; padding:14px 14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; height:100%; display:flex; align-items:center; }
+    .toolbar-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .toolbar-tab:hover { color:var(--text-secondary); }
+
+    /* Layout grid */
+    .layout { display:grid; grid-template-columns:var(--sidebar-w) 1fr; min-height:calc(100vh - var(--toolbar-h)); }
+    @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } .sidebar { display:none; } }
+
+    /* Sidebar */
+    .sidebar { background:var(--bg-sidebar); border-right:1px solid var(--border); padding:14px 12px; overflow-y:auto; max-height:calc(100vh - var(--toolbar-h)); position:sticky; top:var(--toolbar-h); align-self:start; }
+    .sidebar-section { margin-bottom:18px; }
+    .sidebar-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; padding:0 4px; display:flex; align-items:center; justify-content:space-between; }
+    .sidebar-search { width:100%; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-primary); font-family:var(--font-sans); font-size:12px; padding:7px 10px; outline:none; transition:border-color 0.15s; }
+    .sidebar-search::placeholder { color:var(--text-muted); }
+    .sidebar-search:focus { border-color:var(--accent); }
+    .filter-row { display:flex; align-items:center; justify-content:space-between; padding:5px 8px; cursor:pointer; color:var(--text-secondary); font-size:12px; transition:all 0.12s; user-select:none; border-left:2px solid transparent; }
+    .filter-row:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+    .filter-row.active { background:var(--bg-card-active); color:var(--accent); border-left-color:var(--accent); }
+    .filter-row.active .filter-count { color:var(--accent); background:var(--accent-glow); }
+    .filter-row.excluded { color:var(--danger); border-left-color:rgba(239,68,68,0.4); }
+    .filter-row.excluded .filter-label { text-decoration:line-through; }
+    .filter-label { display:flex; align-items:center; gap:6px; }
+    .filter-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .filter-count { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); background:var(--bg-surface); padding:1px 6px; min-width:24px; text-align:center; }
+    .filter-toggle-hide { opacity:0; padding:2px 6px; margin-left:4px; color:var(--text-muted); font-size:10px; transition:opacity 0.12s; }
+    .filter-row:hover .filter-toggle-hide { opacity:1; }
+    .filter-toggle-hide:hover { color:var(--danger); }
+
+    /* Main feed */
+    .main { padding:14px 16px 60px; overflow-x:hidden; }
+    .feed-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding:0 2px; }
+    .feed-counts { display:flex; gap:14px; font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+    .feed-counts span strong { color:var(--text-secondary); font-weight:500; }
+
+    /* Grid */
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; }
+    @media (max-width: 680px) { .grid { grid-template-columns:1fr; } }
+
+    /* Announcement row — dense */
+    .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:all 0.12s; padding:9px 12px; }
+    .row:hover { background:var(--bg-card-hover); border-left-color:var(--accent-dim); }
+    .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
+    .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
+    .row.watchlist:hover { background:rgba(240,192,64,0.10); }
+    .row-meta { display:flex; align-items:center; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:nowrap; }
+    .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
+    .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
+    .row-ticker.watchlist { color:var(--watchlist); }
+    .row-tag { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 6px; border-radius:0; flex-shrink:0; }
+    .row-tag.tier-core { background:rgba(240,192,64,0.12); color:var(--core); }
+    .row-tag.tier-ra { background:rgba(245,158,11,0.10); color:var(--readacross); }
+    .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:0; }
+    .row-source { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); border:1px solid var(--border); padding:0 4px; flex-shrink:0; }
+    .row-spacer { flex:1; }
+    .row-chevron { color:var(--text-dim); font-size:9px; transition:transform 0.15s; flex-shrink:0; }
+    .row.expanded .row-chevron { transform:rotate(180deg); color:var(--accent); }
+    .row-company { font-size:11px; color:var(--text-secondary); font-weight:500; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .row-headline { font-size:13px; color:var(--text-primary); line-height:1.35; font-weight:500; word-wrap:break-word; }
+
+    /* Expanded panel */
+    .expand { border-top:1px solid var(--border); padding:12px 14px; background:var(--bg-detail); }
+    .expand-section { margin-bottom:14px; }
+    .expand-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
+    .expand-summary { font-size:12px; color:var(--text-primary); line-height:1.65; }
+    .key-figure { display:block; padding:6px 10px; margin:0 0 4px 0; background:rgba(61,184,106,0.05); border-left:2px solid rgba(61,184,106,0.25); font-size:11px; color:var(--accent); line-height:1.5; word-wrap:break-word; font-family:var(--font-mono); }
+    .detail-body { font-size:11px; line-height:1.6; color:var(--text-secondary); white-space:normal; word-wrap:break-word; max-height:400px; overflow-y:auto; padding:6px 0; font-family:var(--font-sans); }
+    .detail-body p { margin:0 0 8px 0; }
+    .expand-link { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary); text-decoration:none; padding:5px 10px; border:1px solid var(--border); transition:all 0.15s; }
+    .expand-link:hover { color:var(--accent); border-color:var(--accent); }
+    .expand-toggle { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--text-secondary); background:transparent; border:1px solid var(--border); padding:5px 10px; cursor:pointer; font-family:var(--font-sans); transition:all 0.15s; }
+    .expand-toggle:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Read-across tab styling kept consistent with terminal feel */
+    .ra-grid { background:var(--bg-card); border:1px solid var(--border); overflow:auto; }
+    .ra-grid table { border-collapse:collapse; width:100%; font-size:11px; }
+    .ra-grid th, .ra-grid td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:6px 8px; }
+
+    /* Empty / error states */
+    .empty { text-align:center; padding:60px 20px; background:var(--bg-card); border:1px solid var(--border); color:var(--text-muted); font-size:13px; }
   </style>
 </head>
 <body>
@@ -198,8 +322,8 @@
       );
     }
 
-    // ── Expandable Announcement Card ──
-    function AnnouncementCard({ann, index, backendUrl}) {
+    // ── Expandable Announcement Row — dense terminal style ──
+    function AnnouncementCard({ann, index, backendUrl, tier}) {
       const [expanded, setExpanded] = useState(false);
       const [detail, setDetail] = useState(null);
       const [loading, setLoading] = useState(false);
@@ -208,9 +332,9 @@
       const [shLoading, setShLoading] = useState(false);
       const shFetched = useRef(false);
 
-      // Auto-fetch shareholding detail for Shareholding cards
+      // Auto-fetch shareholding detail for Shareholding rows when expanded
       useEffect(() => {
-        if (ann.category === "Shareholding" && ann.url && !shFetched.current) {
+        if (expanded && ann.category === "Shareholding" && ann.url && !shFetched.current) {
           shFetched.current = true;
           setShLoading(true);
           fetch(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`)
@@ -219,134 +343,97 @@
             .catch(() => {})
             .finally(() => setShLoading(false));
         }
-      }, [ann.category, ann.url, backendUrl]);
+      }, [expanded, ann.category, ann.url, backendUrl]);
 
       const fetchDetail = async () => {
         if (!ann.url) return;
-        if (detail) { setExpanded(!expanded); return; }
-        setExpanded(true);
-        setLoading(true);
-        setError(null);
+        if (detail) return;
+        setLoading(true); setError(null);
         try {
           const resp = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const json = await resp.json();
           if (json.error) throw new Error(json.error);
           setDetail(json);
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
+        } catch (err) { setError(err.message); }
+        finally { setLoading(false); }
       };
 
       const toggleExpand = () => {
-        if (expanded) { setExpanded(false); }
-        else { fetchDetail(); }
+        const next = !expanded;
+        setExpanded(next);
+        if (next && !detail) fetchDetail();
       };
 
+      const catColor = (CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"]);
+      const isWL = ann.is_watchlist;
+      const rowClasses = ["row"];
+      if (isWL) rowClasses.push("watchlist");
+      if (expanded) rowClasses.push("expanded");
+
       return (
-        <div className="fade-up" style={{
-          animationDelay:`${index*40}ms`,
-          background:ann.is_watchlist?"var(--watchlist-bg)":"var(--bg-card)",
-          border:`1px solid ${ann.is_watchlist?"rgba(240,192,64,0.20)":"var(--border)"}`,
-          borderRadius:10, transition:"all 0.2s", overflow:"hidden",
-        }}>
-          {/* Header — always visible, clickable */}
-          <div style={{padding:"16px 20px", cursor:"pointer"}} onClick={toggleExpand}
-            onMouseOver={e=>{e.currentTarget.style.background=ann.is_watchlist?"rgba(240,192,64,0.12)":"var(--bg-card-hover)"}}
-            onMouseOut={e=>{e.currentTarget.style.background="transparent"}}>
-
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-              <span style={{fontFamily:"var(--font-mono)",fontSize:12,color:"var(--text-muted)",fontWeight:500}}>{ann.time}</span>
-              <CategoryBadge category={ann.category} />
-              {ann.is_watchlist&&<span style={{padding:"2px 10px",borderRadius:12,background:"rgba(240,192,64,0.15)",color:"var(--watchlist)",fontSize:11,fontWeight:600,letterSpacing:"0.03em"}}>WATCHLIST</span>}
-              {ann.ticker&&<span style={{padding:"2px 8px",borderRadius:6,background:"var(--bg-surface)",border:"1px solid var(--border)",color:"var(--text-secondary)",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:500}}>{ann.ticker}</span>}
-              {ann.source_feed&&ann.source_feed!=="RNS"&&<span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)",color:"var(--text-muted)",border:"1px solid var(--border)"}}>{ann.source_feed}</span>}
-              <span style={{marginLeft:"auto",fontSize:11,color:"var(--text-muted)",transition:"transform 0.2s",transform:expanded?"rotate(180deg)":"rotate(0)"}}>&#9660;</span>
+        <div className={rowClasses.join(" ") + " fade-in"}>
+          <div onClick={toggleExpand}>
+            <div className="row-meta">
+              <span className="row-time">{ann.time}</span>
+              {ann.ticker && <span className={"row-ticker" + (isWL ? " watchlist" : "")}>{ann.ticker}</span>}
+              {tier === "core" && <span className="row-tag tier-core">CORE</span>}
+              {tier === "read_across" && <span className="row-tag tier-ra">R/A</span>}
+              <span className="row-category" style={{color: catColor.color, background: catColor.bg}}>{ann.category}</span>
+              {ann.source_feed && ann.source_feed !== "RNS" && <span className="row-source">{ann.source_feed}</span>}
+              <span className="row-spacer"/>
+              <span className="row-chevron">&#9660;</span>
             </div>
-
-            <div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",marginBottom:4}}>{ann.company}</div>
-            <div style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.5}}>{ann.headline}</div>
-
-            {/* Shareholding summary strip — shown inline without expanding */}
-            {ann.category === "Shareholding" && shLoading && (
-              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
-                <span className="spinner" style={{width:12,height:12,borderWidth:1.5}}></span>
-                <span style={{fontSize:11,color:"var(--text-muted)"}}>Loading shareholding data...</span>
-              </div>
-            )}
-            {ann.category === "Shareholding" && shData && <ShareholdingStrip data={shData} />}
+            <div className="row-company">{ann.company}</div>
+            <div className="row-headline">{ann.headline}</div>
           </div>
 
-          {/* Expanded Detail Panel */}
           {expanded && (
-            <div style={{
-              borderTop:`1px solid ${ann.is_watchlist?"rgba(240,192,64,0.15)":"var(--border)"}`,
-              padding:"16px 20px",
-              background:"var(--bg-detail)",
-            }}>
+            <div className="expand">
               {loading && (
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"16px 0"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
                   <span className="spinner"></span>
-                  <span style={{fontSize:13,color:"var(--text-muted)"}}>Fetching full announcement...</span>
+                  <span style={{fontSize:11,color:"var(--text-muted)"}}>Fetching announcement...</span>
                 </div>
               )}
-
               {error && (
-                <div style={{padding:"12px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,fontSize:13,color:"var(--danger)",marginBottom:12}}>
+                <div style={{padding:"8px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",marginBottom:10}}>
                   Failed to load: {error}
                 </div>
               )}
-
+              {ann.category === "Shareholding" && shLoading && (
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                  <span className="spinner" style={{width:11,height:11,borderWidth:1.5}}></span>
+                  <span style={{fontSize:10,color:"var(--text-muted)"}}>Loading shareholding data...</span>
+                </div>
+              )}
+              {ann.category === "Shareholding" && shData && <ShareholdingStrip data={shData} />}
               {detail && !loading && (
-                <div>
-                  {/* AI Summary — prominent at top */}
+                <>
                   {detail.ai_summary && (
-                    <div style={{
-                      marginBottom:16, padding:"12px 16px",
-                      background:"var(--bg-surface)",
-                      border:"1px solid var(--border)",
-                      borderRadius:8,
-                    }}>
-                      <div style={{fontSize:12,fontWeight:600,color:"var(--text-muted)",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Summary</div>
-                      <div style={{fontSize:14,color:"var(--text-primary)",lineHeight:1.7}}>{detail.ai_summary}</div>
+                    <div className="expand-section">
+                      <div className="expand-label">Summary</div>
+                      <div className="expand-summary">{detail.ai_summary}</div>
                     </div>
                   )}
-
-                  {/* Key Figures */}
                   {detail.key_figures && detail.key_figures.length > 0 && (
-                    <div style={{marginBottom:16}}>
-                      <div style={{fontSize:12,fontWeight:600,color:"var(--text-muted)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Key figures</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:0}}>
-                        {detail.key_figures.map((fig,i) => (
-                          <span key={i} className="key-figure">{fig}</span>
-                        ))}
-                      </div>
+                    <div className="expand-section">
+                      <div className="expand-label">Key figures</div>
+                      {detail.key_figures.map((fig,i) => <span key={i} className="key-figure">{fig}</span>)}
                     </div>
                   )}
-
-                  {/* Full Announcement — collapsed by default with show/hide toggle */}
                   <FullTextToggle text={detail.body_text} />
-
-                  {/* Actions */}
-                  <div style={{display:"flex",gap:10,alignItems:"center",paddingTop:12,borderTop:"1px solid var(--border)"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center",paddingTop:8,borderTop:"1px solid var(--border)",marginTop:8}}>
                     {ann.url && (
-                      <a href={ann.url} target="_blank" rel="noopener noreferrer" style={{
-                        display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",
-                        border:"1px solid var(--border)",borderRadius:8,background:"transparent",
-                        color:"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:12,
-                        fontWeight:500,textDecoration:"none",cursor:"pointer",transition:"all 0.2s",
-                      }}
-                      onMouseOver={e=>{e.target.style.borderColor="var(--accent)";e.target.style.color="var(--accent)"}}
-                      onMouseOut={e=>{e.target.style.borderColor="var(--border)";e.target.style.color="var(--text-secondary)"}}
-                      >View on Investegate &#8599;</a>
+                      <a href={ann.url} target="_blank" rel="noopener noreferrer" className="expand-link" onClick={e=>e.stopPropagation()}>
+                        View on Investegate &#8599;
+                      </a>
                     )}
-                    <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>
-                      Fetched {new Date(detail.fetched_at).toLocaleTimeString("en-GB")}
+                    <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginLeft:"auto"}}>
+                      {new Date(detail.fetched_at).toLocaleTimeString("en-GB")}
                     </span>
                   </div>
-                </div>
+                </>
               )}
             </div>
           )}
@@ -354,10 +441,15 @@
       );
     }
 
-    function SkeletonCard({index}) {
-      return <div style={{background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:10,padding:"16px 20px"}}>
-        <div style={{display:"flex",gap:8,marginBottom:12}}><div className="skeleton" style={{width:48,height:18}}/><div className="skeleton" style={{width:72,height:18}}/></div>
-        <div className="skeleton" style={{width:"60%",height:16,marginBottom:8}}/><div className="skeleton" style={{width:"85%",height:14}}/>
+    function SkeletonCard() {
+      return <div className="row" style={{cursor:"default"}}>
+        <div style={{display:"flex",gap:6,marginBottom:6}}>
+          <div className="skeleton" style={{width:36,height:11}}/>
+          <div className="skeleton" style={{width:32,height:11}}/>
+          <div className="skeleton" style={{width:64,height:11}}/>
+        </div>
+        <div className="skeleton" style={{width:"55%",height:11,marginBottom:5}}/>
+        <div className="skeleton" style={{width:"90%",height:13}}/>
       </div>;
     }
 
@@ -792,6 +884,7 @@
       const [tab,setTab]=useState("feed");
       const [excludedCats,setExcludedCats]=useState(new Set());
       const [sourceFilter,setSourceFilter]=useState("all"); // all | rns | nonreg
+      const defaultsAppliedRef=useRef(false); // ensure we only pre-populate excludedCats once per session
 
       const NONREG_SOURCES = ["GNW","UKN","PRN","MFN","EQS"];
       const toggleExcludeCat=(cat)=>{
@@ -806,6 +899,13 @@
         setStatus("loading");
         try{const r=await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000`);if(!r.ok)throw new Error(`HTTP ${r.status}`);
           const j=await r.json();setData(j);setStatus("connected");setLastRefresh(new Date());
+          // First-load only: pre-populate excludedCats with the categories the server suggests
+          // hiding by default (Fundraise, Buyback, Director Dealing, Shareholding, Admin, Dividend).
+          // After this, the user is in full control — refreshes won't reset their choices.
+          if(!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)){
+            setExcludedCats(new Set(j.default_hidden_categories));
+            defaultsAppliedRef.current=true;
+          }
         }catch(e){console.error(e);setStatus("error");}
       },[backendUrl]);
 
@@ -825,6 +925,8 @@
       else if(filter==="read_across")anns=anns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="read_across");
       else if(filter==="sector")anns=anns.filter(a=>a.sector_relevant);
       if(categoryFilter!=="all")anns=anns.filter(a=>a.category===categoryFilter);
+      // No watchlist override on excluded categories — if a category is hidden, it stays hidden
+      // regardless of whether the company is on the watchlist. User can re-enable via the pill.
       if(excludedCats.size>0)anns=anns.filter(a=>!excludedCats.has(a.category));
       if(sourceFilter==="rns")anns=anns.filter(a=>!a.source_feed||a.source_feed==="RNS");
       else if(sourceFilter==="nonreg")anns=anns.filter(a=>NONREG_SOURCES.includes(a.source_feed));
@@ -849,127 +951,176 @@
       const catCounts={};allAnns.forEach(a=>{catCounts[a.category]=(catCounts[a.category]||0)+1;});
       const sortedCats=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).map(([c])=>c);
 
-      return <div style={{maxWidth:900,margin:"0 auto",padding:"32px 20px 60px"}}>
-        <header className="fade-up" style={{marginBottom:32}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:12}}>
-            <div>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-                <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.02em"}}><span style={{color:"var(--accent)"}}>h2</span>Radnor</h1>
-                <span style={{fontSize:11,fontWeight:600,color:"var(--accent)",background:"var(--accent-glow)",padding:"3px 10px",borderRadius:12,letterSpacing:"0.08em",textTransform:"uppercase"}}>RNS Monitor</span>
-              </div>
-              <p style={{fontSize:13,color:"var(--text-muted)"}}>{data?.date||"Loading..."} · Investegate · {tab==="readacross" ? "Read-across triggers and the core companies they affect" : "Click any card to read the full RNS"}</p>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
+      const tierFor = (ticker) => watchlist[ticker]?.tier;
+
+      // Sidebar filter helpers
+      const TierRow = ({label, value, count, dotColor}) => (
+        <div className={"filter-row" + (filter===value ? " active" : "")} onClick={()=>setFilter(value)}>
+          <span className="filter-label">{dotColor && <span className="filter-dot" style={{background:dotColor}}/>}{label}</span>
+          <span className="filter-count">{count}</span>
+        </div>
+      );
+      const SourceRow = ({label, value, count}) => (
+        <div className={"filter-row" + (sourceFilter===value ? " active" : "")} onClick={()=>setSourceFilter(value)}>
+          <span className="filter-label">{label}</span>
+          <span className="filter-count">{count}</span>
+        </div>
+      );
+
+      return (
+        <>
+          {/* Top status toolbar */}
+          <div className="toolbar">
+            <span className="brand"><span>h2</span>Radnor</span>
+            <span className="toolbar-tag">RNS Monitor</span>
+            <button className={"toolbar-tab" + (tab==="feed"?" active":"")} onClick={()=>setTab("feed")}>Feed</button>
+            <button className={"toolbar-tab" + (tab==="readacross"?" active":"")} onClick={()=>setTab("readacross")}>Read-across</button>
+            <span className="toolbar-spacer"/>
+            <span className="toolbar-meta">
               <StatusDot status={status}/>
-              <span style={{fontSize:12,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{status==="connected"&&lastRefresh?`Updated ${lastRefresh.toLocaleTimeString("en-GB")}`:status}</span>
+              {status==="connected"&&lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status}
+            </span>
+            <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>
+              {status==="loading"?"...":"Refresh"}
+            </button>
+            <button className={"toolbar-btn"} onClick={()=>setAutoRefresh(!autoRefresh)} style={autoRefresh?{borderColor:"var(--accent)",color:"var(--accent)"}:undefined}>
+              Auto {autoRefresh?"ON":"OFF"}
+            </button>
+            <button className="toolbar-btn" onClick={()=>setShowWatchlist(true)}>WL ({Object.keys(watchlist).length})</button>
+            <button className="toolbar-btn icon" onClick={()=>setConfigOpen(!configOpen)} title="Backend URL">&#9881;</button>
+          </div>
+
+          {configOpen && (
+            <div style={{padding:"10px 16px",background:"var(--bg-sidebar)",borderBottom:"1px solid var(--border)",display:"flex",gap:8,alignItems:"center"}}>
+              <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Backend URL:</span>
+              <input value={backendUrl} onChange={e=>setBackendUrl(e.target.value)} style={{flex:1,maxWidth:400,background:"var(--bg-surface)",border:"1px solid var(--border)",padding:"5px 10px",color:"var(--text-primary)",fontFamily:"var(--font-mono)",fontSize:11,outline:"none"}}/>
+              <button className="toolbar-btn primary" onClick={()=>{fetchData();setConfigOpen(false);}}>Connect</button>
             </div>
+          )}
+
+          {/* Layout: sidebar + main */}
+          <div className="layout">
+            {tab==="feed" && (
+              <aside className="sidebar">
+                <div className="sidebar-section">
+                  <input className="sidebar-search" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search ticker, company, headline..."/>
+                </div>
+
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Tier</div>
+                  <TierRow label="All" value="all" count={allAnns.length}/>
+                  <TierRow label="Watchlist" value="watchlist" count={wlCount} dotColor="var(--watchlist)"/>
+                  <TierRow label="Core" value="core" count={coreCount} dotColor="var(--core)"/>
+                  <TierRow label="Read-across" value="read_across" count={raCount} dotColor="var(--readacross)"/>
+                  <TierRow label="Sector relevant" value="sector" count={secCount} dotColor="var(--accent)"/>
+                </div>
+
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Source</div>
+                  <SourceRow label="All" value="all" count={allAnns.length}/>
+                  <SourceRow label="RNS only" value="rns" count={rnsCount}/>
+                  <SourceRow label="Non-Reg only" value="nonreg" count={nonregCount}/>
+                </div>
+
+                <div className="sidebar-section">
+                  <div className="sidebar-label">
+                    <span>Sort</span>
+                  </div>
+                  <div className={"filter-row" + (sortMode==="relevance"?" active":"")} onClick={()=>setSortMode("relevance")}>
+                    <span className="filter-label">Relevance</span>
+                  </div>
+                  <div className={"filter-row" + (sortMode==="latest"?" active":"")} onClick={()=>setSortMode("latest")}>
+                    <span className="filter-label">Latest first</span>
+                  </div>
+                </div>
+
+                <div className="sidebar-section">
+                  <div className="sidebar-label">
+                    <span>Categories</span>
+                    {excludedCats.size>0 && <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={()=>setExcludedCats(new Set())}>show all</span>}
+                  </div>
+                  <div className={"filter-row" + (categoryFilter==="all"&&excludedCats.size===0?" active":"")} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}>
+                    <span className="filter-label">All types</span>
+                  </div>
+                  {sortedCats.map(cat=>{
+                    const isExcluded=excludedCats.has(cat);
+                    const isActive=categoryFilter===cat;
+                    const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
+                    const cls = "filter-row" + (isActive?" active":"") + (isExcluded?" excluded":"");
+                    return <div key={cat} className={cls}>
+                      <span className="filter-label" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}} style={{flex:1}}>
+                        <span className="filter-dot" style={{background:catColor}}/>
+                        {cat}
+                      </span>
+                      <span className="filter-count" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}}>{catCounts[cat]}</span>
+                      <span className="filter-toggle-hide" onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);if(categoryFilter===cat)setCategoryFilter("all");}} title={isExcluded?"Restore":"Hide"} style={isExcluded?{opacity:1,color:"var(--danger)"}:undefined}>
+                        {isExcluded ? "\u21BA" : "\u2715"}
+                      </span>
+                    </div>;
+                  })}
+                </div>
+              </aside>
+            )}
+
+            <main className="main" style={tab!=="feed"?{gridColumn:"1 / -1"}:undefined}>
+              {tab==="readacross" && <ReadAcrossView backendUrl={backendUrl} refreshTick={lastRefresh ? lastRefresh.getTime() : 0}/>}
+
+              {tab==="feed" && (
+                <>
+                  <div className="feed-header">
+                    <div className="feed-counts">
+                      <span><strong>{anns.length}</strong> showing</span>
+                      <span>/ {allAnns.length} total</span>
+                      {wlCount>0 && <span style={{color:"var(--watchlist)"}}>{wlCount} watchlist</span>}
+                      {excludedCats.size>0 && <span style={{color:"var(--danger)"}}>{excludedCats.size} categories hidden</span>}
+                    </div>
+                  </div>
+
+                  {data?.errors?.length>0 && (
+                    <div style={{marginBottom:10,padding:"6px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",fontFamily:"var(--font-mono)"}}>
+                      {data.errors.length} scrape error{data.errors.length===1?"":"s"}: {data.errors.slice(0,3).map(e=>e.split(":")[0]).join(", ")}{data.errors.length>3?` +${data.errors.length-3} more`:""}
+                    </div>
+                  )}
+
+                  {status==="error"&&!data && (
+                    <div className="empty">
+                      <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:"var(--text-primary)"}}>Can't reach the backend</div>
+                      <div style={{fontSize:11}}>Check <code style={{fontFamily:"var(--font-mono)",color:"var(--accent)"}}>{backendUrl}</code> is running.</div>
+                    </div>
+                  )}
+
+                  {status==="loading"&&!data && (
+                    <div className="grid">{[0,1,2,3,4,5,6,7].map(i=><SkeletonCard key={i}/>)}</div>
+                  )}
+
+                  {anns.length>0 && (
+                    <div className="grid">
+                      {anns.map((a,i) => (
+                        <AnnouncementCard
+                          key={`${a.company}-${a.headline}-${i}`}
+                          ann={a}
+                          index={i}
+                          backendUrl={backendUrl}
+                          tier={tierFor(a.ticker)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {data && anns.length===0 && (
+                    <div className="empty">
+                      <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:"var(--text-primary)"}}>Nothing matches</div>
+                      <div style={{fontSize:11}}>Broaden the filters or unhide categories in the sidebar.</div>
+                    </div>
+                  )}
+                </>
+              )}
+            </main>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:12}}>
-            <button onClick={fetchData} disabled={status==="loading"} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",background:"var(--accent)",color:"var(--bg-primary)",border:"none",borderRadius:8,fontFamily:"var(--font-sans)",fontSize:13,fontWeight:600,cursor:status==="loading"?"wait":"pointer",opacity:status==="loading"?0.6:1}}>{status==="loading"?"Scraping...":"Refresh"}</button>
-            <button onClick={()=>setAutoRefresh(!autoRefresh)} style={{padding:"8px 14px",border:`1px solid ${autoRefresh?"var(--accent)":"var(--border)"}`,borderRadius:8,background:autoRefresh?"var(--accent-glow)":"transparent",color:autoRefresh?"var(--accent)":"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer"}}>Auto {autoRefresh?"ON":"OFF"}</button>
-            <button onClick={()=>setShowWatchlist(true)} style={{padding:"8px 14px",border:"1px solid var(--border)",borderRadius:8,background:"transparent",color:"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer"}}>Watchlist ({Object.keys(watchlist).length})</button>
-            <div style={{flex:1}}/>
-            <input value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search company, ticker, headline..." style={{background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 14px",color:"var(--text-primary)",fontFamily:"var(--font-sans)",fontSize:13,outline:"none",minWidth:200,maxWidth:300}}/>
-            <button onClick={()=>setConfigOpen(!configOpen)} style={{padding:"8px 14px",border:"1px solid var(--border)",borderRadius:8,background:"transparent",color:"var(--text-muted)",fontFamily:"var(--font-mono)",fontSize:11,cursor:"pointer"}}>&#9881;</button>
-          </div>
-          {configOpen&&<div className="fade-up" style={{marginTop:4,marginBottom:12,padding:16,background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:10}}>
-            <label style={{fontSize:12,color:"var(--text-muted)",display:"block",marginBottom:6}}>Backend URL</label>
-            <div style={{display:"flex",gap:8}}>
-              <input value={backendUrl} onChange={e=>setBackendUrl(e.target.value)} style={{flex:1,background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:6,padding:"8px 12px",color:"var(--text-primary)",fontFamily:"var(--font-mono)",fontSize:12,outline:"none"}}/>
-              <button onClick={()=>{fetchData();setConfigOpen(false);}} style={{padding:"8px 14px",background:"var(--accent)",color:"var(--bg-primary)",border:"none",borderRadius:6,fontFamily:"var(--font-sans)",fontSize:12,fontWeight:600,cursor:"pointer"}}>Connect</button>
-            </div>
-          </div>}
-        </header>
 
-        {/* Tab bar */}
-        <div style={{display:"flex",gap:0,marginBottom:20,borderBottom:"1px solid var(--border)"}}>
-          {[{id:"feed",label:"Feed"},{id:"readacross",label:"Read-across"}].map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              padding:"10px 20px",background:"transparent",border:"none",
-              color: tab===t.id ? "var(--accent)" : "var(--text-muted)",
-              borderBottom: tab===t.id ? "2px solid var(--accent)" : "2px solid transparent",
-              fontFamily:"var(--font-sans)",fontSize:14,fontWeight:600,cursor:"pointer",
-              marginBottom:"-1px",transition:"color 0.15s",
-            }}>{t.label}</button>
-          ))}
-        </div>
-
-        {tab==="readacross" && <ReadAcrossView backendUrl={backendUrl} refreshTick={lastRefresh ? lastRefresh.getTime() : 0}/>}
-
-        {tab==="feed" && <>
-        {data&&<div className="fade-up" style={{display:"flex",gap:16,marginBottom:24,flexWrap:"wrap"}}>
-          {[{l:"Today (cached)",v:data.total_raw,c:"var(--text-muted)"},{l:"Showing",v:anns.length,c:"var(--text-secondary)"},{l:"Watchlist",v:wlCount,c:"var(--watchlist)"},{l:"Sector",v:secCount,c:"var(--accent)"}].map(s=>
-            <div key={s.l} style={{padding:"12px 18px",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:10,minWidth:100}}>
-              <div style={{fontFamily:"var(--font-mono)",fontSize:22,fontWeight:600,color:s.c}}>{s.v}</div>
-              <div style={{fontSize:11,color:"var(--text-muted)",marginTop:2}}>{s.l}</div>
-            </div>)}
-        </div>}
-
-        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-          <FilterPill label="All" active={filter==="all"} onClick={()=>setFilter("all")} count={allAnns.length}/>
-          <FilterPill label="Watchlist" active={filter==="watchlist"} onClick={()=>setFilter("watchlist")} count={wlCount}/>
-          <FilterPill label="Core" active={filter==="core"} onClick={()=>setFilter("core")} count={coreCount}/>
-          <FilterPill label="Read-across" active={filter==="read_across"} onClick={()=>setFilter("read_across")} count={raCount}/>
-          <FilterPill label="Sector relevant" active={filter==="sector"} onClick={()=>setFilter("sector")} count={secCount}/>
-          <span style={{width:1,background:"var(--border)",alignSelf:"stretch",margin:"4px 4px"}}/>
-          <FilterPill label="&#9650; Relevance" active={sortMode==="relevance"} onClick={()=>setSortMode("relevance")}/>
-          <FilterPill label="&#9660; Latest first" active={sortMode==="latest"} onClick={()=>setSortMode("latest")}/>
-        </div>
-        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontSize:11,color:"var(--text-muted)",fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:4}}>Source</span>
-          <FilterPill label="All sources" active={sourceFilter==="all"} onClick={()=>setSourceFilter("all")} count={allAnns.length}/>
-          <FilterPill label="RNS only" active={sourceFilter==="rns"} onClick={()=>setSourceFilter("rns")} count={rnsCount}/>
-          <FilterPill label="Non-Reg only" active={sourceFilter==="nonreg"} onClick={()=>setSourceFilter("nonreg")} count={nonregCount}/>
-        </div>
-        <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{fontSize:11,color:"var(--text-muted)",fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase",marginRight:4}}>Categories</span>
-          <FilterPill label="All types" active={categoryFilter==="all"&&excludedCats.size===0} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}/>
-          {sortedCats.map(cat=>{
-            const isExcluded=excludedCats.has(cat);
-            const isActive=categoryFilter===cat;
-            return <span key={cat} style={{display:"inline-flex",alignItems:"stretch",borderRadius:20,overflow:"hidden",border:`1px solid ${isExcluded?"rgba(239,68,68,0.5)":isActive?"var(--accent)":"var(--border)"}`,background:isExcluded?"rgba(239,68,68,0.08)":isActive?"var(--accent-glow)":"transparent",opacity:isExcluded?0.6:1}}>
-              <button onClick={()=>{if(isExcluded){toggleExcludeCat(cat);}else{setCategoryFilter(cat===categoryFilter?"all":cat);}}} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 10px 6px 14px",border:"none",background:"transparent",color:isExcluded?"var(--danger)":isActive?"var(--accent)":"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer",textDecoration:isExcluded?"line-through":"none",whiteSpace:"nowrap"}}>{cat}<span style={{background:isExcluded?"rgba(239,68,68,0.2)":isActive?"var(--accent)":"var(--border)",color:isExcluded?"var(--danger)":isActive?"var(--bg-primary)":"var(--text-secondary)",fontSize:11,fontWeight:600,padding:"1px 7px",borderRadius:10,fontFamily:"var(--font-mono)"}}>{catCounts[cat]}</span></button>
-              {!isExcluded&&<button onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);if(categoryFilter===cat)setCategoryFilter("all");}} title="Hide this category" style={{padding:"0 10px 0 6px",border:"none",borderLeft:"1px solid var(--border)",background:"transparent",color:"var(--text-muted)",fontSize:11,cursor:"pointer",fontFamily:"var(--font-mono)"}}
-                onMouseOver={e=>{e.currentTarget.style.color="var(--danger)"}}
-                onMouseOut={e=>{e.currentTarget.style.color="var(--text-muted)"}}
-              >&#10005;</button>}
-              {isExcluded&&<button onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);}} title="Restore this category" style={{padding:"0 10px 0 6px",border:"none",borderLeft:"1px solid rgba(239,68,68,0.3)",background:"transparent",color:"var(--danger)",fontSize:11,cursor:"pointer",fontFamily:"var(--font-mono)",fontWeight:600}}>&#8634;</button>}
-            </span>;
-          })}
-        </div>
-        <div style={{fontSize:10,color:"var(--text-muted)",marginBottom:20,fontStyle:"italic"}}>Click a category to show only that type. Click &#10005; to hide a category from view.</div>
-
-        {data?.errors?.length>0&&<div style={{marginBottom:16,padding:"10px 16px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,fontSize:12,color:"var(--danger)"}}>{data.errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
-
-        {status==="error"&&!data&&<div className="fade-up" style={{textAlign:"center",padding:"60px 20px",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:14}}>
-          <div style={{fontSize:36,marginBottom:16}}>&#9889;</div>
-          <div style={{fontSize:16,fontWeight:600,marginBottom:8}}>Can't reach the backend</div>
-          <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:20,lineHeight:1.6}}>Server should be running at <code style={{fontFamily:"var(--font-mono)",color:"var(--accent)"}}>{backendUrl}</code></div>
-          <div style={{background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:8,padding:16,display:"inline-block",textAlign:"left"}}>
-            <code style={{fontFamily:"var(--font-mono)",fontSize:12,color:"var(--text-secondary)",lineHeight:1.8,display:"block"}}>cd backend<br/>pip install -r requirements.txt<br/>python server.py</code>
-          </div>
-        </div>}
-
-        {status==="loading"&&!data&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{[0,1,2,3,4].map(i=><SkeletonCard key={i} index={i}/>)}</div>}
-
-        {anns.length>0&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {anns.map((a,i)=><AnnouncementCard key={`${a.company}-${a.headline}-${i}`} ann={a} index={i} backendUrl={backendUrl}/>)}
-        </div>}
-
-        {data&&anns.length===0&&<div className="fade-up" style={{textAlign:"center",padding:"60px 20px",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:14}}>
-          <div style={{fontSize:36,marginBottom:16}}>&#128237;</div>
-          <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>No announcements match your filters</div>
-          <div style={{fontSize:13,color:"var(--text-muted)"}}>Try broadening your filters or check back later.</div>
-        </div>}
-        </>}
-
-        <footer style={{marginTop:40,paddingTop:20,borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text-muted)",flexWrap:"wrap",gap:8}}>
-          <span>h2Radnor Capital Markets · 68 King William Street, London</span>
-          <span>Source: Investegate · Not investment advice</span>
-        </footer>
-
-        {showWatchlist&&<WatchlistModal watchlist={watchlist} onClose={()=>setShowWatchlist(false)} onAdd={handleAdd} onRemove={handleRemove}/>}
-      </div>;
+          {showWatchlist && <WatchlistModal watchlist={watchlist} onClose={()=>setShowWatchlist(false)} onAdd={handleAdd} onRemove={handleRemove}/>}
+        </>
+      );
     }
     ReactDOM.render(<App/>,document.getElementById("root"));
   </script>
