@@ -8,6 +8,9 @@ import json
 import asyncio
 import os
 import logging
+import hmac
+import hashlib
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, date
 from typing import Optional
@@ -24,11 +27,20 @@ from pydantic import BaseModel
 # ── Configuration via environment variables ──────────────────────────────────
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # Empty = no password required
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # For outreach draft generation
+# Model used for outreach drafting. Override from the Render dashboard without a code change.
+# claude-sonnet-4-6 = best speed/quality balance; claude-opus-4-8 = highest quality; claude-haiku-4-5 = cheapest/fastest.
+OUTREACH_MODEL = os.environ.get("OUTREACH_MODEL", "claude-sonnet-4-6")
+# Secret used to derive the auth cookie token. Set this in Render for a stable, private secret.
+# Falls back to the password so the app still works without extra config, but setting it is better.
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
 PORT = int(os.environ.get("PORT", "8000"))
 HOST = os.environ.get("HOST", "0.0.0.0")
 # How often the background task re-scrapes Investegate, in seconds.
 # 120s (2 min) is a good balance between freshness and load on Investegate.
 SCRAPE_INTERVAL_SECONDS = int(os.environ.get("SCRAPE_INTERVAL_SECONDS", "120"))
+# How long fetched announcement bodies stay cached, in seconds. Bodies don't change once published.
+DETAIL_CACHE_TTL = int(os.environ.get("DETAIL_CACHE_TTL", "900"))  # 15 min
+DETAIL_CACHE_MAX = int(os.environ.get("DETAIL_CACHE_MAX", "600"))  # cap entries to bound memory
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("rns-monitor")
@@ -117,12 +129,21 @@ if(new URLSearchParams(location.search).get('error')){document.getElementById('e
 
 AUTH_COOKIE = "rns_auth"
 
+def _auth_token() -> str:
+    """Derive the auth-cookie value from a server secret rather than storing the password itself.
+    Stable across restarts as long as SECRET_KEY (or APP_PASSWORD) is stable."""
+    secret = (SECRET_KEY or APP_PASSWORD or "rns-monitor").encode()
+    return hmac.new(secret, b"rns-monitor-auth-v1", hashlib.sha256).hexdigest()
+
+def _cookie_ok(token: Optional[str]) -> bool:
+    """Constant-time comparison of the presented cookie against the expected token."""
+    return bool(token) and hmac.compare_digest(token, _auth_token())
+
 def check_auth(request: Request):
     """Check if user is authenticated. Skip if no password is set."""
     if not APP_PASSWORD:
         return True
-    token = request.cookies.get(AUTH_COOKIE)
-    if token != APP_PASSWORD:
+    if not _cookie_ok(request.cookies.get(AUTH_COOKIE)):
         raise HTTPException(status_code=401, detail="Not authenticated")
     return True
 
@@ -136,9 +157,11 @@ async def login_page():
 async def login(request: Request):
     form = await request.form()
     password = form.get("password", "")
-    if password == APP_PASSWORD:
+    # Compare the submitted password against the real password in constant time.
+    if APP_PASSWORD and hmac.compare_digest(password, APP_PASSWORD):
         response = RedirectResponse("/", status_code=302)
-        response.set_cookie(AUTH_COOKIE, APP_PASSWORD, httponly=True, max_age=86400)
+        # Store a derived token, never the password itself.
+        response.set_cookie(AUTH_COOKIE, _auth_token(), httponly=True, samesite="lax", max_age=86400)
         return response
     return RedirectResponse("/login?error=1", status_code=302)
 
@@ -148,10 +171,8 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend(request: Request):
-    if APP_PASSWORD:
-        token = request.cookies.get(AUTH_COOKIE)
-        if token != APP_PASSWORD:
-            return RedirectResponse("/login")
+    if APP_PASSWORD and not _cookie_ok(request.cookies.get(AUTH_COOKIE)):
+        return RedirectResponse("/login")
     html_path = STATIC_DIR / "index.html"
     return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
@@ -162,8 +183,7 @@ async def auth_middleware(request: Request, call_next):
     # Skip auth for login routes, health check, and static assets
     if not APP_PASSWORD or path in ("/login", "/api/health") or not path.startswith("/api/"):
         return await call_next(request)
-    token = request.cookies.get(AUTH_COOKIE)
-    if token != APP_PASSWORD:
+    if not _cookie_ok(request.cookies.get(AUTH_COOKIE)):
         return Response(content='{"detail":"Not authenticated"}', status_code=401, media_type="application/json")
     return await call_next(request)
 
@@ -629,7 +649,7 @@ async def generate_outreach(req: OutreachRequest) -> OutreachResponse:
                         "content-type": "application/json",
                     },
                     json={
-                        "model": "claude-sonnet-4-20250514",
+                        "model": OUTREACH_MODEL,
                         "max_tokens": 1000,
                         "system": OUTREACH_SYSTEM_PROMPT,
                         "messages": [{"role": "user", "content": prompt}],
@@ -1561,15 +1581,50 @@ async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False
         default_hidden_categories=sorted(NOISE_CATEGORIES),
     )
 
+# ── Detail response cache (TTL) ──────────────────────────────────────────────
+# Announcement bodies don't change once published, so caching repeat opens avoids
+# re-fetching and re-parsing the same Investegate page. Only successful (error-free)
+# responses are cached. Cache is in-memory and resets on restart, which is fine.
+_detail_cache: dict[str, tuple[float, object]] = {}
+
+def _cache_get(key: str):
+    hit = _detail_cache.get(key)
+    if hit and (time.monotonic() - hit[0]) < DETAIL_CACHE_TTL:
+        return hit[1]
+    if hit:
+        _detail_cache.pop(key, None)  # expired
+    return None
+
+def _cache_put(key: str, value):
+    # Evict oldest entries if over the cap.
+    if len(_detail_cache) >= DETAIL_CACHE_MAX:
+        for old_key in sorted(_detail_cache, key=lambda k: _detail_cache[k][0])[:max(1, DETAIL_CACHE_MAX // 5)]:
+            _detail_cache.pop(old_key, None)
+    _detail_cache[key] = (time.monotonic(), value)
+
 @app.get("/api/rns/detail", response_model=DetailResponse)
 async def get_rns_detail(url: str = Query(..., description="Full Investegate announcement URL")):
-    """Fetch and parse a single announcement's full body text."""
-    return await fetch_announcement_detail(url)
+    """Fetch and parse a single announcement's full body text. Cached per URL for DETAIL_CACHE_TTL."""
+    cache_key = f"detail:{url}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+    result = await fetch_announcement_detail(url)
+    if result.error is None:  # never cache failures, so a retry can succeed
+        _cache_put(cache_key, result)
+    return result
 
 @app.get("/api/rns/shareholding", response_model=ShareholdingDetail)
 async def get_shareholding_detail(url: str = Query(..., description="Full Investegate TR-1/Holdings announcement URL")):
-    """Fetch a TR-1/Holdings announcement and return structured shareholding data."""
-    return await fetch_shareholding_detail(url)
+    """Fetch a TR-1/Holdings announcement and return structured shareholding data. Cached per URL."""
+    cache_key = f"sh:{url}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+    result = await fetch_shareholding_detail(url)
+    if result.error is None:
+        _cache_put(cache_key, result)
+    return result
 
 @app.post("/api/outreach", response_model=OutreachResponse)
 async def generate_outreach_emails(req: OutreachRequest):
