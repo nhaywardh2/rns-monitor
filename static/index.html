@@ -70,6 +70,7 @@
     @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.35} }
     @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
     @keyframes spin { to{transform:rotate(360deg)} }
+    @keyframes slideInLeft { from{transform:translateX(-100%)} to{transform:translateX(0)} }
     .fade-in { animation:fadeIn 0.18s ease-out both; }
     .fade-up { animation:fadeIn 0.22s ease-out both; }  /* legacy alias, kept for older components */
     .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-card-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:shimmer 1.8s ease-in-out infinite; }
@@ -93,7 +94,37 @@
 
     /* Layout grid */
     .layout { display:grid; grid-template-columns:var(--sidebar-w) 1fr; min-height:calc(100vh - var(--toolbar-h)); }
-    @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } .sidebar { display:none; } }
+
+    /* Mobile toolbar bits */
+    .toolbar-icon-btn { background:transparent; border:1px solid var(--border); color:var(--text-secondary); font-size:16px; line-height:1; padding:8px 11px; cursor:pointer; transition:all 0.15s; }
+    .toolbar-icon-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Mobile tab bar (under toolbar) */
+    .mobile-tabbar { position:sticky; top:var(--toolbar-h); z-index:45; display:flex; background:var(--bg-toolbar); border-bottom:1px solid var(--border); }
+    .mobile-tab { flex:1; text-align:center; padding:13px 8px; font-size:13px; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; }
+    .mobile-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    /* Scrim + drawer + overflow menu */
+    .scrim { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:90; animation:fadeIn 0.18s ease-out both; }
+    .scrim.clear { background:transparent; }
+    .drawer { position:fixed; top:0; bottom:0; left:0; width:min(86%,330px); background:var(--bg-sidebar); border-right:1px solid var(--border); z-index:91; display:flex; flex-direction:column; animation:slideInLeft 0.2s ease-out both; }
+    .drawer-head { padding:14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .drawer-head-title { font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-secondary); }
+    .drawer-body { flex:1; overflow-y:auto; padding:14px 12px; }
+    .overflow-menu { position:fixed; top:calc(var(--toolbar-h) + 4px); right:8px; width:230px; background:var(--bg-card); border:1px solid var(--border-strong); z-index:91; animation:fadeIn 0.14s ease-out both; }
+    .overflow-item { display:flex; align-items:center; justify-content:space-between; padding:14px; font-size:13px; color:var(--text-secondary); cursor:pointer; border-bottom:1px solid var(--border); }
+    .overflow-item:last-child { border-bottom:none; }
+    .overflow-item:active, .overflow-item:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+    .overflow-val { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+
+    /* Bigger touch targets inside the drawer (no hover on touch) */
+    .drawer .filter-row { padding:11px 8px; }
+    .drawer .sidebar-search { padding:11px 12px; font-size:14px; }
+    .drawer .filter-toggle-hide { opacity:1; padding:4px 8px; font-size:13px; }
+
+    @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+    /* Tighten side padding on small screens; allow grid to drop to one column naturally */
+    @media (max-width: 560px) { .main { padding:12px 12px 60px; } .toolbar { padding:0 10px; gap:8px; } }
 
     /* Sidebar */
     .sidebar { background:var(--bg-sidebar); border-right:1px solid var(--border); padding:14px 12px; overflow-y:auto; max-height:calc(100vh - var(--toolbar-h)); position:sticky; top:var(--toolbar-h); align-self:start; }
@@ -885,6 +916,21 @@
       const [excludedCats,setExcludedCats]=useState(new Set());
       const [sourceFilter,setSourceFilter]=useState("all"); // all | rns | nonreg
       const defaultsAppliedRef=useRef(false); // ensure we only pre-populate excludedCats once per session
+      // Responsive state
+      const [isMobile,setIsMobile]=useState(typeof window!=="undefined" && window.innerWidth<880);
+      const [drawerOpen,setDrawerOpen]=useState(false); // mobile filter drawer
+      const [menuOpen,setMenuOpen]=useState(false);      // mobile overflow menu
+      useEffect(()=>{
+        const onResize=()=>{ const m=window.innerWidth<880; setIsMobile(m); if(!m){setDrawerOpen(false);setMenuOpen(false);} };
+        window.addEventListener("resize",onResize);
+        return ()=>window.removeEventListener("resize",onResize);
+      },[]);
+      // Close mobile overlays on Escape
+      useEffect(()=>{
+        const onKey=(e)=>{ if(e.key==="Escape"){ if(menuOpen)setMenuOpen(false); else if(drawerOpen)setDrawerOpen(false); } };
+        window.addEventListener("keydown",onKey);
+        return ()=>window.removeEventListener("keydown",onKey);
+      },[menuOpen,drawerOpen]);
 
       const NONREG_SOURCES = ["GNW","UKN","PRN","MFN","EQS"];
       const toggleExcludeCat=(cat)=>{
@@ -967,102 +1013,150 @@
         </div>
       );
 
+      // Sidebar filter content — rendered inline (desktop) or inside the mobile drawer
+      const sidebarContent = (
+        <>
+          <div className="sidebar-section">
+            <input className="sidebar-search" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search ticker, company, headline..."/>
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-label">Tier</div>
+            <TierRow label="All" value="all" count={allAnns.length}/>
+            <TierRow label="Watchlist" value="watchlist" count={wlCount} dotColor="var(--watchlist)"/>
+            <TierRow label="Core" value="core" count={coreCount} dotColor="var(--core)"/>
+            <TierRow label="Read-across" value="read_across" count={raCount} dotColor="var(--readacross)"/>
+            <TierRow label="Sector relevant" value="sector" count={secCount} dotColor="var(--accent)"/>
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-label">Source</div>
+            <SourceRow label="All" value="all" count={allAnns.length}/>
+            <SourceRow label="RNS only" value="rns" count={rnsCount}/>
+            <SourceRow label="Non-Reg only" value="nonreg" count={nonregCount}/>
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-label"><span>Sort</span></div>
+            <div className={"filter-row" + (sortMode==="relevance"?" active":"")} onClick={()=>setSortMode("relevance")}>
+              <span className="filter-label">Relevance</span>
+            </div>
+            <div className={"filter-row" + (sortMode==="latest"?" active":"")} onClick={()=>setSortMode("latest")}>
+              <span className="filter-label">Latest first</span>
+            </div>
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-label">
+              <span>Categories</span>
+              {excludedCats.size>0 && <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={()=>setExcludedCats(new Set())}>show all</span>}
+            </div>
+            <div className={"filter-row" + (categoryFilter==="all"&&excludedCats.size===0?" active":"")} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}>
+              <span className="filter-label">All types</span>
+            </div>
+            {sortedCats.map(cat=>{
+              const isExcluded=excludedCats.has(cat);
+              const isActive=categoryFilter===cat;
+              const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
+              const cls = "filter-row" + (isActive?" active":"") + (isExcluded?" excluded":"");
+              return <div key={cat} className={cls}>
+                <span className="filter-label" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}} style={{flex:1}}>
+                  <span className="filter-dot" style={{background:catColor}}/>
+                  {cat}
+                </span>
+                <span className="filter-count" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}}>{catCounts[cat]}</span>
+                <span className="filter-toggle-hide" onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);if(categoryFilter===cat)setCategoryFilter("all");}} title={isExcluded?"Restore":"Hide"} style={isExcluded?{opacity:1,color:"var(--danger)"}:undefined}>
+                  {isExcluded ? "\u21BA" : "\u2715"}
+                </span>
+              </div>;
+            })}
+          </div>
+        </>
+      );
+
       return (
         <>
           {/* Top status toolbar */}
-          <div className="toolbar">
-            <span className="brand"><span>h2</span>Radnor</span>
-            <span className="toolbar-tag">RNS Monitor</span>
-            <button className={"toolbar-tab" + (tab==="feed"?" active":"")} onClick={()=>setTab("feed")}>Feed</button>
-            <button className={"toolbar-tab" + (tab==="readacross"?" active":"")} onClick={()=>setTab("readacross")}>Read-across</button>
-            <span className="toolbar-spacer"/>
-            <span className="toolbar-meta">
-              <StatusDot status={status}/>
-              {status==="connected"&&lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status}
-            </span>
-            <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>
-              {status==="loading"?"...":"Refresh"}
-            </button>
-            <button className={"toolbar-btn"} onClick={()=>setAutoRefresh(!autoRefresh)} style={autoRefresh?{borderColor:"var(--accent)",color:"var(--accent)"}:undefined}>
-              Auto {autoRefresh?"ON":"OFF"}
-            </button>
-            <button className="toolbar-btn" onClick={()=>setShowWatchlist(true)}>WL ({Object.keys(watchlist).length})</button>
-            <button className="toolbar-btn icon" onClick={()=>setConfigOpen(!configOpen)} title="Backend URL">&#9881;</button>
-          </div>
+          {!isMobile ? (
+            <div className="toolbar">
+              <span className="brand"><span>h2</span>Radnor</span>
+              <span className="toolbar-tag">RNS Monitor</span>
+              <button className={"toolbar-tab" + (tab==="feed"?" active":"")} onClick={()=>setTab("feed")}>Feed</button>
+              <button className={"toolbar-tab" + (tab==="readacross"?" active":"")} onClick={()=>setTab("readacross")}>Read-across</button>
+              <span className="toolbar-spacer"/>
+              <span className="toolbar-meta">
+                <StatusDot status={status}/>
+                {status==="connected"&&lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status}
+              </span>
+              <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>
+                {status==="loading"?"...":"Refresh"}
+              </button>
+              <button className={"toolbar-btn"} onClick={()=>setAutoRefresh(!autoRefresh)} style={autoRefresh?{borderColor:"var(--accent)",color:"var(--accent)"}:undefined}>
+                Auto {autoRefresh?"ON":"OFF"}
+              </button>
+              <button className="toolbar-btn" onClick={()=>setShowWatchlist(true)}>WL ({Object.keys(watchlist).length})</button>
+              <button className="toolbar-btn icon" onClick={()=>setConfigOpen(!configOpen)} title="Backend URL">&#9881;</button>
+            </div>
+          ) : (
+            <>
+              <div className="toolbar">
+                {tab==="feed" && <button className="toolbar-icon-btn" onClick={()=>setDrawerOpen(true)} title="Filters">&#9776;</button>}
+                <span className="brand"><span>h2</span>Radnor</span>
+                <span className="toolbar-spacer"/>
+                <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>{status==="loading"?"...":"Refresh"}</button>
+                <button className="toolbar-icon-btn" onClick={()=>setMenuOpen(!menuOpen)} title="More">&#8942;</button>
+              </div>
+              <div className="mobile-tabbar">
+                <button className={"mobile-tab" + (tab==="feed"?" active":"")} onClick={()=>setTab("feed")}>Feed</button>
+                <button className={"mobile-tab" + (tab==="readacross"?" active":"")} onClick={()=>setTab("readacross")}>Read-across</button>
+              </div>
+            </>
+          )}
+
+          {/* Mobile overflow menu */}
+          {isMobile && menuOpen && (
+            <>
+              <div className="scrim clear" onClick={()=>setMenuOpen(false)}/>
+              <div className="overflow-menu">
+                <div className="overflow-item" onClick={()=>{setAutoRefresh(!autoRefresh);}}>
+                  <span>Auto-refresh</span>
+                  <span className="overflow-val" style={autoRefresh?{color:"var(--accent)"}:undefined}>{autoRefresh?"ON":"OFF"}</span>
+                </div>
+                <div className="overflow-item" onClick={()=>{setShowWatchlist(true);setMenuOpen(false);}}>
+                  <span>Watchlist</span><span className="overflow-val">{Object.keys(watchlist).length}</span>
+                </div>
+                <div className="overflow-item" onClick={()=>{setConfigOpen(!configOpen);setMenuOpen(false);}}>
+                  <span>Backend URL</span><span className="overflow-val">&#9881;</span>
+                </div>
+              </div>
+            </>
+          )}
 
           {configOpen && (
-            <div style={{padding:"10px 16px",background:"var(--bg-sidebar)",borderBottom:"1px solid var(--border)",display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{padding:"10px 16px",background:"var(--bg-sidebar)",borderBottom:"1px solid var(--border)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
               <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Backend URL:</span>
-              <input value={backendUrl} onChange={e=>setBackendUrl(e.target.value)} style={{flex:1,maxWidth:400,background:"var(--bg-surface)",border:"1px solid var(--border)",padding:"5px 10px",color:"var(--text-primary)",fontFamily:"var(--font-mono)",fontSize:11,outline:"none"}}/>
+              <input value={backendUrl} onChange={e=>setBackendUrl(e.target.value)} style={{flex:1,minWidth:160,maxWidth:400,background:"var(--bg-surface)",border:"1px solid var(--border)",padding:"5px 10px",color:"var(--text-primary)",fontFamily:"var(--font-mono)",fontSize:11,outline:"none"}}/>
               <button className="toolbar-btn primary" onClick={()=>{fetchData();setConfigOpen(false);}}>Connect</button>
             </div>
           )}
 
+          {/* Mobile filter drawer */}
+          {isMobile && drawerOpen && tab==="feed" && (
+            <>
+              <div className="scrim" onClick={()=>setDrawerOpen(false)}/>
+              <div className="drawer">
+                <div className="drawer-head">
+                  <span className="drawer-head-title">Filters</span>
+                  <button className="toolbar-btn primary" onClick={()=>setDrawerOpen(false)}>Done</button>
+                </div>
+                <div className="drawer-body">{sidebarContent}</div>
+              </div>
+            </>
+          )}
+
           {/* Layout: sidebar + main */}
           <div className="layout">
-            {tab==="feed" && (
-              <aside className="sidebar">
-                <div className="sidebar-section">
-                  <input className="sidebar-search" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search ticker, company, headline..."/>
-                </div>
-
-                <div className="sidebar-section">
-                  <div className="sidebar-label">Tier</div>
-                  <TierRow label="All" value="all" count={allAnns.length}/>
-                  <TierRow label="Watchlist" value="watchlist" count={wlCount} dotColor="var(--watchlist)"/>
-                  <TierRow label="Core" value="core" count={coreCount} dotColor="var(--core)"/>
-                  <TierRow label="Read-across" value="read_across" count={raCount} dotColor="var(--readacross)"/>
-                  <TierRow label="Sector relevant" value="sector" count={secCount} dotColor="var(--accent)"/>
-                </div>
-
-                <div className="sidebar-section">
-                  <div className="sidebar-label">Source</div>
-                  <SourceRow label="All" value="all" count={allAnns.length}/>
-                  <SourceRow label="RNS only" value="rns" count={rnsCount}/>
-                  <SourceRow label="Non-Reg only" value="nonreg" count={nonregCount}/>
-                </div>
-
-                <div className="sidebar-section">
-                  <div className="sidebar-label">
-                    <span>Sort</span>
-                  </div>
-                  <div className={"filter-row" + (sortMode==="relevance"?" active":"")} onClick={()=>setSortMode("relevance")}>
-                    <span className="filter-label">Relevance</span>
-                  </div>
-                  <div className={"filter-row" + (sortMode==="latest"?" active":"")} onClick={()=>setSortMode("latest")}>
-                    <span className="filter-label">Latest first</span>
-                  </div>
-                </div>
-
-                <div className="sidebar-section">
-                  <div className="sidebar-label">
-                    <span>Categories</span>
-                    {excludedCats.size>0 && <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={()=>setExcludedCats(new Set())}>show all</span>}
-                  </div>
-                  <div className={"filter-row" + (categoryFilter==="all"&&excludedCats.size===0?" active":"")} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}>
-                    <span className="filter-label">All types</span>
-                  </div>
-                  {sortedCats.map(cat=>{
-                    const isExcluded=excludedCats.has(cat);
-                    const isActive=categoryFilter===cat;
-                    const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
-                    const cls = "filter-row" + (isActive?" active":"") + (isExcluded?" excluded":"");
-                    return <div key={cat} className={cls}>
-                      <span className="filter-label" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}} style={{flex:1}}>
-                        <span className="filter-dot" style={{background:catColor}}/>
-                        {cat}
-                      </span>
-                      <span className="filter-count" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}}>{catCounts[cat]}</span>
-                      <span className="filter-toggle-hide" onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);if(categoryFilter===cat)setCategoryFilter("all");}} title={isExcluded?"Restore":"Hide"} style={isExcluded?{opacity:1,color:"var(--danger)"}:undefined}>
-                        {isExcluded ? "\u21BA" : "\u2715"}
-                      </span>
-                    </div>;
-                  })}
-                </div>
-              </aside>
+            {tab==="feed" && !isMobile && (
+              <aside className="sidebar">{sidebarContent}</aside>
             )}
 
-            <main className="main" style={tab!=="feed"?{gridColumn:"1 / -1"}:undefined}>
+            <main className="main" style={(tab!=="feed"||isMobile)?{gridColumn:"1 / -1"}:undefined}>
               {tab==="readacross" && <ReadAcrossView backendUrl={backendUrl} refreshTick={lastRefresh ? lastRefresh.getTime() : 0}/>}
 
               {tab==="feed" && (
@@ -1073,6 +1167,12 @@
                       <span>/ {allAnns.length} total</span>
                       {wlCount>0 && <span style={{color:"var(--watchlist)"}}>{wlCount} watchlist</span>}
                       {excludedCats.size>0 && <span style={{color:"var(--danger)"}}>{excludedCats.size} categories hidden</span>}
+                      {isMobile && (
+                        <span style={{marginLeft:"auto",display:"flex",alignItems:"center"}}>
+                          <StatusDot status={status}/>
+                          {status==="connected"&&lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status}
+                        </span>
+                      )}
                     </div>
                   </div>
 
