@@ -162,6 +162,9 @@
     .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
     .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
     .row.watchlist:hover { background:rgba(240,192,64,0.10); }
+    /* Read rows: dimmed but fully legible. Hovering restores full strength so re-reading is easy. */
+    .row.read { opacity:0.5; }
+    .row.read:hover { opacity:1; }
     .row-meta { display:flex; align-items:center; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:nowrap; }
     .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
     .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
@@ -204,6 +207,35 @@
   <script type="text/babel">
     const { useState, useEffect, useCallback, useRef, useMemo } = React;
     const API_BASE = "";
+
+    // ── Read-state store ──────────────────────────────────────────────────────
+    // Tracks which announcements have been opened. Persists in the browser, keyed
+    // per day so it resets each morning in step with the daily feed. Read rows are
+    // dimmed but stay visible. Self-contained so any card can use it without prop threading.
+    const readStore = (() => {
+      const KEY = "rns_read_v1";
+      const today = new Date().toISOString().slice(0, 10);
+      let ids = new Set();
+      try {
+        const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
+        if (raw && raw.date === today && Array.isArray(raw.ids)) ids = new Set(raw.ids);
+      } catch (e) {}
+      const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ date: today, ids: [...ids] })); } catch (e) {} };
+      return {
+        keyFor: (ann) => ann.url || `${ann.ticker || ann.company}|${ann.headline}`,
+        has: (k) => ids.has(k),
+        mark: (k) => { if (!ids.has(k)) { ids.add(k); persist(); } },
+      };
+    })();
+
+    // ── Filter-preference store ──────────────────────────────────────────────
+    // Persists the user's view settings (tier, source, sort, category filter and
+    // hidden categories) in the browser so the feed opens the way they left it.
+    const prefsStore = {
+      KEY: "rns_prefs_v1",
+      load: () => { try { return JSON.parse(localStorage.getItem("rns_prefs_v1") || "null"); } catch (e) { return null; } },
+      save: (p) => { try { localStorage.setItem("rns_prefs_v1", JSON.stringify(p)); } catch (e) {} },
+    };
 
     const CATEGORY_COLORS = {
       "Results":          { color:"var(--results)",        bg:"rgba(91,168,247,0.10)" },
@@ -362,6 +394,8 @@
       const [shData, setShData] = useState(null);
       const [shLoading, setShLoading] = useState(false);
       const shFetched = useRef(false);
+      const readKey = readStore.keyFor(ann);
+      const [isRead, setIsRead] = useState(() => readStore.has(readKey));
 
       // Auto-fetch shareholding detail for Shareholding rows when expanded
       useEffect(() => {
@@ -393,7 +427,11 @@
       const toggleExpand = () => {
         const next = !expanded;
         setExpanded(next);
-        if (next && !detail) fetchDetail();
+        if (next) {
+          readStore.mark(readKey);
+          setIsRead(true);
+          if (!detail) fetchDetail();
+        }
       };
 
       const catColor = (CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"]);
@@ -401,6 +439,7 @@
       const rowClasses = ["row"];
       if (isWL) rowClasses.push("watchlist");
       if (expanded) rowClasses.push("expanded");
+      if (isRead && !expanded) rowClasses.push("read");
 
       return (
         <div className={rowClasses.join(" ") + " fade-in"}>
@@ -906,16 +945,19 @@
     }
 
     function App() {
+      // Restore saved view preferences (null on first ever visit)
+      const savedPrefs = useMemo(() => prefsStore.load(), []);
       const [data,setData]=useState(null);const [status,setStatus]=useState("idle");
-      const [filter,setFilter]=useState("all");const [categoryFilter,setCategoryFilter]=useState("all");
+      const [filter,setFilter]=useState(()=>savedPrefs?.filter ?? "all");const [categoryFilter,setCategoryFilter]=useState(()=>savedPrefs?.categoryFilter ?? "all");
       const [autoRefresh,setAutoRefresh]=useState(false);const [showWatchlist,setShowWatchlist]=useState(false);
       const [watchlist,setWatchlist]=useState({});const [lastRefresh,setLastRefresh]=useState(null);
       const [backendUrl,setBackendUrl]=useState(API_BASE);const [configOpen,setConfigOpen]=useState(false);
-      const [searchText,setSearchText]=useState("");const [sortMode,setSortMode]=useState("relevance");const intervalRef=useRef(null);
+      const [searchText,setSearchText]=useState("");const [sortMode,setSortMode]=useState(()=>savedPrefs?.sortMode ?? "relevance");const intervalRef=useRef(null);
       const [tab,setTab]=useState("feed");
-      const [excludedCats,setExcludedCats]=useState(new Set());
-      const [sourceFilter,setSourceFilter]=useState("all"); // all | rns | nonreg
-      const defaultsAppliedRef=useRef(false); // ensure we only pre-populate excludedCats once per session
+      const [excludedCats,setExcludedCats]=useState(()=>savedPrefs?.excludedCats ? new Set(savedPrefs.excludedCats) : new Set());
+      const [sourceFilter,setSourceFilter]=useState(()=>savedPrefs?.sourceFilter ?? "all"); // all | rns | nonreg
+      // If we restored saved prefs, skip the server-default category seeding so the user's choices win.
+      const defaultsAppliedRef=useRef(savedPrefs != null);
       // Responsive state
       const [isMobile,setIsMobile]=useState(typeof window!=="undefined" && window.innerWidth<880);
       const [drawerOpen,setDrawerOpen]=useState(false); // mobile filter drawer
@@ -931,6 +973,11 @@
         window.addEventListener("keydown",onKey);
         return ()=>window.removeEventListener("keydown",onKey);
       },[menuOpen,drawerOpen]);
+
+      // Persist view preferences whenever they change (search is intentionally not saved)
+      useEffect(()=>{
+        prefsStore.save({ filter, categoryFilter, sortMode, sourceFilter, excludedCats:[...excludedCats] });
+      },[filter,categoryFilter,sortMode,sourceFilter,excludedCats]);
 
       const NONREG_SOURCES = ["GNW","UKN","PRN","MFN","EQS"];
       const toggleExcludeCat=(cat)=>{
