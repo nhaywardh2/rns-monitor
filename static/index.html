@@ -6,7 +6,6 @@
   <title>h2Radnor · RNS Monitor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -201,1028 +200,2082 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect, useCallback, useRef } = React;
-    const API_BASE = "";
-
-    const CATEGORY_COLORS = {
-      "Results":          { color:"var(--results)",        bg:"rgba(91,168,247,0.10)" },
-      "Trading Update":   { color:"var(--trading)",        bg:"rgba(167,139,250,0.10)" },
-      "Company Update":   { color:"var(--company-update)", bg:"rgba(96,165,250,0.10)" },
-      "M&A":              { color:"var(--ma)",             bg:"rgba(249,112,102,0.10)" },
-      "Contract":         { color:"var(--contract)",       bg:"rgba(45,212,191,0.10)" },
-      "Fundraise":        { color:"var(--fundraise)",      bg:"rgba(52,211,153,0.10)" },
-      "Buyback":          { color:"#22d3ee",               bg:"rgba(34,211,238,0.10)" },
-      "Board Change":     { color:"var(--board-change)",   bg:"rgba(192,132,252,0.10)" },
-      "Director Dealing": { color:"var(--director)",       bg:"rgba(251,191,36,0.10)" },
-      "Shareholding":     { color:"#f472b6",               bg:"rgba(244,114,182,0.10)" },
-      "Regulatory":       { color:"var(--regulatory)",     bg:"rgba(251,146,60,0.10)" },
-      "Dividend":         { color:"var(--dividend)",       bg:"rgba(163,230,53,0.10)" },
-      "Non-Reg":          { color:"#38bdf8",               bg:"rgba(56,189,248,0.10)" },
-      "Admin":            { color:"#94a3b8",               bg:"rgba(148,163,184,0.10)" },
-      "Other":            { color:"var(--other)",          bg:"rgba(138,158,143,0.08)" },
-    };
-
-    function StatusDot({status}) {
-      const c = {connected:"var(--accent)",loading:"var(--watchlist)",error:"var(--danger)",idle:"var(--text-muted)"};
-      return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:c[status]||c.idle,animation:status==="loading"?"pulse-dot 1.2s infinite":"none",marginRight:8,flexShrink:0}}/>;
+  <script>
+/* Precompiled from index.src.html via Babel (preset-react). Edit the .src.html and recompile, not this. */
+const {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo
+} = React;
+const API_BASE = "";
+const CATEGORY_COLORS = {
+  "Results": {
+    color: "var(--results)",
+    bg: "rgba(91,168,247,0.10)"
+  },
+  "Trading Update": {
+    color: "var(--trading)",
+    bg: "rgba(167,139,250,0.10)"
+  },
+  "Company Update": {
+    color: "var(--company-update)",
+    bg: "rgba(96,165,250,0.10)"
+  },
+  "M&A": {
+    color: "var(--ma)",
+    bg: "rgba(249,112,102,0.10)"
+  },
+  "Contract": {
+    color: "var(--contract)",
+    bg: "rgba(45,212,191,0.10)"
+  },
+  "Fundraise": {
+    color: "var(--fundraise)",
+    bg: "rgba(52,211,153,0.10)"
+  },
+  "Buyback": {
+    color: "#22d3ee",
+    bg: "rgba(34,211,238,0.10)"
+  },
+  "Board Change": {
+    color: "var(--board-change)",
+    bg: "rgba(192,132,252,0.10)"
+  },
+  "Director Dealing": {
+    color: "var(--director)",
+    bg: "rgba(251,191,36,0.10)"
+  },
+  "Shareholding": {
+    color: "#f472b6",
+    bg: "rgba(244,114,182,0.10)"
+  },
+  "Regulatory": {
+    color: "var(--regulatory)",
+    bg: "rgba(251,146,60,0.10)"
+  },
+  "Dividend": {
+    color: "var(--dividend)",
+    bg: "rgba(163,230,53,0.10)"
+  },
+  "Non-Reg": {
+    color: "#38bdf8",
+    bg: "rgba(56,189,248,0.10)"
+  },
+  "Admin": {
+    color: "#94a3b8",
+    bg: "rgba(148,163,184,0.10)"
+  },
+  "Other": {
+    color: "var(--other)",
+    bg: "rgba(138,158,143,0.08)"
+  }
+};
+function StatusDot({
+  status
+}) {
+  const c = {
+    connected: "var(--accent)",
+    loading: "var(--watchlist)",
+    error: "var(--danger)",
+    idle: "var(--text-muted)"
+  };
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-block",
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: c[status] || c.idle,
+      animation: status === "loading" ? "pulse-dot 1.2s infinite" : "none",
+      marginRight: 8,
+      flexShrink: 0
     }
-
-    function FilterPill({label,active,onClick,count}) {
-      return <button onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 14px",border:`1px solid ${active?"var(--accent)":"var(--border)"}`,borderRadius:20,background:active?"var(--accent-glow)":"transparent",color:active?"var(--accent)":"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s",whiteSpace:"nowrap"}}>
-        {label}{count!==undefined&&<span style={{background:active?"var(--accent)":"var(--border)",color:active?"var(--bg-primary)":"var(--text-secondary)",fontSize:11,fontWeight:600,padding:"1px 7px",borderRadius:10,fontFamily:"var(--font-mono)"}}>{count}</span>}
-      </button>;
+  });
+}
+function FilterPill({
+  label,
+  active,
+  onClick,
+  count
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    onClick: onClick,
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+      borderRadius: 20,
+      background: active ? "var(--accent-glow)" : "transparent",
+      color: active ? "var(--accent)" : "var(--text-secondary)",
+      fontFamily: "var(--font-sans)",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer",
+      transition: "all 0.2s",
+      whiteSpace: "nowrap"
     }
-
-    function CategoryBadge({category}) {
-      const cat = CATEGORY_COLORS[category]||CATEGORY_COLORS["Other"];
-      return <span style={{padding:"2px 10px",borderRadius:12,background:cat.bg,color:cat.color,fontSize:11,fontWeight:600,letterSpacing:"0.03em",textTransform:"uppercase"}}>{category}</span>;
+  }, label, count !== undefined && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: active ? "var(--accent)" : "var(--border)",
+      color: active ? "var(--bg-primary)" : "var(--text-secondary)",
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "1px 7px",
+      borderRadius: 10,
+      fontFamily: "var(--font-mono)"
     }
-
-    // ── Shareholding Summary Strip ──
-    function ShareholdingStrip({data}) {
-      if (!data) return null;
-
-      // Check if structured data looks confident (both old and new pct present and different)
-      const confident = data.old_pct !== null && data.new_pct !== null
-        && data.old_pct !== data.new_pct && data.direction;
-      const dir = data.direction;
-      const dirColor = dir === "increase" ? "var(--accent)" : dir === "decrease" ? "var(--ma)" : "var(--text-muted)";
-      const arrow = dir === "increase" ? "\u25B2" : dir === "decrease" ? "\u25BC" : "";
-      const changePP = data.change_pp !== null && data.change_pp !== undefined
-        ? `${data.change_pp > 0 ? "+" : ""}${data.change_pp.toFixed(2)}pp` : "";
-
-      return (
-        <div style={{
-          marginTop:8, padding:"10px 16px",
-          background:"rgba(244,114,182,0.06)",
-          border:"1px solid rgba(244,114,182,0.12)",
-          borderRadius:8,
-        }}>
-          {/* Structured badges — only when confident */}
-          {confident && (
-            <div style={{display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom: data.summary ? 8 : 0}}>
-              {data.holder && <span style={{fontWeight:600, fontSize:13, color:"var(--text-primary)"}}>{data.holder}</span>}
-              <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--text-secondary)"}}>
-                {data.old_pct.toFixed(2)}%
-                <span style={{margin:"0 4px", color:"var(--text-muted)"}}>{"\u2192"}</span>
-                <span style={{color: dirColor, fontWeight:600}}>{data.new_pct.toFixed(2)}%</span>
-              </span>
-              {changePP && (
-                <span style={{
-                  display:"inline-flex", alignItems:"center", gap:3,
-                  padding:"2px 8px", borderRadius:10,
-                  background: dir === "increase" ? "rgba(61,184,106,0.12)" : dir === "decrease" ? "rgba(249,112,102,0.12)" : "rgba(138,158,143,0.08)",
-                  color: dirColor, fontSize:11, fontWeight:600, fontFamily:"var(--font-mono)",
-                }}>{arrow} {changePP}</span>
-              )}
-              {data.voting_rights && (
-                <span style={{fontSize:11, color:"var(--text-muted)", fontFamily:"var(--font-mono)"}}>{data.voting_rights} votes</span>
-              )}
-            </div>
-          )}
-          {/* Always show the AI summary text */}
-          {data.summary && (
-            <div style={{fontSize:12, color:"var(--text-secondary)", lineHeight:1.6}}>
-              {data.summary}
-            </div>
-          )}
-          {/* If no summary and no confident data, show what we have */}
-          {!data.summary && !confident && data.holder && (
-            <div style={{fontSize:12, color:"var(--text-secondary)"}}>
-              {data.holder}{data.new_pct !== null ? ` — ${data.new_pct.toFixed(2)}%` : ""}
-            </div>
-          )}
-        </div>
-      );
+  }, count));
+}
+function CategoryBadge({
+  category
+}) {
+  const cat = CATEGORY_COLORS[category] || CATEGORY_COLORS["Other"];
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      padding: "2px 10px",
+      borderRadius: 12,
+      background: cat.bg,
+      color: cat.color,
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: "0.03em",
+      textTransform: "uppercase"
     }
+  }, category);
+}
 
-    // ── Full Text Toggle ──
-    function FullTextToggle({text}) {
-      const [showFull, setShowFull] = useState(false);
-      if (!text || text === "Could not extract announcement body from the page.") return null;
+// ── Shareholding Summary Strip ──
+function ShareholdingStrip({
+  data
+}) {
+  if (!data) return null;
 
-      // Join broken lines into proper paragraphs
-      // Lines that don't end with a period/colon and are followed by a lowercase line = same paragraph
-      const buildParagraphs = (raw) => {
-        const lines = raw.split("\n").filter(l => l.trim());
-        const paragraphs = [];
-        let current = "";
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          if (!current) {
-            current = line;
-          } else {
-            // If previous line doesn't end with sentence-ending punctuation
-            // and current line starts with lowercase or continues mid-sentence, join them
-            const prevEnds = /[.!?:;"\u2019\u201D]$/.test(current);
-            const curStartsLower = /^[a-z]/.test(line);
-            if (!prevEnds || curStartsLower) {
-              current += " " + line;
-            } else {
-              paragraphs.push(current);
-              current = line;
-            }
-          }
+  // Check if structured data looks confident (both old and new pct present and different)
+  const confident = data.old_pct !== null && data.new_pct !== null && data.old_pct !== data.new_pct && data.direction;
+  const dir = data.direction;
+  const dirColor = dir === "increase" ? "var(--accent)" : dir === "decrease" ? "var(--ma)" : "var(--text-muted)";
+  const arrow = dir === "increase" ? "\u25B2" : dir === "decrease" ? "\u25BC" : "";
+  const changePP = data.change_pp !== null && data.change_pp !== undefined ? `${data.change_pp > 0 ? "+" : ""}${data.change_pp.toFixed(2)}pp` : "";
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      padding: "10px 16px",
+      background: "rgba(244,114,182,0.06)",
+      border: "1px solid rgba(244,114,182,0.12)",
+      borderRadius: 8
+    }
+  }, confident && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: data.summary ? 8 : 0
+    }
+  }, data.holder && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "var(--text-primary)"
+    }
+  }, data.holder), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 12,
+      color: "var(--text-secondary)"
+    }
+  }, data.old_pct.toFixed(2), "%", /*#__PURE__*/React.createElement("span", {
+    style: {
+      margin: "0 4px",
+      color: "var(--text-muted)"
+    }
+  }, "\u2192"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: dirColor,
+      fontWeight: 600
+    }
+  }, data.new_pct.toFixed(2), "%")), changePP && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 3,
+      padding: "2px 8px",
+      borderRadius: 10,
+      background: dir === "increase" ? "rgba(61,184,106,0.12)" : dir === "decrease" ? "rgba(249,112,102,0.12)" : "rgba(138,158,143,0.08)",
+      color: dirColor,
+      fontSize: 11,
+      fontWeight: 600,
+      fontFamily: "var(--font-mono)"
+    }
+  }, arrow, " ", changePP), data.voting_rights && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)",
+      fontFamily: "var(--font-mono)"
+    }
+  }, data.voting_rights, " votes")), data.summary && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-secondary)",
+      lineHeight: 1.6
+    }
+  }, data.summary), !data.summary && !confident && data.holder && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-secondary)"
+    }
+  }, data.holder, data.new_pct !== null ? ` — ${data.new_pct.toFixed(2)}%` : ""));
+}
+
+// ── Full Text Toggle ──
+function FullTextToggle({
+  text
+}) {
+  const [showFull, setShowFull] = useState(false);
+  if (!text || text === "Could not extract announcement body from the page.") return null;
+
+  // Join broken lines into proper paragraphs
+  // Lines that don't end with a period/colon and are followed by a lowercase line = same paragraph
+  const buildParagraphs = raw => {
+    const lines = raw.split("\n").filter(l => l.trim());
+    const paragraphs = [];
+    let current = "";
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      if (!current) {
+        current = line;
+      } else {
+        // If previous line doesn't end with sentence-ending punctuation
+        // and current line starts with lowercase or continues mid-sentence, join them
+        const prevEnds = /[.!?:;"\u2019\u201D]$/.test(current);
+        const curStartsLower = /^[a-z]/.test(line);
+        if (!prevEnds || curStartsLower) {
+          current += " " + line;
+        } else {
+          paragraphs.push(current);
+          current = line;
         }
-        if (current) paragraphs.push(current);
-        return paragraphs;
-      };
-
-      const paragraphs = buildParagraphs(text);
-
-      return (
-        <div style={{marginBottom:16}}>
-          <button onClick={(e)=>{e.stopPropagation();setShowFull(!showFull);}} style={{
-            display:"inline-flex",alignItems:"center",gap:6,
-            padding:"6px 14px",border:"1px solid var(--border)",borderRadius:8,
-            background:"transparent",color:"var(--text-secondary)",
-            fontFamily:"var(--font-sans)",fontSize:12,fontWeight:500,cursor:"pointer",
-            transition:"all 0.2s",marginBottom:showFull?10:0,
-          }}>
-            {showFull ? "Hide full announcement" : "Show full announcement"}
-            <span style={{fontSize:10,transition:"transform 0.2s",transform:showFull?"rotate(180deg)":"rotate(0)"}}>&#9660;</span>
-          </button>
-          {showFull && (
-            <div className="detail-body">
-              {paragraphs.map((p, i) => <p key={i} style={{margin:"0 0 10px 0"}}>{p}</p>)}
-            </div>
-          )}
-        </div>
-      );
+      }
     }
-
-    // ── Expandable Announcement Row — dense terminal style ──
-    function AnnouncementCard({ann, index, backendUrl, tier}) {
-      const [expanded, setExpanded] = useState(false);
-      const [detail, setDetail] = useState(null);
-      const [loading, setLoading] = useState(false);
-      const [error, setError] = useState(null);
-      const [shData, setShData] = useState(null);
-      const [shLoading, setShLoading] = useState(false);
-      const shFetched = useRef(false);
-
-      // Auto-fetch shareholding detail for Shareholding rows when expanded
-      useEffect(() => {
-        if (expanded && ann.category === "Shareholding" && ann.url && !shFetched.current) {
-          shFetched.current = true;
-          setShLoading(true);
-          fetch(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(json => { if (json && !json.error) setShData(json); })
-            .catch(() => {})
-            .finally(() => setShLoading(false));
-        }
-      }, [expanded, ann.category, ann.url, backendUrl]);
-
-      const fetchDetail = async () => {
-        if (!ann.url) return;
-        if (detail) return;
-        setLoading(true); setError(null);
-        try {
-          const resp = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
-          if (json.error) throw new Error(json.error);
-          setDetail(json);
-        } catch (err) { setError(err.message); }
-        finally { setLoading(false); }
-      };
-
-      const toggleExpand = () => {
-        const next = !expanded;
-        setExpanded(next);
-        if (next && !detail) fetchDetail();
-      };
-
-      const catColor = (CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"]);
-      const isWL = ann.is_watchlist;
-      const rowClasses = ["row"];
-      if (isWL) rowClasses.push("watchlist");
-      if (expanded) rowClasses.push("expanded");
-
-      return (
-        <div className={rowClasses.join(" ") + " fade-in"}>
-          <div onClick={toggleExpand}>
-            <div className="row-meta">
-              <span className="row-time">{ann.time}</span>
-              {ann.ticker && <span className={"row-ticker" + (isWL ? " watchlist" : "")}>{ann.ticker}</span>}
-              {tier === "core" && <span className="row-tag tier-core">CORE</span>}
-              {tier === "read_across" && <span className="row-tag tier-ra">R/A</span>}
-              <span className="row-category" style={{color: catColor.color, background: catColor.bg}}>{ann.category}</span>
-              {ann.source_feed && ann.source_feed !== "RNS" && <span className="row-source">{ann.source_feed}</span>}
-              <span className="row-spacer"/>
-              <span className="row-chevron">&#9660;</span>
-            </div>
-            <div className="row-company">{ann.company}</div>
-            <div className="row-headline">{ann.headline}</div>
-          </div>
-
-          {expanded && (
-            <div className="expand">
-              {loading && (
-                <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
-                  <span className="spinner"></span>
-                  <span style={{fontSize:11,color:"var(--text-muted)"}}>Fetching announcement...</span>
-                </div>
-              )}
-              {error && (
-                <div style={{padding:"8px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",marginBottom:10}}>
-                  Failed to load: {error}
-                </div>
-              )}
-              {ann.category === "Shareholding" && shLoading && (
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                  <span className="spinner" style={{width:11,height:11,borderWidth:1.5}}></span>
-                  <span style={{fontSize:10,color:"var(--text-muted)"}}>Loading shareholding data...</span>
-                </div>
-              )}
-              {ann.category === "Shareholding" && shData && <ShareholdingStrip data={shData} />}
-              {detail && !loading && (
-                <>
-                  {detail.ai_summary && (
-                    <div className="expand-section">
-                      <div className="expand-label">Summary</div>
-                      <div className="expand-summary">{detail.ai_summary}</div>
-                    </div>
-                  )}
-                  {detail.key_figures && detail.key_figures.length > 0 && (
-                    <div className="expand-section">
-                      <div className="expand-label">Key figures</div>
-                      {detail.key_figures.map((fig,i) => <span key={i} className="key-figure">{fig}</span>)}
-                    </div>
-                  )}
-                  <FullTextToggle text={detail.body_text} />
-                  <div style={{display:"flex",gap:8,alignItems:"center",paddingTop:8,borderTop:"1px solid var(--border)",marginTop:8}}>
-                    {ann.url && (
-                      <a href={ann.url} target="_blank" rel="noopener noreferrer" className="expand-link" onClick={e=>e.stopPropagation()}>
-                        View on Investegate &#8599;
-                      </a>
-                    )}
-                    <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginLeft:"auto"}}>
-                      {new Date(detail.fetched_at).toLocaleTimeString("en-GB")}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      );
+    if (current) paragraphs.push(current);
+    return paragraphs;
+  };
+  const paragraphs = buildParagraphs(text);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
     }
-
-    function SkeletonCard() {
-      return <div className="row" style={{cursor:"default"}}>
-        <div style={{display:"flex",gap:6,marginBottom:6}}>
-          <div className="skeleton" style={{width:36,height:11}}/>
-          <div className="skeleton" style={{width:32,height:11}}/>
-          <div className="skeleton" style={{width:64,height:11}}/>
-        </div>
-        <div className="skeleton" style={{width:"55%",height:11,marginBottom:5}}/>
-        <div className="skeleton" style={{width:"90%",height:13}}/>
-      </div>;
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      setShowFull(!showFull);
+    },
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      border: "1px solid var(--border)",
+      borderRadius: 8,
+      background: "transparent",
+      color: "var(--text-secondary)",
+      fontFamily: "var(--font-sans)",
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: "pointer",
+      transition: "all 0.2s",
+      marginBottom: showFull ? 10 : 0
     }
-
-    function WatchlistModal({watchlist,onClose,onAdd,onRemove}) {
-      const [ticker,setTicker]=useState("");const [name,setName]=useState("");const [sector,setSector]=useState("");
-      const is={background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:6,padding:"8px 12px",color:"var(--text-primary)",fontFamily:"var(--font-sans)",fontSize:13,outline:"none",width:"100%"};
-      return <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
-        <div onClick={e=>e.stopPropagation()} className="fade-up" style={{background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:14,padding:28,width:"100%",maxWidth:560,maxHeight:"80vh",overflow:"auto",margin:20}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-            <h2 style={{fontSize:18,fontWeight:600}}>Watchlist ({Object.keys(watchlist).length})</h2>
-            <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text-muted)",fontSize:20,cursor:"pointer"}}>&#10005;</button>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
-            {Object.entries(watchlist).map(([t,info])=><div key={t} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:8}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600,color:"var(--accent)",background:"var(--accent-glow)",padding:"2px 8px",borderRadius:4}}>{t}</span>
-                <span style={{fontSize:13,color:"var(--text-primary)"}}>{info.name}</span>
-                <span style={{fontSize:11,color:"var(--text-muted)"}}>{info.sector}</span>
-              </div>
-              <button onClick={()=>onRemove(t)} style={{background:"none",border:"none",color:"var(--text-muted)",cursor:"pointer",fontSize:14,padding:"2px 6px"}}
-                onMouseOver={e=>e.target.style.color="var(--danger)"} onMouseOut={e=>e.target.style.color="var(--text-muted)"}>&#10005;</button>
-            </div>)}
-          </div>
-          <div style={{borderTop:"1px solid var(--border)",paddingTop:16,display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontSize:13,fontWeight:500,color:"var(--text-secondary)",marginBottom:4}}>Add to watchlist</div>
-            <div style={{display:"flex",gap:8}}>
-              <input value={ticker} onChange={e=>setTicker(e.target.value)} placeholder="Ticker" style={{...is,maxWidth:90,fontFamily:"var(--font-mono)"}}/>
-              <input value={name} onChange={e=>setName(e.target.value)} placeholder="Company name" style={is}/>
-            </div>
-            <input value={sector} onChange={e=>setSector(e.target.value)} placeholder="Sector (optional)" style={is}/>
-            <button onClick={()=>{if(ticker&&name){onAdd(ticker.toUpperCase(),name,sector);setTicker("");setName("");setSector("");}}} disabled={!ticker||!name} style={{background:ticker&&name?"var(--accent)":"var(--border)",color:ticker&&name?"var(--bg-primary)":"var(--text-muted)",border:"none",borderRadius:8,padding:"10px 16px",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:600,cursor:ticker&&name?"pointer":"not-allowed"}}>Add company</button>
-          </div>
-        </div>
-      </div>;
+  }, showFull ? "Hide full announcement" : "Show full announcement", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      transition: "transform 0.2s",
+      transform: showFull ? "rotate(180deg)" : "rotate(0)"
     }
+  }, "\u25BC")), showFull && /*#__PURE__*/React.createElement("div", {
+    className: "detail-body"
+  }, paragraphs.map((p, i) => /*#__PURE__*/React.createElement("p", {
+    key: i,
+    style: {
+      margin: "0 0 10px 0"
+    }
+  }, p))));
+}
 
-    // ── Read-Across View ──
-    function ReadAcrossView({backendUrl, refreshTick}) {
-      const [raData, setRaData] = useState(null);
-      const [raLoading, setRaLoading] = useState(true);
-      const [raError, setRaError] = useState(null);
-      const [selectedCell, setSelectedCell] = useState(null);
-      const [typeFilter, setTypeFilter] = useState("ALL");
-      const [liveDetails, setLiveDetails] = useState({});
-      const [loadingDetail, setLoadingDetail] = useState(false);
-      const rowRefs = useRef({});
+// ── Expandable Announcement Row — dense terminal style ──
+function AnnouncementCard({
+  ann,
+  index,
+  backendUrl,
+  tier
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [shData, setShData] = useState(null);
+  const [shLoading, setShLoading] = useState(false);
+  const shFetched = useRef(false);
 
-      const fetchRA = useCallback(async () => {
-        setRaLoading(true);
-        try {
-          const r = await fetch(`${backendUrl}/api/readacross`);
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  // Auto-fetch shareholding detail for Shareholding rows when expanded
+  useEffect(() => {
+    if (expanded && ann.category === "Shareholding" && ann.url && !shFetched.current) {
+      shFetched.current = true;
+      setShLoading(true);
+      fetch(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`).then(r => r.ok ? r.json() : null).then(json => {
+        if (json && !json.error) setShData(json);
+      }).catch(() => {}).finally(() => setShLoading(false));
+    }
+  }, [expanded, ann.category, ann.url, backendUrl]);
+  const fetchDetail = async () => {
+    if (!ann.url) return;
+    if (detail) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if (json.error) throw new Error(json.error);
+      setDetail(json);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const toggleExpand = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && !detail) fetchDetail();
+  };
+  const catColor = CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"];
+  const isWL = ann.is_watchlist;
+  const rowClasses = ["row"];
+  if (isWL) rowClasses.push("watchlist");
+  if (expanded) rowClasses.push("expanded");
+  return /*#__PURE__*/React.createElement("div", {
+    className: rowClasses.join(" ") + " fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: toggleExpand
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker" + (isWL ? " watchlist" : "")
+  }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-core"
+  }, "CORE"), tier === "read_across" && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-ra"
+  }, "R/A"), /*#__PURE__*/React.createElement("span", {
+    className: "row-category",
+    style: {
+      color: catColor.color,
+      background: catColor.bg
+    }
+  }, ann.category), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
+    className: "row-source"
+  }, ann.source_feed), /*#__PURE__*/React.createElement("span", {
+    className: "row-spacer"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "row-chevron"
+  }, "\u25BC")), /*#__PURE__*/React.createElement("div", {
+    className: "row-company"
+  }, ann.company), /*#__PURE__*/React.createElement("div", {
+    className: "row-headline"
+  }, ann.headline)), expanded && /*#__PURE__*/React.createElement("div", {
+    className: "expand"
+  }, loading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "spinner"
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)"
+    }
+  }, "Fetching announcement...")), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 10px",
+      background: "rgba(239,68,68,0.06)",
+      border: "1px solid rgba(239,68,68,0.18)",
+      fontSize: 11,
+      color: "var(--danger)",
+      marginBottom: 10
+    }
+  }, "Failed to load: ", error), ann.category === "Shareholding" && shLoading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "spinner",
+    style: {
+      width: 11,
+      height: 11,
+      borderWidth: 1.5
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)"
+    }
+  }, "Loading shareholding data...")), ann.category === "Shareholding" && shData && /*#__PURE__*/React.createElement(ShareholdingStrip, {
+    data: shData
+  }), detail && !loading && /*#__PURE__*/React.createElement(React.Fragment, null, detail.ai_summary && /*#__PURE__*/React.createElement("div", {
+    className: "expand-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand-label"
+  }, "Summary"), /*#__PURE__*/React.createElement("div", {
+    className: "expand-summary"
+  }, detail.ai_summary)), detail.key_figures && detail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "expand-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand-label"
+  }, "Key figures"), detail.key_figures.map((fig, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "key-figure"
+  }, fig))), /*#__PURE__*/React.createElement(FullTextToggle, {
+    text: detail.body_text
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      paddingTop: 8,
+      borderTop: "1px solid var(--border)",
+      marginTop: 8
+    }
+  }, ann.url && /*#__PURE__*/React.createElement("a", {
+    href: ann.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "expand-link",
+    onClick: e => e.stopPropagation()
+  }, "View on Investegate \u2197"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)",
+      fontFamily: "var(--font-mono)",
+      marginLeft: "auto"
+    }
+  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))))));
+}
+function SkeletonCard() {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      cursor: "default"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: 36,
+      height: 11
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: 32,
+      height: 11
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: 64,
+      height: 11
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: "55%",
+      height: 11,
+      marginBottom: 5
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: "90%",
+      height: 13
+    }
+  }));
+}
+function WatchlistModal({
+  watchlist,
+  onClose,
+  onAdd,
+  onRemove
+}) {
+  const [ticker, setTicker] = useState("");
+  const [name, setName] = useState("");
+  const [sector, setSector] = useState("");
+  const is = {
+    background: "var(--bg-surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    padding: "8px 12px",
+    color: "var(--text-primary)",
+    fontFamily: "var(--font-sans)",
+    fontSize: 13,
+    outline: "none",
+    width: "100%"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 1000,
+      background: "rgba(0,0,0,0.7)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      backdropFilter: "blur(4px)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "fade-up",
+    style: {
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 14,
+      padding: 28,
+      width: "100%",
+      maxWidth: 560,
+      maxHeight: "80vh",
+      overflow: "auto",
+      margin: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontSize: 18,
+      fontWeight: 600
+    }
+  }, "Watchlist (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "none",
+      color: "var(--text-muted)",
+      fontSize: 20,
+      cursor: "pointer"
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      marginBottom: 20
+    }
+  }, Object.entries(watchlist).map(([t, info]) => /*#__PURE__*/React.createElement("div", {
+    key: t,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "8px 12px",
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 12,
+      fontWeight: 600,
+      color: "var(--accent)",
+      background: "var(--accent-glow)",
+      padding: "2px 8px",
+      borderRadius: 4
+    }
+  }, t), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--text-primary)"
+    }
+  }, info.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)"
+    }
+  }, info.sector)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onRemove(t),
+    style: {
+      background: "none",
+      border: "none",
+      color: "var(--text-muted)",
+      cursor: "pointer",
+      fontSize: 14,
+      padding: "2px 6px"
+    },
+    onMouseOver: e => e.target.style.color = "var(--danger)",
+    onMouseOut: e => e.target.style.color = "var(--text-muted)"
+  }, "\u2715")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid var(--border)",
+      paddingTop: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "var(--text-secondary)",
+      marginBottom: 4
+    }
+  }, "Add to watchlist"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: ticker,
+    onChange: e => setTicker(e.target.value),
+    placeholder: "Ticker",
+    style: {
+      ...is,
+      maxWidth: 90,
+      fontFamily: "var(--font-mono)"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: name,
+    onChange: e => setName(e.target.value),
+    placeholder: "Company name",
+    style: is
+  })), /*#__PURE__*/React.createElement("input", {
+    value: sector,
+    onChange: e => setSector(e.target.value),
+    placeholder: "Sector (optional)",
+    style: is
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (ticker && name) {
+        onAdd(ticker.toUpperCase(), name, sector);
+        setTicker("");
+        setName("");
+        setSector("");
+      }
+    },
+    disabled: !ticker || !name,
+    style: {
+      background: ticker && name ? "var(--accent)" : "var(--border)",
+      color: ticker && name ? "var(--bg-primary)" : "var(--text-muted)",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px 16px",
+      fontFamily: "var(--font-sans)",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: ticker && name ? "pointer" : "not-allowed"
+    }
+  }, "Add company"))));
+}
+
+// ── Read-Across View ──
+function ReadAcrossView({
+  backendUrl,
+  refreshTick
+}) {
+  const [raData, setRaData] = useState(null);
+  const [raLoading, setRaLoading] = useState(true);
+  const [raError, setRaError] = useState(null);
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [liveDetails, setLiveDetails] = useState({});
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const rowRefs = useRef({});
+  const fetchRA = useCallback(async () => {
+    setRaLoading(true);
+    try {
+      const r = await fetch(`${backendUrl}/api/readacross`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setRaData(j);
+      setRaError(null);
+    } catch (e) {
+      setRaError(e.message);
+    } finally {
+      setRaLoading(false);
+    }
+  }, [backendUrl]);
+  useEffect(() => {
+    fetchRA();
+  }, [fetchRA, refreshTick]);
+  if (raLoading && !raData) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 10
+      }
+    }, [0, 1, 2].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
+      key: i,
+      index: i
+    })));
+  }
+  if (raError && !raData) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 20,
+        background: "rgba(239,68,68,0.08)",
+        border: "1px solid rgba(239,68,68,0.2)",
+        borderRadius: 8,
+        color: "var(--danger)"
+      }
+    }, "Failed to load read-across: ", raError);
+  }
+  if (!raData) return null;
+  const {
+    matrix,
+    rel_types: RT,
+    core,
+    read_across,
+    triggered
+  } = raData;
+  const activeCoreSet = new Set();
+  Object.values(matrix).forEach(row => {
+    Object.keys(row).forEach(t => activeCoreSet.add(t));
+  });
+  const activeCore = core.filter(c => activeCoreSet.has(c.ticker));
+  const inactiveCore = core.filter(c => !activeCoreSet.has(c.ticker));
+  const filterMatch = rel => typeFilter === "ALL" || rel.type === typeFilter;
+  const triggerCount = Object.keys(triggered).length;
+  const isTriggered = ticker => triggered[ticker] && triggered[ticker].length > 0;
+  const handleCellClick = async (ra_ticker, core_ticker) => {
+    const rel = matrix[ra_ticker]?.[core_ticker];
+    if (!rel) return;
+    const key = `${ra_ticker}-${core_ticker}`;
+    if (selectedCell === key) {
+      setSelectedCell(null);
+      return;
+    }
+    setSelectedCell(key);
+    const anns = triggered[ra_ticker] || [];
+    if (anns.length > 0 && anns[0].url && !liveDetails[anns[0].url]) {
+      setLoadingDetail(true);
+      try {
+        const r = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(anns[0].url)}`);
+        if (r.ok) {
           const j = await r.json();
-          setRaData(j);
-          setRaError(null);
-        } catch (e) {
-          setRaError(e.message);
-        } finally {
-          setRaLoading(false);
+          setLiveDetails(prev => ({
+            ...prev,
+            [anns[0].url]: j
+          }));
         }
-      }, [backendUrl]);
-
-      useEffect(() => { fetchRA(); }, [fetchRA, refreshTick]);
-
-      if (raLoading && !raData) {
-        return <div style={{display:"flex",flexDirection:"column",gap:10}}>{[0,1,2].map(i=><SkeletonCard key={i} index={i}/>)}</div>;
+      } catch {} finally {
+        setLoadingDetail(false);
       }
-      if (raError && !raData) {
-        return <div style={{padding:20,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,color:"var(--danger)"}}>Failed to load read-across: {raError}</div>;
+    }
+  };
+  const scrollToRow = ra_ticker => {
+    const el = rowRefs.current[ra_ticker];
+    if (el) el.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fade-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20,
+      padding: "14px 18px",
+      background: triggerCount > 0 ? "rgba(240,192,64,0.08)" : "var(--bg-card)",
+      border: `1px solid ${triggerCount > 0 ? "rgba(240,192,64,0.25)" : "var(--border)"}`,
+      borderRadius: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: triggerCount > 0 ? 12 : 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)",
+      animation: triggerCount > 0 ? "pulse-dot 1.5s infinite" : "none"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)"
+    }
+  }, triggerCount === 0 ? "No live read-across triggers yet today" : `${triggerCount} live read-across ${triggerCount === 1 ? "trigger" : "triggers"} today`)), triggerCount > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, Object.entries(triggered).map(([ra_ticker, anns]) => {
+    const raCompany = read_across.find(r => r.ticker === ra_ticker);
+    const affectedCores = Object.keys(matrix[ra_ticker] || {});
+    return /*#__PURE__*/React.createElement("div", {
+      key: ra_ticker,
+      onClick: () => scrollToRow(ra_ticker),
+      style: {
+        padding: "10px 14px",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        cursor: "pointer",
+        transition: "all 0.15s"
+      },
+      onMouseOver: e => {
+        e.currentTarget.style.borderColor = "var(--watchlist)";
+      },
+      onMouseOut: e => {
+        e.currentTarget.style.borderColor = "var(--border)";
       }
-      if (!raData) return null;
-
-      const {matrix, rel_types: RT, core, read_across, triggered} = raData;
-
-      const activeCoreSet = new Set();
-      Object.values(matrix).forEach(row => { Object.keys(row).forEach(t => activeCoreSet.add(t)); });
-      const activeCore = core.filter(c => activeCoreSet.has(c.ticker));
-      const inactiveCore = core.filter(c => !activeCoreSet.has(c.ticker));
-
-      const filterMatch = (rel) => typeFilter === "ALL" || rel.type === typeFilter;
-      const triggerCount = Object.keys(triggered).length;
-      const isTriggered = (ticker) => triggered[ticker] && triggered[ticker].length > 0;
-
-      const handleCellClick = async (ra_ticker, core_ticker) => {
-        const rel = matrix[ra_ticker]?.[core_ticker];
-        if (!rel) return;
-        const key = `${ra_ticker}-${core_ticker}`;
-        if (selectedCell === key) { setSelectedCell(null); return; }
-        setSelectedCell(key);
-        const anns = triggered[ra_ticker] || [];
-        if (anns.length > 0 && anns[0].url && !liveDetails[anns[0].url]) {
-          setLoadingDetail(true);
-          try {
-            const r = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(anns[0].url)}`);
-            if (r.ok) {
-              const j = await r.json();
-              setLiveDetails(prev => ({...prev, [anns[0].url]: j}));
-            }
-          } catch {} finally { setLoadingDetail(false); }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        fontWeight: 700,
+        color: "var(--watchlist)",
+        background: "rgba(240,192,64,0.1)",
+        padding: "2px 6px",
+        borderRadius: 4
+      }
+    }, ra_ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: "var(--text-primary)"
+      }
+    }, raCompany?.name || ra_ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        fontSize: 11,
+        color: "var(--text-muted)",
+        fontFamily: "var(--font-mono)"
+      }
+    }, anns[0].time)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-secondary)",
+        marginBottom: 6
+      }
+    }, anns.slice(0, 3).map((a, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        marginBottom: 4,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement(CategoryBadge, {
+      category: a.category
+    }), /*#__PURE__*/React.createElement("span", null, a.headline))), anns.length > 3 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-muted)",
+        marginTop: 4
+      }
+    }, "+ ", anns.length - 3, " more")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-muted)"
+      }
+    }, "Reads across to ", affectedCores.length, " core ", affectedCores.length === 1 ? "company" : "companies", ": ", affectedCores.join(", ")));
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 16,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(FilterPill, {
+    label: "All types",
+    active: typeFilter === "ALL",
+    onClick: () => setTypeFilter("ALL")
+  }), Object.entries(RT).map(([k, r]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setTypeFilter(k),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      borderRadius: 20,
+      border: `1px solid ${typeFilter === k ? r.border : "var(--border)"}`,
+      background: typeFilter === k ? r.bg : "transparent",
+      color: typeFilter === k ? r.color : "var(--text-secondary)",
+      fontFamily: "var(--font-sans)",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 14,
+      height: 14,
+      borderRadius: 3,
+      background: r.bg,
+      border: `1px solid ${r.border}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: r.color,
+      fontFamily: "var(--font-mono)"
+    }
+  }, r.short)), r.label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: "collapse",
+      minWidth: "100%",
+      fontSize: 11
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      background: "var(--bg-surface)"
+    }
+  }, /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: "12px 14px",
+      textAlign: "left",
+      borderBottom: "1px solid var(--border)",
+      borderRight: "1px solid var(--border)",
+      position: "sticky",
+      left: 0,
+      background: "var(--bg-surface)",
+      zIndex: 2,
+      minWidth: 180
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: "var(--text-muted)"
+    }
+  }, "Read-across \u2193  Core \u2192")), activeCore.map(c => /*#__PURE__*/React.createElement("th", {
+    key: c.ticker,
+    title: `${c.name} · ${c.sector}`,
+    style: {
+      padding: "10px 8px",
+      borderBottom: "1px solid var(--border)",
+      borderRight: "1px solid var(--border)",
+      minWidth: 64,
+      background: "var(--bg-surface)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 10,
+      fontWeight: 700,
+      color: "var(--accent)",
+      letterSpacing: "0.04em"
+    }
+  }, c.ticker), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "var(--text-muted)",
+      marginTop: 2,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      maxWidth: 56
+    }
+  }, c.sector.split(" / ")[0]))))), /*#__PURE__*/React.createElement("tbody", null, read_across.map((ra, ri) => {
+    const rowData = matrix[ra.ticker] || {};
+    const triggered_here = isTriggered(ra.ticker);
+    const rowBg = triggered_here ? "rgba(240,192,64,0.05)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+    const stickyBg = triggered_here ? "rgba(240,192,64,0.08)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+    return /*#__PURE__*/React.createElement("tr", {
+      key: ra.ticker,
+      ref: el => rowRefs.current[ra.ticker] = el,
+      style: {
+        background: rowBg
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "10px 14px",
+        borderRight: "1px solid var(--border)",
+        borderBottom: "1px solid var(--border)",
+        position: "sticky",
+        left: 0,
+        zIndex: 1,
+        background: stickyBg,
+        borderLeft: triggered_here ? "3px solid var(--watchlist)" : "3px solid transparent"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        fontWeight: 700,
+        color: triggered_here ? "var(--watchlist)" : "var(--accent)",
+        background: triggered_here ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+        padding: "2px 6px",
+        borderRadius: 4
+      }
+    }, ra.ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-primary)"
+      }
+    }, ra.name), triggered_here && /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: "var(--watchlist)",
+        color: "var(--bg-primary)",
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        animation: "pulse-dot 2s infinite"
+      }
+    }, "LIVE")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--text-muted)",
+        marginTop: 2,
+        paddingLeft: 2
+      }
+    }, ra.sector)), activeCore.map(c => {
+      const rel = rowData[c.ticker];
+      const cellKey = `${ra.ticker}-${c.ticker}`;
+      const isSelected = selectedCell === cellKey;
+      const visible = rel && filterMatch(rel);
+      const r = visible ? RT[rel.type] : null;
+      return /*#__PURE__*/React.createElement("td", {
+        key: c.ticker,
+        style: {
+          padding: "6px 8px",
+          textAlign: "center",
+          borderRight: "1px solid var(--border)",
+          borderBottom: "1px solid var(--border)",
+          cursor: visible ? "pointer" : "default",
+          background: isSelected ? "rgba(61,184,106,0.12)" : "transparent",
+          transition: "background 0.15s"
+        },
+        onClick: () => handleCellClick(ra.ticker, c.ticker)
+      }, visible && r && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 3
         }
-      };
-
-      const scrollToRow = (ra_ticker) => {
-        const el = rowRefs.current[ra_ticker];
-        if (el) el.scrollIntoView({behavior:"smooth", block:"center"});
-      };
-
-      return (
-        <div className="fade-up">
-          {/* Alert strip */}
-          <div style={{
-            marginBottom:20, padding:"14px 18px",
-            background: triggerCount > 0 ? "rgba(240,192,64,0.08)" : "var(--bg-card)",
-            border: `1px solid ${triggerCount > 0 ? "rgba(240,192,64,0.25)" : "var(--border)"}`,
-            borderRadius:10,
-          }}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom: triggerCount > 0 ? 12 : 0}}>
-              <div style={{
-                width:8, height:8, borderRadius:"50%",
-                background: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)",
-                animation: triggerCount > 0 ? "pulse-dot 1.5s infinite" : "none",
-              }}/>
-              <span style={{fontSize:13, fontWeight:600, color: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)"}}>
-                {triggerCount === 0
-                  ? "No live read-across triggers yet today"
-                  : `${triggerCount} live read-across ${triggerCount === 1 ? "trigger" : "triggers"} today`}
-              </span>
-            </div>
-            {triggerCount > 0 && (
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {Object.entries(triggered).map(([ra_ticker, anns]) => {
-                  const raCompany = read_across.find(r => r.ticker === ra_ticker);
-                  const affectedCores = Object.keys(matrix[ra_ticker] || {});
-                  return (
-                    <div key={ra_ticker} onClick={() => scrollToRow(ra_ticker)} style={{
-                      padding:"10px 14px", background:"var(--bg-surface)",
-                      border:"1px solid var(--border)", borderRadius:8,
-                      cursor:"pointer", transition:"all 0.15s",
-                    }}
-                      onMouseOver={e=>{e.currentTarget.style.borderColor="var(--watchlist)"}}
-                      onMouseOut={e=>{e.currentTarget.style.borderColor="var(--border)"}}
-                    >
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-                        <span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,color:"var(--watchlist)",background:"rgba(240,192,64,0.1)",padding:"2px 6px",borderRadius:4}}>{ra_ticker}</span>
-                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>{raCompany?.name || ra_ticker}</span>
-                        <span style={{marginLeft:"auto",fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{anns[0].time}</span>
-                      </div>
-                      <div style={{fontSize:12,color:"var(--text-secondary)",marginBottom:6}}>
-                        {anns.slice(0,3).map((a,i)=>(
-                          <div key={i} style={{marginBottom:4,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                            <CategoryBadge category={a.category}/>
-                            <span>{a.headline}</span>
-                          </div>
-                        ))}
-                        {anns.length > 3 && <div style={{fontSize:11,color:"var(--text-muted)",marginTop:4}}>+ {anns.length - 3} more</div>}
-                      </div>
-                      <div style={{fontSize:11,color:"var(--text-muted)"}}>
-                        Reads across to {affectedCores.length} core {affectedCores.length === 1 ? "company" : "companies"}: {affectedCores.join(", ")}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Relationship type filters */}
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
-            <FilterPill label="All types" active={typeFilter==="ALL"} onClick={()=>setTypeFilter("ALL")}/>
-            {Object.entries(RT).map(([k,r]) => (
-              <button key={k} onClick={()=>setTypeFilter(k)} style={{
-                display:"inline-flex",alignItems:"center",gap:6,
-                padding:"6px 14px",borderRadius:20,
-                border:`1px solid ${typeFilter===k ? r.border : "var(--border)"}`,
-                background: typeFilter===k ? r.bg : "transparent",
-                color: typeFilter===k ? r.color : "var(--text-secondary)",
-                fontFamily:"var(--font-sans)",fontSize:13,fontWeight:500,cursor:"pointer",
-              }}>
-                <div style={{width:14,height:14,borderRadius:3,background:r.bg,border:`1px solid ${r.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <span style={{fontSize:8,fontWeight:700,color:r.color,fontFamily:"var(--font-mono)"}}>{r.short}</span>
-                </div>
-                {r.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Matrix grid */}
-          <div style={{overflowX:"auto",borderRadius:12,border:"1px solid var(--border)",marginBottom:16}}>
-            <table style={{borderCollapse:"collapse",minWidth:"100%",fontSize:11}}>
-              <thead>
-                <tr style={{background:"var(--bg-surface)"}}>
-                  <th style={{
-                    padding:"12px 14px",textAlign:"left",
-                    borderBottom:"1px solid var(--border)",borderRight:"1px solid var(--border)",
-                    position:"sticky",left:0,background:"var(--bg-surface)",zIndex:2,minWidth:180,
-                  }}>
-                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)"}}>Read-across &#8595;  Core &#8594;</div>
-                  </th>
-                  {activeCore.map(c => (
-                    <th key={c.ticker} title={`${c.name} · ${c.sector}`} style={{
-                      padding:"10px 8px",borderBottom:"1px solid var(--border)",borderRight:"1px solid var(--border)",
-                      minWidth:64,background:"var(--bg-surface)",
-                    }}>
-                      <div style={{fontFamily:"var(--font-mono)",fontSize:10,fontWeight:700,color:"var(--accent)",letterSpacing:"0.04em"}}>{c.ticker}</div>
-                      <div style={{fontSize:9,color:"var(--text-muted)",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:56}}>{c.sector.split(" / ")[0]}</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {read_across.map((ra, ri) => {
-                  const rowData = matrix[ra.ticker] || {};
-                  const triggered_here = isTriggered(ra.ticker);
-                  const rowBg = triggered_here ? "rgba(240,192,64,0.05)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
-                  const stickyBg = triggered_here ? "rgba(240,192,64,0.08)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
-                  return (
-                    <tr key={ra.ticker} ref={el => rowRefs.current[ra.ticker] = el} style={{background: rowBg}}>
-                      <td style={{
-                        padding:"10px 14px",borderRight:"1px solid var(--border)",
-                        borderBottom:"1px solid var(--border)",position:"sticky",left:0,zIndex:1,
-                        background: stickyBg,
-                        borderLeft: triggered_here ? "3px solid var(--watchlist)" : "3px solid transparent",
-                      }}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                          <span style={{
-                            fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,
-                            color: triggered_here ? "var(--watchlist)" : "var(--accent)",
-                            background: triggered_here ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
-                            padding:"2px 6px",borderRadius:4,
-                          }}>{ra.ticker}</span>
-                          <span style={{fontSize:11,color:"var(--text-primary)"}}>{ra.name}</span>
-                          {triggered_here && (
-                            <span style={{
-                              padding:"1px 6px",borderRadius:4,
-                              background:"var(--watchlist)",color:"var(--bg-primary)",
-                              fontSize:9,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",
-                              animation:"pulse-dot 2s infinite",
-                            }}>LIVE</span>
-                          )}
-                        </div>
-                        <div style={{fontSize:10,color:"var(--text-muted)",marginTop:2,paddingLeft:2}}>{ra.sector}</div>
-                      </td>
-                      {activeCore.map(c => {
-                        const rel = rowData[c.ticker];
-                        const cellKey = `${ra.ticker}-${c.ticker}`;
-                        const isSelected = selectedCell === cellKey;
-                        const visible = rel && filterMatch(rel);
-                        const r = visible ? RT[rel.type] : null;
-                        return (
-                          <td key={c.ticker} style={{
-                            padding:"6px 8px",textAlign:"center",
-                            borderRight:"1px solid var(--border)",borderBottom:"1px solid var(--border)",
-                            cursor: visible ? "pointer" : "default",
-                            background: isSelected ? "rgba(61,184,106,0.12)" : "transparent",
-                            transition:"background 0.15s",
-                          }} onClick={()=>handleCellClick(ra.ticker, c.ticker)}>
-                            {visible && r && (
-                              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                                <div style={{
-                                  width:26,height:26,borderRadius:6,
-                                  background: triggered_here ? r.bg : (isSelected ? r.bg : "rgba(255,255,255,0.03)"),
-                                  border: `1px solid ${triggered_here ? r.border : (isSelected ? r.border : "rgba(255,255,255,0.06)")}`,
-                                  display:"flex",alignItems:"center",justifyContent:"center",
-                                  boxShadow: triggered_here ? `0 0 10px ${r.bg}` : "none",
-                                  transition:"all 0.15s",
-                                }}>
-                                  <span style={{fontSize:10,fontWeight:700,color:r.color,fontFamily:"var(--font-mono)"}}>{r.short}</span>
-                                </div>
-                                <div style={{display:"flex",gap:1.5}}>
-                                  {[1,2,3].map(s => (
-                                    <div key={s} style={{
-                                      width:4,height:4,borderRadius:"50%",
-                                      background: s <= rel.strength ? r.color : "var(--border)",
-                                      opacity: s <= rel.strength ? 1 : 0.5,
-                                    }}/>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Legend */}
-          <div style={{display:"flex",gap:16,marginBottom:24,flexWrap:"wrap",fontSize:11,color:"var(--text-muted)",alignItems:"center"}}>
-            {Object.entries(RT).map(([k,r]) => (
-              <div key={k} style={{display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:16,height:16,borderRadius:4,background:r.bg,border:`1px solid ${r.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <span style={{fontSize:8,fontWeight:700,color:r.color,fontFamily:"var(--font-mono)"}}>{r.short}</span>
-                </div>
-                <span>{r.label}</span>
-              </div>
-            ))}
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{display:"flex",gap:2}}>
-                {[1,2,3].map(s => <div key={s} style={{width:5,height:5,borderRadius:"50%",background:"var(--accent)",opacity:0.3+s*0.23}}/>)}
-              </div>
-              <span>Strength (1 to 3)</span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:12,height:12,borderRadius:3,background:"rgba(240,192,64,0.15)",border:"1px solid rgba(240,192,64,0.4)"}}/>
-              <span>Live trigger today</span>
-            </div>
-          </div>
-
-          {/* Selected cell detail */}
-          {selectedCell && (() => {
-            const [ra_ticker, core_ticker] = selectedCell.split("-");
-            const rel = matrix[ra_ticker]?.[core_ticker];
-            if (!rel) return null;
-            const ra = read_across.find(r => r.ticker === ra_ticker);
-            const coreComp = core.find(c => c.ticker === core_ticker);
-            const r = RT[rel.type];
-            const liveAnns = triggered[ra_ticker] || [];
-            const topAnn = liveAnns[0];
-            const liveDetail = topAnn ? liveDetails[topAnn.url] : null;
-
-            return (
-              <div className="fade-up" style={{
-                marginBottom:24, padding:"18px 22px",
-                background:"var(--bg-card)",
-                border:`1px solid ${liveAnns.length > 0 ? "rgba(240,192,64,0.3)" : r.border}`,
-                borderRadius:12,
-              }}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-                  <span style={{
-                    fontFamily:"var(--font-mono)",fontSize:12,fontWeight:700,
-                    color: liveAnns.length > 0 ? "var(--watchlist)" : "var(--accent)",
-                    background: liveAnns.length > 0 ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
-                    padding:"3px 8px",borderRadius:5,
-                  }}>{ra.ticker}</span>
-                  <span style={{fontSize:13,color:"var(--text-primary)",fontWeight:500}}>{ra.name}</span>
-                  <span style={{color:"var(--text-muted)"}}>&#8594;</span>
-                  <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:700,color:"var(--accent)",background:"var(--accent-glow)",padding:"3px 8px",borderRadius:5}}>{coreComp.ticker}</span>
-                  <span style={{fontSize:13,color:"var(--text-primary)",fontWeight:500}}>{coreComp.name}</span>
-                  <span style={{padding:"3px 10px",borderRadius:10,background:r.bg,border:`1px solid ${r.border}`,color:r.color,fontSize:11,fontWeight:700}}>{r.label}</span>
-                  <div style={{display:"flex",gap:3,alignItems:"center"}}>
-                    {[1,2,3].map(s => <div key={s} style={{width:6,height:6,borderRadius:"50%",background: s <= rel.strength ? r.color : "var(--border)"}}/>)}
-                  </div>
-                </div>
-
-                <div style={{marginBottom: liveAnns.length > 0 ? 18 : 0}}>
-                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",marginBottom:8}}>Read-across rationale</div>
-                  <p style={{fontSize:13,color:"var(--text-primary)",lineHeight:1.7}}>{rel.note}</p>
-                </div>
-
-                {liveAnns.length > 0 && (
-                  <div style={{paddingTop:16, borderTop:"1px dashed rgba(240,192,64,0.3)"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:"var(--watchlist)",animation:"pulse-dot 1.5s infinite"}}/>
-                      <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--watchlist)"}}>Live today · {liveAnns.length} announcement{liveAnns.length === 1 ? "" : "s"} from {ra.ticker}</span>
-                    </div>
-                    {liveAnns.map((ann, i) => (
-                      <div key={i} style={{
-                        padding:"12px 14px",
-                        background:"var(--bg-surface)",
-                        border:"1px solid var(--border)",
-                        borderRadius:8,
-                        marginBottom: i < liveAnns.length - 1 ? 8 : 0,
-                      }}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
-                          <span style={{fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)"}}>{ann.time}</span>
-                          <CategoryBadge category={ann.category}/>
-                          {ann.source_feed && ann.source_feed !== "RNS" && <span style={{padding:"1px 6px",borderRadius:3,fontSize:9,fontFamily:"var(--font-mono)",color:"var(--text-muted)",border:"1px solid var(--border)"}}>{ann.source_feed}</span>}
-                        </div>
-                        <div style={{fontSize:13,color:"var(--text-primary)",fontWeight:500,marginBottom:6}}>{ann.headline}</div>
-                        {i === 0 && loadingDetail && (
-                          <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
-                            <span className="spinner" style={{width:12,height:12,borderWidth:1.5}}></span>
-                            <span style={{fontSize:11,color:"var(--text-muted)"}}>Loading summary...</span>
-                          </div>
-                        )}
-                        {i === 0 && liveDetail && liveDetail.ai_summary && (
-                          <div style={{marginTop:8,padding:"10px 12px",background:"var(--bg-primary)",borderRadius:6,border:"1px solid var(--border)"}}>
-                            <div style={{fontSize:10,fontWeight:700,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Summary</div>
-                            <div style={{fontSize:12,color:"var(--text-secondary)",lineHeight:1.6}}>{liveDetail.ai_summary}</div>
-                          </div>
-                        )}
-                        {i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && (
-                          <div style={{marginTop:8}}>
-                            <div style={{fontSize:10,fontWeight:700,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Key figures</div>
-                            {liveDetail.key_figures.slice(0,5).map((fig, j) => <div key={j} className="key-figure" style={{margin:"0 0 4px 0",fontSize:11}}>{fig}</div>)}
-                          </div>
-                        )}
-                        {ann.url && (
-                          <a href={ann.url} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{
-                            display:"inline-block",marginTop:10,
-                            fontSize:11,color:"var(--accent)",textDecoration:"none",
-                          }}>View full announcement &#8599;</a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Inactive core companies */}
-          {inactiveCore.length > 0 && (
-            <div style={{padding:"14px 18px",background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:10}}>
-              <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",marginBottom:8}}>Core companies with no current read-across mapping</div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-                {inactiveCore.map(c => (
-                  <span key={c.ticker} title={`${c.name} · ${c.sector}`} style={{
-                    fontFamily:"var(--font-mono)",fontSize:10,fontWeight:600,
-                    color:"var(--text-muted)",background:"var(--bg-surface)",
-                    padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",
-                  }}>{c.ticker}</span>
-                ))}
-              </div>
-              <div style={{fontSize:10,color:"var(--text-muted)"}}>No current read-across company maps to these directly.</div>
-            </div>
-          )}
-        </div>
-      );
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 26,
+          height: 26,
+          borderRadius: 6,
+          background: triggered_here ? r.bg : isSelected ? r.bg : "rgba(255,255,255,0.03)",
+          border: `1px solid ${triggered_here ? r.border : isSelected ? r.border : "rgba(255,255,255,0.06)"}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: triggered_here ? `0 0 10px ${r.bg}` : "none",
+          transition: "all 0.15s"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          fontWeight: 700,
+          color: r.color,
+          fontFamily: "var(--font-mono)"
+        }
+      }, r.short)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 1.5
+        }
+      }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+        key: s,
+        style: {
+          width: 4,
+          height: 4,
+          borderRadius: "50%",
+          background: s <= rel.strength ? r.color : "var(--border)",
+          opacity: s <= rel.strength ? 1 : 0.5
+        }
+      })))));
+    }));
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 16,
+      marginBottom: 24,
+      flexWrap: "wrap",
+      fontSize: 11,
+      color: "var(--text-muted)",
+      alignItems: "center"
     }
-
-    function App() {
-      const [data,setData]=useState(null);const [status,setStatus]=useState("idle");
-      const [filter,setFilter]=useState("all");const [categoryFilter,setCategoryFilter]=useState("all");
-      const [autoRefresh,setAutoRefresh]=useState(false);const [showWatchlist,setShowWatchlist]=useState(false);
-      const [watchlist,setWatchlist]=useState({});const [lastRefresh,setLastRefresh]=useState(null);
-      const [backendUrl,setBackendUrl]=useState(API_BASE);const [configOpen,setConfigOpen]=useState(false);
-      const [searchText,setSearchText]=useState("");const [sortMode,setSortMode]=useState("relevance");const intervalRef=useRef(null);
-      const [tab,setTab]=useState("feed");
-      const [excludedCats,setExcludedCats]=useState(new Set());
-      const [sourceFilter,setSourceFilter]=useState("all"); // all | rns | nonreg
-      const defaultsAppliedRef=useRef(false); // ensure we only pre-populate excludedCats once per session
-      // Responsive state
-      const [isMobile,setIsMobile]=useState(typeof window!=="undefined" && window.innerWidth<880);
-      const [drawerOpen,setDrawerOpen]=useState(false); // mobile filter drawer
-      const [menuOpen,setMenuOpen]=useState(false);      // mobile overflow menu
-      useEffect(()=>{
-        const onResize=()=>{ const m=window.innerWidth<880; setIsMobile(m); if(!m){setDrawerOpen(false);setMenuOpen(false);} };
-        window.addEventListener("resize",onResize);
-        return ()=>window.removeEventListener("resize",onResize);
-      },[]);
-      // Close mobile overlays on Escape
-      useEffect(()=>{
-        const onKey=(e)=>{ if(e.key==="Escape"){ if(menuOpen)setMenuOpen(false); else if(drawerOpen)setDrawerOpen(false); } };
-        window.addEventListener("keydown",onKey);
-        return ()=>window.removeEventListener("keydown",onKey);
-      },[menuOpen,drawerOpen]);
-
-      const NONREG_SOURCES = ["GNW","UKN","PRN","MFN","EQS"];
-      const toggleExcludeCat=(cat)=>{
-        setExcludedCats(prev=>{
-          const next=new Set(prev);
-          if(next.has(cat))next.delete(cat); else next.add(cat);
-          return next;
-        });
-      };
-
-      const fetchData=useCallback(async()=>{
-        setStatus("loading");
-        try{const r=await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000`);if(!r.ok)throw new Error(`HTTP ${r.status}`);
-          const j=await r.json();setData(j);setStatus("connected");setLastRefresh(new Date());
-          // First-load only: pre-populate excludedCats with the categories the server suggests
-          // hiding by default (Fundraise, Buyback, Director Dealing, Shareholding, Admin, Dividend).
-          // After this, the user is in full control — refreshes won't reset their choices.
-          if(!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)){
-            setExcludedCats(new Set(j.default_hidden_categories));
-            defaultsAppliedRef.current=true;
-          }
-        }catch(e){console.error(e);setStatus("error");}
-      },[backendUrl]);
-
-      const fetchWatchlist=useCallback(async()=>{
-        try{const r=await fetch(`${backendUrl}/api/watchlist`);if(r.ok){const j=await r.json();setWatchlist(j.watchlist||{});}}catch{}
-      },[backendUrl]);
-
-      useEffect(()=>{fetchData();fetchWatchlist();},[fetchData,fetchWatchlist]);
-      useEffect(()=>{if(autoRefresh)intervalRef.current=setInterval(fetchData,120000);return()=>{if(intervalRef.current)clearInterval(intervalRef.current);};},[autoRefresh,fetchData]);
-
-      const handleAdd=async(t,n,s)=>{try{await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}`,{method:"POST"});fetchWatchlist();}catch{}};
-      const handleRemove=async(t)=>{try{await fetch(`${backendUrl}/api/watchlist/${t}`,{method:"DELETE"});fetchWatchlist();}catch{}};
-
-      let anns=data?.announcements||[];
-      if(filter==="watchlist")anns=anns.filter(a=>a.is_watchlist);
-      else if(filter==="core")anns=anns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="core");
-      else if(filter==="read_across")anns=anns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="read_across");
-      else if(filter==="sector")anns=anns.filter(a=>a.sector_relevant);
-      if(categoryFilter!=="all")anns=anns.filter(a=>a.category===categoryFilter);
-      // No watchlist override on excluded categories — if a category is hidden, it stays hidden
-      // regardless of whether the company is on the watchlist. User can re-enable via the pill.
-      if(excludedCats.size>0)anns=anns.filter(a=>!excludedCats.has(a.category));
-      if(sourceFilter==="rns")anns=anns.filter(a=>!a.source_feed||a.source_feed==="RNS");
-      else if(sourceFilter==="nonreg")anns=anns.filter(a=>NONREG_SOURCES.includes(a.source_feed));
-      if(searchText){const q=searchText.toLowerCase();anns=anns.filter(a=>a.company.toLowerCase().includes(q)||a.headline.toLowerCase().includes(q)||(a.ticker||"").toLowerCase().includes(q));}
-
-      // Sort: relevance (default from backend) or latest-first by time
-      if(sortMode==="latest"){
-        anns=[...anns].sort((a,b)=>{
-          if(a.time>b.time)return -1;
-          if(a.time<b.time)return 1;
-          return 0;
-        });
+  }, Object.entries(RT).map(([k, r]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+      background: r.bg,
+      border: `1px solid ${r.border}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: r.color,
+      fontFamily: "var(--font-mono)"
+    }
+  }, r.short)), /*#__PURE__*/React.createElement("span", null, r.label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 2
+    }
+  }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+    key: s,
+    style: {
+      width: 5,
+      height: 5,
+      borderRadius: "50%",
+      background: "var(--accent)",
+      opacity: 0.3 + s * 0.23
+    }
+  }))), /*#__PURE__*/React.createElement("span", null, "Strength (1 to 3)")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 12,
+      height: 12,
+      borderRadius: 3,
+      background: "rgba(240,192,64,0.15)",
+      border: "1px solid rgba(240,192,64,0.4)"
+    }
+  }), /*#__PURE__*/React.createElement("span", null, "Live trigger today"))), selectedCell && (() => {
+    const [ra_ticker, core_ticker] = selectedCell.split("-");
+    const rel = matrix[ra_ticker]?.[core_ticker];
+    if (!rel) return null;
+    const ra = read_across.find(r => r.ticker === ra_ticker);
+    const coreComp = core.find(c => c.ticker === core_ticker);
+    const r = RT[rel.type];
+    const liveAnns = triggered[ra_ticker] || [];
+    const topAnn = liveAnns[0];
+    const liveDetail = topAnn ? liveDetails[topAnn.url] : null;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "fade-up",
+      style: {
+        marginBottom: 24,
+        padding: "18px 22px",
+        background: "var(--bg-card)",
+        border: `1px solid ${liveAnns.length > 0 ? "rgba(240,192,64,0.3)" : r.border}`,
+        borderRadius: 12
       }
-
-      const allAnns=data?.announcements||[];
-      const wlCount=allAnns.filter(a=>a.is_watchlist).length;
-      const coreCount=allAnns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="core").length;
-      const raCount=allAnns.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="read_across").length;
-      const secCount=allAnns.filter(a=>a.sector_relevant).length;
-      const rnsCount=allAnns.filter(a=>!a.source_feed||a.source_feed==="RNS").length;
-      const nonregCount=allAnns.filter(a=>NONREG_SOURCES.includes(a.source_feed)).length;
-      const catCounts={};allAnns.forEach(a=>{catCounts[a.category]=(catCounts[a.category]||0)+1;});
-      const sortedCats=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).map(([c])=>c);
-
-      const tierFor = (ticker) => watchlist[ticker]?.tier;
-
-      // Sidebar filter helpers
-      const TierRow = ({label, value, count, dotColor}) => (
-        <div className={"filter-row" + (filter===value ? " active" : "")} onClick={()=>setFilter(value)}>
-          <span className="filter-label">{dotColor && <span className="filter-dot" style={{background:dotColor}}/>}{label}</span>
-          <span className="filter-count">{count}</span>
-        </div>
-      );
-      const SourceRow = ({label, value, count}) => (
-        <div className={"filter-row" + (sourceFilter===value ? " active" : "")} onClick={()=>setSourceFilter(value)}>
-          <span className="filter-label">{label}</span>
-          <span className="filter-count">{count}</span>
-        </div>
-      );
-
-      // Sidebar filter content — rendered inline (desktop) or inside the mobile drawer
-      const sidebarContent = (
-        <>
-          <div className="sidebar-section">
-            <input className="sidebar-search" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search ticker, company, headline..."/>
-          </div>
-          <div className="sidebar-section">
-            <div className="sidebar-label">Tier</div>
-            <TierRow label="All" value="all" count={allAnns.length}/>
-            <TierRow label="Watchlist" value="watchlist" count={wlCount} dotColor="var(--watchlist)"/>
-            <TierRow label="Core" value="core" count={coreCount} dotColor="var(--core)"/>
-            <TierRow label="Read-across" value="read_across" count={raCount} dotColor="var(--readacross)"/>
-            <TierRow label="Sector relevant" value="sector" count={secCount} dotColor="var(--accent)"/>
-          </div>
-          <div className="sidebar-section">
-            <div className="sidebar-label">Source</div>
-            <SourceRow label="All" value="all" count={allAnns.length}/>
-            <SourceRow label="RNS only" value="rns" count={rnsCount}/>
-            <SourceRow label="Non-Reg only" value="nonreg" count={nonregCount}/>
-          </div>
-          <div className="sidebar-section">
-            <div className="sidebar-label"><span>Sort</span></div>
-            <div className={"filter-row" + (sortMode==="relevance"?" active":"")} onClick={()=>setSortMode("relevance")}>
-              <span className="filter-label">Relevance</span>
-            </div>
-            <div className={"filter-row" + (sortMode==="latest"?" active":"")} onClick={()=>setSortMode("latest")}>
-              <span className="filter-label">Latest first</span>
-            </div>
-          </div>
-          <div className="sidebar-section">
-            <div className="sidebar-label">
-              <span>Categories</span>
-              {excludedCats.size>0 && <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={()=>setExcludedCats(new Set())}>show all</span>}
-            </div>
-            <div className={"filter-row" + (categoryFilter==="all"&&excludedCats.size===0?" active":"")} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}>
-              <span className="filter-label">All types</span>
-            </div>
-            {sortedCats.map(cat=>{
-              const isExcluded=excludedCats.has(cat);
-              const isActive=categoryFilter===cat;
-              const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
-              const cls = "filter-row" + (isActive?" active":"") + (isExcluded?" excluded":"");
-              return <div key={cat} className={cls}>
-                <span className="filter-label" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}} style={{flex:1}}>
-                  <span className="filter-dot" style={{background:catColor}}/>
-                  {cat}
-                </span>
-                <span className="filter-count" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}}>{catCounts[cat]}</span>
-                <span className="filter-toggle-hide" onClick={(e)=>{e.stopPropagation();toggleExcludeCat(cat);if(categoryFilter===cat)setCategoryFilter("all");}} title={isExcluded?"Restore":"Hide"} style={isExcluded?{opacity:1,color:"var(--danger)"}:undefined}>
-                  {isExcluded ? "\u21BA" : "\u2715"}
-                </span>
-              </div>;
-            })}
-          </div>
-        </>
-      );
-
-      return (
-        <>
-          {/* Top status toolbar */}
-          {!isMobile ? (
-            <div className="toolbar">
-              <span className="brand"><span>h2</span>Radnor</span>
-              <span className="toolbar-tag">RNS Monitor</span>
-              <button className={"toolbar-tab" + (tab==="feed"?" active":"")} onClick={()=>setTab("feed")}>Feed</button>
-              <button className={"toolbar-tab" + (tab==="readacross"?" active":"")} onClick={()=>setTab("readacross")}>Read-across</button>
-              <span className="toolbar-spacer"/>
-              <span className="toolbar-meta">
-                <StatusDot status={status}/>
-                {status==="connected"&&lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status}
-              </span>
-              <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>
-                {status==="loading"?"...":"Refresh"}
-              </button>
-              <button className={"toolbar-btn"} onClick={()=>setAutoRefresh(!autoRefresh)} style={autoRefresh?{borderColor:"var(--accent)",color:"var(--accent)"}:undefined}>
-                Auto {autoRefresh?"ON":"OFF"}
-              </button>
-              <button className="toolbar-btn" onClick={()=>setShowWatchlist(true)}>WL ({Object.keys(watchlist).length})</button>
-              <button className="toolbar-btn icon" onClick={()=>setConfigOpen(!configOpen)} title="Backend URL">&#9881;</button>
-            </div>
-          ) : (
-            <>
-              <div className="toolbar">
-                {tab==="feed" && <button className="toolbar-icon-btn" onClick={()=>setDrawerOpen(true)} title="Filters">&#9776;</button>}
-                <span className="brand"><span>h2</span>Radnor</span>
-                <span className="toolbar-spacer"/>
-                <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>{status==="loading"?"...":"Refresh"}</button>
-                <button className="toolbar-icon-btn" onClick={()=>setMenuOpen(!menuOpen)} title="More">&#8942;</button>
-              </div>
-              <div className="mobile-tabbar">
-                <button className={"mobile-tab" + (tab==="feed"?" active":"")} onClick={()=>setTab("feed")}>Feed</button>
-                <button className={"mobile-tab" + (tab==="readacross"?" active":"")} onClick={()=>setTab("readacross")}>Read-across</button>
-              </div>
-            </>
-          )}
-
-          {/* Mobile overflow menu */}
-          {isMobile && menuOpen && (
-            <>
-              <div className="scrim clear" onClick={()=>setMenuOpen(false)}/>
-              <div className="overflow-menu">
-                <div className="overflow-item" onClick={()=>{setAutoRefresh(!autoRefresh);}}>
-                  <span>Auto-refresh</span>
-                  <span className="overflow-val" style={autoRefresh?{color:"var(--accent)"}:undefined}>{autoRefresh?"ON":"OFF"}</span>
-                </div>
-                <div className="overflow-item" onClick={()=>{setShowWatchlist(true);setMenuOpen(false);}}>
-                  <span>Watchlist</span><span className="overflow-val">{Object.keys(watchlist).length}</span>
-                </div>
-                <div className="overflow-item" onClick={()=>{setConfigOpen(!configOpen);setMenuOpen(false);}}>
-                  <span>Backend URL</span><span className="overflow-val">&#9881;</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {configOpen && (
-            <div style={{padding:"10px 16px",background:"var(--bg-sidebar)",borderBottom:"1px solid var(--border)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Backend URL:</span>
-              <input value={backendUrl} onChange={e=>setBackendUrl(e.target.value)} style={{flex:1,minWidth:160,maxWidth:400,background:"var(--bg-surface)",border:"1px solid var(--border)",padding:"5px 10px",color:"var(--text-primary)",fontFamily:"var(--font-mono)",fontSize:11,outline:"none"}}/>
-              <button className="toolbar-btn primary" onClick={()=>{fetchData();setConfigOpen(false);}}>Connect</button>
-            </div>
-          )}
-
-          {/* Mobile filter drawer */}
-          {isMobile && drawerOpen && tab==="feed" && (
-            <>
-              <div className="scrim" onClick={()=>setDrawerOpen(false)}/>
-              <div className="drawer">
-                <div className="drawer-head">
-                  <span className="drawer-head-title">Filters</span>
-                  <button className="toolbar-btn primary" onClick={()=>setDrawerOpen(false)}>Done</button>
-                </div>
-                <div className="drawer-body">{sidebarContent}</div>
-              </div>
-            </>
-          )}
-
-          {/* Layout: sidebar + main */}
-          <div className="layout">
-            {tab==="feed" && !isMobile && (
-              <aside className="sidebar">{sidebarContent}</aside>
-            )}
-
-            <main className="main" style={(tab!=="feed"||isMobile)?{gridColumn:"1 / -1"}:undefined}>
-              {tab==="readacross" && <ReadAcrossView backendUrl={backendUrl} refreshTick={lastRefresh ? lastRefresh.getTime() : 0}/>}
-
-              {tab==="feed" && (
-                <>
-                  <div className="feed-header">
-                    <div className="feed-counts">
-                      <span><strong>{anns.length}</strong> showing</span>
-                      <span>/ {allAnns.length} total</span>
-                      {wlCount>0 && <span style={{color:"var(--watchlist)"}}>{wlCount} watchlist</span>}
-                      {excludedCats.size>0 && <span style={{color:"var(--danger)"}}>{excludedCats.size} categories hidden</span>}
-                      {isMobile && (
-                        <span style={{marginLeft:"auto",display:"flex",alignItems:"center"}}>
-                          <StatusDot status={status}/>
-                          {status==="connected"&&lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {data?.errors?.length>0 && (
-                    <div style={{marginBottom:10,padding:"6px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",fontFamily:"var(--font-mono)"}}>
-                      {data.errors.length} scrape error{data.errors.length===1?"":"s"}: {data.errors.slice(0,3).map(e=>e.split(":")[0]).join(", ")}{data.errors.length>3?` +${data.errors.length-3} more`:""}
-                    </div>
-                  )}
-
-                  {status==="error"&&!data && (
-                    <div className="empty">
-                      <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:"var(--text-primary)"}}>Can't reach the backend</div>
-                      <div style={{fontSize:11}}>Check <code style={{fontFamily:"var(--font-mono)",color:"var(--accent)"}}>{backendUrl}</code> is running.</div>
-                    </div>
-                  )}
-
-                  {status==="loading"&&!data && (
-                    <div className="grid">{[0,1,2,3,4,5,6,7].map(i=><SkeletonCard key={i}/>)}</div>
-                  )}
-
-                  {anns.length>0 && (
-                    <div className="grid">
-                      {anns.map((a,i) => (
-                        <AnnouncementCard
-                          key={`${a.company}-${a.headline}-${i}`}
-                          ann={a}
-                          index={i}
-                          backendUrl={backendUrl}
-                          tier={tierFor(a.ticker)}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {data && anns.length===0 && (
-                    <div className="empty">
-                      <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:"var(--text-primary)"}}>Nothing matches</div>
-                      <div style={{fontSize:11}}>Broaden the filters or unhide categories in the sidebar.</div>
-                    </div>
-                  )}
-                </>
-              )}
-            </main>
-          </div>
-
-          {showWatchlist && <WatchlistModal watchlist={watchlist} onClose={()=>setShowWatchlist(false)} onAdd={handleAdd} onRemove={handleRemove}/>}
-        </>
-      );
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 14,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        fontWeight: 700,
+        color: liveAnns.length > 0 ? "var(--watchlist)" : "var(--accent)",
+        background: liveAnns.length > 0 ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+        padding: "3px 8px",
+        borderRadius: 5
+      }
+    }, ra.ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        fontWeight: 500
+      }
+    }, ra.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--text-muted)"
+      }
+    }, "\u2192"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        fontWeight: 700,
+        color: "var(--accent)",
+        background: "var(--accent-glow)",
+        padding: "3px 8px",
+        borderRadius: 5
+      }
+    }, coreComp.ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        fontWeight: 500
+      }
+    }, coreComp.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: "3px 10px",
+        borderRadius: 10,
+        background: r.bg,
+        border: `1px solid ${r.border}`,
+        color: r.color,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, r.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 3,
+        alignItems: "center"
+      }
+    }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+      key: s,
+      style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: s <= rel.strength ? r.color : "var(--border)"
+      }
+    })))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: liveAnns.length > 0 ? 18 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "var(--text-muted)",
+        marginBottom: 8
+      }
+    }, "Read-across rationale"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        lineHeight: 1.7
+      }
+    }, rel.note)), liveAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        paddingTop: 16,
+        borderTop: "1px dashed rgba(240,192,64,0.3)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: "var(--watchlist)",
+        animation: "pulse-dot 1.5s infinite"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "var(--watchlist)"
+      }
+    }, "Live today \xB7 ", liveAnns.length, " announcement", liveAnns.length === 1 ? "" : "s", " from ", ra.ticker)), liveAnns.map((ann, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        padding: "12px 14px",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        marginBottom: i < liveAnns.length - 1 ? 8 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        color: "var(--text-muted)"
+      }
+    }, ann.time), /*#__PURE__*/React.createElement(CategoryBadge, {
+      category: ann.category
+    }), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: "1px 6px",
+        borderRadius: 3,
+        fontSize: 9,
+        fontFamily: "var(--font-mono)",
+        color: "var(--text-muted)",
+        border: "1px solid var(--border)"
+      }
+    }, ann.source_feed)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        fontWeight: 500,
+        marginBottom: 6
+      }
+    }, ann.headline), i === 0 && loadingDetail && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 0"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "spinner",
+      style: {
+        width: 12,
+        height: 12,
+        borderWidth: 1.5
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-muted)"
+      }
+    }, "Loading summary...")), i === 0 && liveDetail && liveDetail.ai_summary && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        padding: "10px 12px",
+        background: "var(--bg-primary)",
+        borderRadius: 6,
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "var(--text-muted)",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        marginBottom: 4
+      }
+    }, "Summary"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-secondary)",
+        lineHeight: 1.6
+      }
+    }, liveDetail.ai_summary)), i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "var(--text-muted)",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        marginBottom: 6
+      }
+    }, "Key figures"), liveDetail.key_figures.slice(0, 5).map((fig, j) => /*#__PURE__*/React.createElement("div", {
+      key: j,
+      className: "key-figure",
+      style: {
+        margin: "0 0 4px 0",
+        fontSize: 11
+      }
+    }, fig))), ann.url && /*#__PURE__*/React.createElement("a", {
+      href: ann.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      onClick: e => e.stopPropagation(),
+      style: {
+        display: "inline-block",
+        marginTop: 10,
+        fontSize: 11,
+        color: "var(--accent)",
+        textDecoration: "none"
+      }
+    }, "View full announcement \u2197")))));
+  })(), inactiveCore.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 18px",
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 10
     }
-    ReactDOM.render(<App/>,document.getElementById("root"));
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: "var(--text-muted)",
+      marginBottom: 8
+    }
+  }, "Core companies with no current read-across mapping"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginBottom: 6
+    }
+  }, inactiveCore.map(c => /*#__PURE__*/React.createElement("span", {
+    key: c.ticker,
+    title: `${c.name} · ${c.sector}`,
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 10,
+      fontWeight: 600,
+      color: "var(--text-muted)",
+      background: "var(--bg-surface)",
+      padding: "3px 8px",
+      borderRadius: 4,
+      border: "1px solid var(--border)"
+    }
+  }, c.ticker))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)"
+    }
+  }, "No current read-across company maps to these directly.")));
+}
+function App() {
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState("idle");
+  const [filter, setFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [showWatchlist, setShowWatchlist] = useState(false);
+  const [watchlist, setWatchlist] = useState({});
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [backendUrl, setBackendUrl] = useState(API_BASE);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState("relevance");
+  const intervalRef = useRef(null);
+  const [tab, setTab] = useState("feed");
+  const [excludedCats, setExcludedCats] = useState(new Set());
+  const [sourceFilter, setSourceFilter] = useState("all"); // all | rns | nonreg
+  const defaultsAppliedRef = useRef(false); // ensure we only pre-populate excludedCats once per session
+  // Responsive state
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 880);
+  const [drawerOpen, setDrawerOpen] = useState(false); // mobile filter drawer
+  const [menuOpen, setMenuOpen] = useState(false); // mobile overflow menu
+  useEffect(() => {
+    const onResize = () => {
+      const m = window.innerWidth < 880;
+      setIsMobile(m);
+      if (!m) {
+        setDrawerOpen(false);
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  // Close mobile overlays on Escape
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === "Escape") {
+        if (menuOpen) setMenuOpen(false);else if (drawerOpen) setDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen, drawerOpen]);
+  const NONREG_SOURCES = ["GNW", "UKN", "PRN", "MFN", "EQS"];
+  const toggleExcludeCat = cat => {
+    setExcludedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);else next.add(cat);
+      return next;
+    });
+  };
+  const fetchData = useCallback(async () => {
+    setStatus("loading");
+    try {
+      const r = await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setData(j);
+      setStatus("connected");
+      setLastRefresh(new Date());
+      // First-load only: pre-populate excludedCats with the categories the server suggests
+      // hiding by default (Fundraise, Buyback, Director Dealing, Shareholding, Admin, Dividend).
+      // After this, the user is in full control — refreshes won't reset their choices.
+      if (!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)) {
+        setExcludedCats(new Set(j.default_hidden_categories));
+        defaultsAppliedRef.current = true;
+      }
+    } catch (e) {
+      console.error(e);
+      setStatus("error");
+    }
+  }, [backendUrl]);
+  const fetchWatchlist = useCallback(async () => {
+    try {
+      const r = await fetch(`${backendUrl}/api/watchlist`);
+      if (r.ok) {
+        const j = await r.json();
+        setWatchlist(j.watchlist || {});
+      }
+    } catch {}
+  }, [backendUrl]);
+  useEffect(() => {
+    fetchData();
+    fetchWatchlist();
+  }, [fetchData, fetchWatchlist]);
+  useEffect(() => {
+    if (autoRefresh) intervalRef.current = setInterval(fetchData, 120000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [autoRefresh, fetchData]);
+  const handleAdd = async (t, n, s) => {
+    try {
+      await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}`, {
+        method: "POST"
+      });
+      fetchWatchlist();
+    } catch {}
+  };
+  const handleRemove = async t => {
+    try {
+      await fetch(`${backendUrl}/api/watchlist/${t}`, {
+        method: "DELETE"
+      });
+      fetchWatchlist();
+    } catch {}
+  };
+  const allAnns = data?.announcements || [];
+
+  // Derived counts — recomputed only when the source data or watchlist changes
+  const {
+    wlCount,
+    coreCount,
+    raCount,
+    secCount,
+    rnsCount,
+    nonregCount,
+    catCounts,
+    sortedCats
+  } = useMemo(() => {
+    const cc = {};
+    allAnns.forEach(a => {
+      cc[a.category] = (cc[a.category] || 0) + 1;
+    });
+    return {
+      wlCount: allAnns.filter(a => a.is_watchlist).length,
+      coreCount: allAnns.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core").length,
+      raCount: allAnns.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across").length,
+      secCount: allAnns.filter(a => a.sector_relevant).length,
+      rnsCount: allAnns.filter(a => !a.source_feed || a.source_feed === "RNS").length,
+      nonregCount: allAnns.filter(a => NONREG_SOURCES.includes(a.source_feed)).length,
+      catCounts: cc,
+      sortedCats: Object.entries(cc).sort((a, b) => b[1] - a[1]).map(([c]) => c)
+    };
+  }, [allAnns, watchlist]);
+
+  // Filtered + sorted feed — recomputed only when data or any filter input changes
+  const anns = useMemo(() => {
+    let out = allAnns;
+    if (filter === "watchlist") out = out.filter(a => a.is_watchlist);else if (filter === "core") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core");else if (filter === "read_across") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across");else if (filter === "sector") out = out.filter(a => a.sector_relevant);
+    if (categoryFilter !== "all") out = out.filter(a => a.category === categoryFilter);
+    // No watchlist override on excluded categories — if a category is hidden, it stays hidden.
+    if (excludedCats.size > 0) out = out.filter(a => !excludedCats.has(a.category));
+    if (sourceFilter === "rns") out = out.filter(a => !a.source_feed || a.source_feed === "RNS");else if (sourceFilter === "nonreg") out = out.filter(a => NONREG_SOURCES.includes(a.source_feed));
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      out = out.filter(a => a.company.toLowerCase().includes(q) || a.headline.toLowerCase().includes(q) || (a.ticker || "").toLowerCase().includes(q));
+    }
+    if (sortMode === "latest") {
+      out = [...out].sort((a, b) => a.time > b.time ? -1 : a.time < b.time ? 1 : 0);
+    }
+    return out;
+  }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode]);
+  const tierFor = ticker => watchlist[ticker]?.tier;
+
+  // Sidebar filter helpers
+  const TierRow = ({
+    label,
+    value,
+    count,
+    dotColor
+  }) => /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (filter === value ? " active" : ""),
+    onClick: () => setFilter(value)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, dotColor && /*#__PURE__*/React.createElement("span", {
+    className: "filter-dot",
+    style: {
+      background: dotColor
+    }
+  }), label), /*#__PURE__*/React.createElement("span", {
+    className: "filter-count"
+  }, count));
+  const SourceRow = ({
+    label,
+    value,
+    count
+  }) => /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (sourceFilter === value ? " active" : ""),
+    onClick: () => setSourceFilter(value)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, label), /*#__PURE__*/React.createElement("span", {
+    className: "filter-count"
+  }, count));
+
+  // Sidebar filter content — rendered inline (desktop) or inside the mobile drawer
+  const sidebarContent = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "sidebar-search",
+    value: searchText,
+    onChange: e => setSearchText(e.target.value),
+    placeholder: "Search ticker, company, headline..."
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Tier"), /*#__PURE__*/React.createElement(TierRow, {
+    label: "All",
+    value: "all",
+    count: allAnns.length
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Watchlist",
+    value: "watchlist",
+    count: wlCount,
+    dotColor: "var(--watchlist)"
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Core",
+    value: "core",
+    count: coreCount,
+    dotColor: "var(--core)"
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Read-across",
+    value: "read_across",
+    count: raCount,
+    dotColor: "var(--readacross)"
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Sector relevant",
+    value: "sector",
+    count: secCount,
+    dotColor: "var(--accent)"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Source"), /*#__PURE__*/React.createElement(SourceRow, {
+    label: "All",
+    value: "all",
+    count: allAnns.length
+  }), /*#__PURE__*/React.createElement(SourceRow, {
+    label: "RNS only",
+    value: "rns",
+    count: rnsCount
+  }), /*#__PURE__*/React.createElement(SourceRow, {
+    label: "Non-Reg only",
+    value: "nonreg",
+    count: nonregCount
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, /*#__PURE__*/React.createElement("span", null, "Sort")), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (sortMode === "relevance" ? " active" : ""),
+    onClick: () => setSortMode("relevance")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, "Relevance")), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (sortMode === "latest" ? " active" : ""),
+    onClick: () => setSortMode("latest")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, "Latest first"))), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, /*#__PURE__*/React.createElement("span", null, "Categories"), excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      cursor: "pointer",
+      color: "var(--text-secondary)",
+      textTransform: "none",
+      letterSpacing: 0,
+      fontSize: 9
+    },
+    onClick: () => setExcludedCats(new Set())
+  }, "show all")), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (categoryFilter === "all" && excludedCats.size === 0 ? " active" : ""),
+    onClick: () => {
+      setCategoryFilter("all");
+      setExcludedCats(new Set());
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, "All types")), sortedCats.map(cat => {
+    const isExcluded = excludedCats.has(cat);
+    const isActive = categoryFilter === cat;
+    const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
+    const cls = "filter-row" + (isActive ? " active" : "") + (isExcluded ? " excluded" : "");
+    return /*#__PURE__*/React.createElement("div", {
+      key: cat,
+      className: cls
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "filter-label",
+      onClick: () => {
+        if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
+      },
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "filter-dot",
+      style: {
+        background: catColor
+      }
+    }), cat), /*#__PURE__*/React.createElement("span", {
+      className: "filter-count",
+      onClick: () => {
+        if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
+      }
+    }, catCounts[cat]), /*#__PURE__*/React.createElement("span", {
+      className: "filter-toggle-hide",
+      onClick: e => {
+        e.stopPropagation();
+        toggleExcludeCat(cat);
+        if (categoryFilter === cat) setCategoryFilter("all");
+      },
+      title: isExcluded ? "Restore" : "Hide",
+      style: isExcluded ? {
+        opacity: 1,
+        color: "var(--danger)"
+      } : undefined
+    }, isExcluded ? "\u21BA" : "\u2715"));
+  })));
+  return /*#__PURE__*/React.createElement(React.Fragment, null, !isMobile ? /*#__PURE__*/React.createElement("div", {
+    className: "toolbar"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", null, "h2"), "Radnor"), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-tag"
+  }, "RNS Monitor"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-tab" + (tab === "feed" ? " active" : ""),
+    onClick: () => setTab("feed")
+  }, "Feed"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-tab" + (tab === "readacross" ? " active" : ""),
+    onClick: () => setTab("readacross")
+  }, "Read-across"), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-spacer"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-meta"
+  }, /*#__PURE__*/React.createElement(StatusDot, {
+    status: status
+  }), status === "connected" && lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: fetchData,
+    disabled: status === "loading"
+  }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => setAutoRefresh(!autoRefresh),
+    style: autoRefresh ? {
+      borderColor: "var(--accent)",
+      color: "var(--accent)"
+    } : undefined
+  }, "Auto ", autoRefresh ? "ON" : "OFF"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => setShowWatchlist(true)
+  }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn icon",
+    onClick: () => setConfigOpen(!configOpen),
+    title: "Backend URL"
+  }, "\u2699")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "toolbar"
+  }, tab === "feed" && /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-icon-btn",
+    onClick: () => setDrawerOpen(true),
+    title: "Filters"
+  }, "\u2630"), /*#__PURE__*/React.createElement("span", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", null, "h2"), "Radnor"), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-spacer"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: fetchData,
+    disabled: status === "loading"
+  }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-icon-btn",
+    onClick: () => setMenuOpen(!menuOpen),
+    title: "More"
+  }, "\u22EE")), /*#__PURE__*/React.createElement("div", {
+    className: "mobile-tabbar"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "mobile-tab" + (tab === "feed" ? " active" : ""),
+    onClick: () => setTab("feed")
+  }, "Feed"), /*#__PURE__*/React.createElement("button", {
+    className: "mobile-tab" + (tab === "readacross" ? " active" : ""),
+    onClick: () => setTab("readacross")
+  }, "Read-across"))), isMobile && menuOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "scrim clear",
+    onClick: () => setMenuOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-menu"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setAutoRefresh(!autoRefresh);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Auto-refresh"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val",
+    style: autoRefresh ? {
+      color: "var(--accent)"
+    } : undefined
+  }, autoRefresh ? "ON" : "OFF")), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setShowWatchlist(true);
+      setMenuOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Watchlist"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val"
+  }, Object.keys(watchlist).length)), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setConfigOpen(!configOpen);
+      setMenuOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Backend URL"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val"
+  }, "\u2699")))), configOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px 16px",
+      background: "var(--bg-sidebar)",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)",
+      fontFamily: "var(--font-mono)"
+    }
+  }, "Backend URL:"), /*#__PURE__*/React.createElement("input", {
+    value: backendUrl,
+    onChange: e => setBackendUrl(e.target.value),
+    style: {
+      flex: 1,
+      minWidth: 160,
+      maxWidth: 400,
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border)",
+      padding: "5px 10px",
+      color: "var(--text-primary)",
+      fontFamily: "var(--font-mono)",
+      fontSize: 11,
+      outline: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => {
+      fetchData();
+      setConfigOpen(false);
+    }
+  }, "Connect")), isMobile && drawerOpen && tab === "feed" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "scrim",
+    onClick: () => setDrawerOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "drawer"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "drawer-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "drawer-head-title"
+  }, "Filters"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => setDrawerOpen(false)
+  }, "Done")), /*#__PURE__*/React.createElement("div", {
+    className: "drawer-body"
+  }, sidebarContent))), /*#__PURE__*/React.createElement("div", {
+    className: "layout"
+  }, tab === "feed" && !isMobile && /*#__PURE__*/React.createElement("aside", {
+    className: "sidebar"
+  }, sidebarContent), /*#__PURE__*/React.createElement("main", {
+    className: "main",
+    style: tab !== "feed" || isMobile ? {
+      gridColumn: "1 / -1"
+    } : undefined
+  }, tab === "readacross" && /*#__PURE__*/React.createElement(ReadAcrossView, {
+    backendUrl: backendUrl,
+    refreshTick: lastRefresh ? lastRefresh.getTime() : 0
+  }), tab === "feed" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "feed-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "feed-counts"
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, anns.length), " showing"), /*#__PURE__*/React.createElement("span", null, "/ ", allAnns.length, " total"), wlCount > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--watchlist)"
+    }
+  }, wlCount, " watchlist"), excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--danger)"
+    }
+  }, excludedCats.size, " categories hidden"), isMobile && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: "auto",
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(StatusDot, {
+    status: status
+  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), data?.errors?.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10,
+      padding: "6px 10px",
+      background: "rgba(239,68,68,0.06)",
+      border: "1px solid rgba(239,68,68,0.18)",
+      fontSize: 11,
+      color: "var(--danger)",
+      fontFamily: "var(--font-mono)"
+    }
+  }, data.errors.length, " scrape error", data.errors.length === 1 ? "" : "s", ": ", data.errors.slice(0, 3).map(e => e.split(":")[0]).join(", "), data.errors.length > 3 ? ` +${data.errors.length - 3} more` : ""), status === "error" && !data && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      marginBottom: 6,
+      color: "var(--text-primary)"
+    }
+  }, "Can't reach the backend"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11
+    }
+  }, "Check ", /*#__PURE__*/React.createElement("code", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      color: "var(--accent)"
+    }
+  }, backendUrl), " is running.")), status === "loading" && !data && /*#__PURE__*/React.createElement("div", {
+    className: "grid"
+  }, [0, 1, 2, 3, 4, 5, 6, 7].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
+    key: i
+  }))), anns.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "grid"
+  }, anns.map((a, i) => /*#__PURE__*/React.createElement(AnnouncementCard, {
+    key: `${a.company}-${a.headline}-${i}`,
+    ann: a,
+    index: i,
+    backendUrl: backendUrl,
+    tier: tierFor(a.ticker)
+  }))), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      marginBottom: 6,
+      color: "var(--text-primary)"
+    }
+  }, "Nothing matches"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11
+    }
+  }, "Broaden the filters or unhide categories in the sidebar."))))), showWatchlist && /*#__PURE__*/React.createElement(WatchlistModal, {
+    watchlist: watchlist,
+    onClose: () => setShowWatchlist(false),
+    onAdd: handleAdd,
+    onRemove: handleRemove
+  }));
+}
+ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById("root"));
   </script>
 </body>
 </html>
