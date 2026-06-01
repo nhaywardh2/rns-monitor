@@ -34,7 +34,8 @@
       --watchlist-bg: rgba(240,192,64,0.06);
       --watchlist-border: rgba(240,192,64,0.22);
       --core: #f0c040;
-      --readacross: #f59e0b;
+      --readacross: #f97316;
+      --readacross-bg: rgba(249,115,22,0.06);
       /* Category accent colours — kept restrained */
       --results: #5ba8f7;
       --trading: #a78bfa;
@@ -161,6 +162,9 @@
     .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
     .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
     .row.watchlist:hover { background:rgba(240,192,64,0.10); }
+    /* Read-across rows: orange highlight, distinct from the gold of core watchlist rows */
+    .row.readacross { border-left-color:var(--readacross); background:var(--readacross-bg); }
+    .row.readacross:hover { background:rgba(249,115,22,0.11); }
     /* Read rows: dimmed but fully legible. Hovering restores full strength so re-reading is easy. */
     .row.read { opacity:0.5; }
     .row.read:hover { opacity:1; }
@@ -168,9 +172,10 @@
     .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
     .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
     .row-ticker.watchlist { color:var(--watchlist); }
+    .row-ticker.readacross { color:var(--readacross); }
     .row-tag { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 6px; border-radius:0; flex-shrink:0; }
     .row-tag.tier-core { background:rgba(240,192,64,0.12); color:var(--core); }
-    .row-tag.tier-ra { background:rgba(245,158,11,0.10); color:var(--readacross); }
+    .row-tag.tier-ra { background:rgba(249,115,22,0.12); color:var(--readacross); }
     .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:0; }
     .row-source { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); border:1px solid var(--border); padding:0 4px; flex-shrink:0; }
     .row-spacer { flex:1; }
@@ -617,7 +622,7 @@ function AnnouncementCard({
   const catColor = CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"];
   const isWL = ann.is_watchlist;
   const rowClasses = ["row"];
-  if (isWL) rowClasses.push("watchlist");
+  if (isWL) rowClasses.push(tier === "read_across" ? "readacross" : "watchlist");
   if (expanded) rowClasses.push("expanded");
   if (isRead && !expanded) rowClasses.push("read");
   return /*#__PURE__*/React.createElement("div", {
@@ -629,7 +634,7 @@ function AnnouncementCard({
   }, /*#__PURE__*/React.createElement("span", {
     className: "row-time"
   }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
-    className: "row-ticker" + (isWL ? " watchlist" : "")
+    className: "row-ticker" + (isWL ? tier === "read_across" ? " readacross" : " watchlist" : "")
   }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
     className: "row-tag tier-core"
   }, "CORE"), tier === "read_across" && /*#__PURE__*/React.createElement("span", {
@@ -905,7 +910,7 @@ function WatchlistModal({
       letterSpacing: "0.08em",
       padding: "1px 6px",
       borderRadius: 4,
-      background: "rgba(245,158,11,0.10)",
+      background: "rgba(249,115,22,0.12)",
       color: "var(--readacross)"
     }
   }, "R/A") : /*#__PURE__*/React.createElement("span", {
