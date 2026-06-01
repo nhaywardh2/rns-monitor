@@ -191,7 +191,8 @@ WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
 # All other watchlist tickers are treated as core by default.
 READ_ACROSS_TICKERS = {
     "CRST", "BTRW", "TW.", "GRI", "KNOS", "BBOX", "SAVS", "LSL",
-    "ALFA", "WTB", "JET2", "SUS", "SGRO", "SAFE",
+    "ALFA", "WTB", "JET2", "SUS", "SGRO", "SAFE", "FTC",
+    "IQE", "TTG", "DSCV", "ABDP",
 }
 
 DEFAULT_WATCHLIST = {
@@ -235,6 +236,11 @@ DEFAULT_WATCHLIST = {
     "SUS":  {"name": "S&U",                              "sector": "Consumer finance / motor lending",     "tier": "read_across"},
     "SGRO": {"name": "SEGRO",                            "sector": "Industrial REIT",                      "tier": "read_across"},
     "SAFE": {"name": "Safestore Holdings",               "sector": "Self-storage REIT",                    "tier": "read_across"},
+    "FTC":  {"name": "Filtronic",                        "sector": "RF / microwave components",            "tier": "read_across"},
+    "IQE":  {"name": "IQE",                               "sector": "Compound semiconductors / RF materials", "tier": "read_across"},
+    "TTG":  {"name": "TT Electronics",                    "sector": "Electronic components / manufacturing", "tier": "read_across"},
+    "DSCV": {"name": "discoverIE Group",                  "sector": "Specialist electronic components",      "tier": "read_across"},
+    "ABDP": {"name": "AB Dynamics",                       "sector": "Automotive test / simulation",          "tier": "read_across"},
 }
 
 def _ensure_tiers(wl: dict) -> dict:
@@ -359,6 +365,21 @@ READ_ACROSS_MATRIX = {
     "SAFE": {
         "BYG":  {"type": "DIRECT",   "strength": 3, "note": "Direct peer — Safestore and Big Yellow are the two main listed UK self-storage REITs; RevPASF, occupancy, and rate commentary reads directly across"},
         "NRR":  {"type": "MACRO",    "strength": 1, "note": "REIT sector rates and refinancing environment"},
+    },
+    "FTC": {
+        "CML":  {"type": "THEMATIC", "strength": 2, "note": "Shared RF, microwave and wireless end markets — Filtronic demand across telecoms infrastructure, aerospace/defence and space reads through to CML's RF and mixed-signal semiconductor exposure"},
+    },
+    "IQE": {
+        "CML":  {"type": "THEMATIC", "strength": 2, "note": "Shared RF, wireless and photonics semiconductor end markets — IQE compound-semiconductor demand reads across to CML's RF and mixed-signal exposure; with Filtronic this forms an RF/semiconductor cluster"},
+    },
+    "TTG": {
+        "TRI":  {"type": "THEMATIC", "strength": 2, "note": "Electronic components and manufacturing into shared industrial, aerospace/defence and medical OEM end markets — TT Electronics order-book and demand commentary reads across to Trifast's components-into-OEM supply chain"},
+    },
+    "DSCV": {
+        "TRI":  {"type": "THEMATIC", "strength": 2, "note": "Specialist electronic components for industrial OEMs — discoverIE end-market demand across renewables, transportation, medical and industrial overlaps Trifast's OEM supply-chain exposure"},
+    },
+    "ABDP": {
+        "SEE":  {"type": "THEMATIC", "strength": 2, "note": "Automotive test and driving-simulation adjacency — AB Dynamics demand tracks ADAS and vehicle-autonomy development spend, the same end market driving Seeing Machines' driver-monitoring systems"},
     },
 }
 
