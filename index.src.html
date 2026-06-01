@@ -524,8 +524,9 @@
     }
 
     function WatchlistModal({watchlist,onClose,onAdd,onRemove}) {
-      const [ticker,setTicker]=useState("");const [name,setName]=useState("");const [sector,setSector]=useState("");
+      const [ticker,setTicker]=useState("");const [name,setName]=useState("");const [sector,setSector]=useState("");const [tier,setTier]=useState("core");
       const is={background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:6,padding:"8px 12px",color:"var(--text-primary)",fontFamily:"var(--font-sans)",fontSize:13,outline:"none",width:"100%"};
+      const tierBtn=(val,label)=>(<button onClick={()=>setTier(val)} style={{flex:1,padding:"8px 10px",borderRadius:6,border:`1px solid ${tier===val?"var(--accent)":"var(--border)"}`,background:tier===val?"var(--accent-glow)":"transparent",color:tier===val?"var(--accent)":"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:12,fontWeight:600,cursor:"pointer"}}>{label}</button>);
       return <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
         <div onClick={e=>e.stopPropagation()} className="fade-up" style={{background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:14,padding:28,width:"100%",maxWidth:560,maxHeight:"80vh",overflow:"auto",margin:20}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -536,6 +537,9 @@
             {Object.entries(watchlist).map(([t,info])=><div key={t} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:8}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600,color:"var(--accent)",background:"var(--accent-glow)",padding:"2px 8px",borderRadius:4}}>{t}</span>
+                {info.tier==="read_across"
+                  ? <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",padding:"1px 6px",borderRadius:4,background:"rgba(245,158,11,0.10)",color:"var(--readacross)"}}>R/A</span>
+                  : <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",padding:"1px 6px",borderRadius:4,background:"rgba(240,192,64,0.12)",color:"var(--core)"}}>CORE</span>}
                 <span style={{fontSize:13,color:"var(--text-primary)"}}>{info.name}</span>
                 <span style={{fontSize:11,color:"var(--text-muted)"}}>{info.sector}</span>
               </div>
@@ -550,7 +554,11 @@
               <input value={name} onChange={e=>setName(e.target.value)} placeholder="Company name" style={is}/>
             </div>
             <input value={sector} onChange={e=>setSector(e.target.value)} placeholder="Sector (optional)" style={is}/>
-            <button onClick={()=>{if(ticker&&name){onAdd(ticker.toUpperCase(),name,sector);setTicker("");setName("");setSector("");}}} disabled={!ticker||!name} style={{background:ticker&&name?"var(--accent)":"var(--border)",color:ticker&&name?"var(--bg-primary)":"var(--text-muted)",border:"none",borderRadius:8,padding:"10px 16px",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:600,cursor:ticker&&name?"pointer":"not-allowed"}}>Add company</button>
+            <div>
+              <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:6}}>Tier</div>
+              <div style={{display:"flex",gap:8}}>{tierBtn("core","Core")}{tierBtn("read_across","Read-across")}</div>
+            </div>
+            <button onClick={()=>{if(ticker&&name){onAdd(ticker.toUpperCase(),name,sector,tier);setTicker("");setName("");setSector("");setTier("core");}}} disabled={!ticker||!name} style={{background:ticker&&name?"var(--accent)":"var(--border)",color:ticker&&name?"var(--bg-primary)":"var(--text-muted)",border:"none",borderRadius:8,padding:"10px 16px",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:600,cursor:ticker&&name?"pointer":"not-allowed"}}>Add company</button>
           </div>
         </div>
       </div>;
@@ -1009,8 +1017,8 @@
       useEffect(()=>{fetchData();fetchWatchlist();},[fetchData,fetchWatchlist]);
       useEffect(()=>{if(autoRefresh)intervalRef.current=setInterval(fetchData,120000);return()=>{if(intervalRef.current)clearInterval(intervalRef.current);};},[autoRefresh,fetchData]);
 
-      const handleAdd=async(t,n,s)=>{try{await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}`,{method:"POST"});fetchWatchlist();}catch{}};
-      const handleRemove=async(t)=>{try{await fetch(`${backendUrl}/api/watchlist/${t}`,{method:"DELETE"});fetchWatchlist();}catch{}};
+      const handleAdd=async(t,n,s,tier)=>{try{await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier||"core"}`,{method:"POST"});await fetchWatchlist();fetchData();}catch{}};
+      const handleRemove=async(t)=>{try{await fetch(`${backendUrl}/api/watchlist/${t}`,{method:"DELETE"});await fetchWatchlist();fetchData();}catch{}};
 
       const allAnns=data?.announcements||[];
 

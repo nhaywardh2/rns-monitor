@@ -1354,6 +1354,16 @@ def rank_announcements(anns):
         return (p, a.time)
     return sorted(anns, key=sk)
 
+def apply_live_watchlist(anns):
+    """Recompute is_watchlist against the CURRENT watchlist at serve time.
+    The flag is set when an announcement is first scraped, so a company added to the
+    watchlist later would otherwise stay is_watchlist=False in the cache. Recomputing
+    here means manually-added companies are highlighted, filtered, and ranked correctly
+    on the next refresh without waiting for the announcement to be re-scraped."""
+    for a in anns:
+        a.is_watchlist = bool(a.ticker) and a.ticker in WATCHLIST
+    return anns
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @app.get("/api/health")
@@ -1406,7 +1416,7 @@ async def get_rns(
     `include_all=true` additionally bypasses the headline-level material-type filter
     (EXCLUDED_TYPES); without it, factsheets, NAVs, and reissue notices are dropped."""
     await _ensure_cache_warm(force=force)
-    raw = [Announcement(**v) for v in daily_cache.announcements.values()]
+    raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
     total_raw = len(raw)
     if include_all:
         # Just exclude mining/oil/gas — let the client decide what to hide
@@ -1431,7 +1441,7 @@ async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False
     """Like /api/rns but with no headline-level or category-level filtering at all.
     Reads from cache."""
     await _ensure_cache_warm(force=force)
-    raw = [Announcement(**v) for v in daily_cache.announcements.values()]
+    raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
     total_raw = len(raw)
     scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
     return ScrapeResponse(
@@ -1493,7 +1503,7 @@ async def get_readacross():
     # Cold-start safety: if cache is empty, kick off a synchronous scrape so first call returns data
     await _ensure_cache_warm()
     # Pull today's announcements from the daily cache
-    today_anns = [Announcement(**v) for v in daily_cache.announcements.values()]
+    today_anns = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
 
     # Group triggered read-across announcements by ticker
     triggered: dict[str, list[dict]] = {}
@@ -1532,7 +1542,7 @@ async def get_readacross():
 async def get_rns_by_ticker(ticker: str):
     ticker = ticker.upper()
     await _ensure_cache_warm()
-    raw = [Announcement(**v) for v in daily_cache.announcements.values()]
+    raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
     return {"ticker": ticker, "company": WATCHLIST.get(ticker, {}).get("name", "Unknown"),
             "announcements": [a for a in raw if a.ticker == ticker], "errors": list(daily_cache.last_errors)}
 
