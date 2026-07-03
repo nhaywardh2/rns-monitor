@@ -25,7 +25,13 @@ const src = fs.readFileSync(SRC, "utf8");
 const m = src.match(/<script type="text\/babel">([\s\S]*?)<\/script>/);
 if (!m) { console.error("No <script type=\"text/babel\"> block found in " + SRC); process.exit(1); }
 
-const compiled = babel.transformSync(m[1], { presets: ["@babel/preset-react"] }).code;
+// runtime: "classic" pins the output to React.createElement calls. Newer Babel
+// versions default to the "automatic" runtime, which emits import statements —
+// those throw in a plain browser <script> tag and the app renders a black screen.
+const compiled = babel.transformSync(m[1], {
+  presets: [["@babel/preset-react", { runtime: "classic" }]],
+  sourceType: "script",
+}).code;
 
 let out = src
   // drop the babel-standalone CDN script
