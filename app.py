@@ -19,7 +19,6 @@ from pathlib import Path
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Query, Request, Response, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -40,6 +39,20 @@ DETAIL_CACHE_MAX = int(os.environ.get("DETAIL_CACHE_MAX", "600"))  # cap entries
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("rns-monitor")
+
+# ── London-time "today" ──────────────────────────────────────────────────────
+# Render dynos run UTC. During BST, UTC's date lags London by an hour around
+# midnight: the daily cache would reset at 1am London and announcements stamped
+# with the new London date before UTC midnight would fail the is_today check.
+# All date logic therefore uses London's calendar day, matching Investegate.
+try:
+    from zoneinfo import ZoneInfo
+    _LONDON_TZ = ZoneInfo("Europe/London")
+except Exception:  # tz database unavailable — fall back to server-local date
+    _LONDON_TZ = None
+
+def today_london() -> date:
+    return datetime.now(_LONDON_TZ).date() if _LONDON_TZ else date.today()
 
 # Background scraper task handle, populated in the lifespan handler
 _background_task: Optional[asyncio.Task] = None
@@ -79,11 +92,9 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="h2Radnor RNS Monitor", version="2.1.0", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
-)
+# No CORS middleware: the frontend is served same-origin from this app, so
+# cross-origin headers are unnecessary. The previous allow_origins=["*"] with
+# allow_credentials=True was an invalid combination browsers reject anyway.
 
 # ── Password Gate ────────────────────────────────────────────────────────────
 
@@ -157,7 +168,7 @@ async def login(request: Request):
     if APP_PASSWORD and hmac.compare_digest(password, APP_PASSWORD):
         response = RedirectResponse("/", status_code=302)
         # Store a derived token, never the password itself.
-        response.set_cookie(AUTH_COOKIE, _auth_token(), httponly=True, samesite="lax", max_age=86400)
+        response.set_cookie(AUTH_COOKIE, _auth_token(), httponly=True, secure=True, samesite="lax", max_age=86400)
         return response
     return RedirectResponse("/login?error=1", status_code=302)
 
@@ -397,19 +408,19 @@ class DailyCache:
         self._load()
 
     def _load(self):
-        """Load cache from disk if it exists and is from today."""
+        """Load cache from disk if it exists and is from today (London calendar day)."""
         if self.cache_file.exists():
             try:
                 with open(self.cache_file, "r") as f:
                     data = json.load(f)
-                if data.get("date") == date.today().isoformat():
+                if data.get("date") == today_london().isoformat():
                     self.announcements = data.get("announcements", {})
                     self.cache_date = data["date"]
                     return
             except (json.JSONDecodeError, IOError):
                 pass
         self.announcements = {}
-        self.cache_date = date.today().isoformat()
+        self.cache_date = today_london().isoformat()
 
     def _save(self):
         """Save cache to disk."""
@@ -423,8 +434,8 @@ class DailyCache:
             pass
 
     def _check_date(self):
-        """Reset cache at midnight."""
-        today = date.today().isoformat()
+        """Reset cache at midnight (London time, matching Investegate's date stamps)."""
+        today = today_london().isoformat()
         if self.cache_date != today:
             self.announcements = {}
             self.cache_date = today
@@ -435,18 +446,18 @@ class DailyCache:
         First reindexes existing cache entries under the normalised key so any
         legacy duplicates from earlier scrapes collapse on the next run."""
         self._check_date()
-        # Reindex existing entries so old per-company-name keys collapse into ticker-based keys
+        # Reindex existing entries so old per-company-name keys collapse into URL/ticker-based keys
         reindexed = {}
         for v in self.announcements.values():
             ann = Announcement(**v) if not isinstance(v, Announcement) else v
-            new_key = make_dedup_key(ann.ticker, ann.company, ann.headline)
+            new_key = make_dedup_key(ann.ticker, ann.company, ann.headline, ann.url)
             # If two old entries collapse to the same new key, keep the newer one
             # (we have no timestamp on the dict value, so last write wins)
             reindexed[new_key] = v
         self.announcements = reindexed
         # Now merge in the fresh results — they take precedence over any older copy
         for ann in new_announcements:
-            key = make_dedup_key(ann.ticker, ann.company, ann.headline)
+            key = make_dedup_key(ann.ticker, ann.company, ann.headline, ann.url)
             self.announcements[key] = ann.model_dump()
         self.last_scrape = datetime.now()
         self._save()
@@ -471,7 +482,7 @@ RELEVANT_SECTORS = [
     "fintech", "financial services", "insurance", "wealth",
     "consumer finance", "lending", "currency", "fx",
     "publishing", "media", "content", "marketing", "communications",
-    "advertising", "pr ",
+    "advertising", "pr",
     "industrial", "engineering", "acquisition", "manufacturing",
     "fastener", "building products", "construction",
     "emerging market", "investment trust",
@@ -580,13 +591,21 @@ class ShareholdingDetail(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def make_dedup_key(ticker, company, headline):
+def make_dedup_key(ticker, company, headline, url=None):
     """Build a normalised dedup key so the same announcement can't slip through under
     two slightly-different company-name strings or headline whitespace variants.
 
-    Uses ticker as the primary identifier when available — it's the only stable
-    cross-source signal. Falls back to a normalised company name otherwise.
+    Uses the announcement URL as the primary key when available — it's unique per
+    announcement, so two same-day filings with identical headlines (e.g. two TR-1s
+    both titled "Holding(s) in Company") are kept as separate rows rather than the
+    later one silently overwriting the earlier. The same announcement scraped from
+    multiple index pages shares one URL and still collapses to a single row.
+
+    Falls back to ticker (the only stable cross-source signal), then to a
+    normalised company name.
     """
+    if url:
+        return f"U:{url}"
     # Normalise headline: lowercase, collapse all whitespace
     h = re.sub(r'\s+', ' ', (headline or "").strip().lower())
     if ticker:
@@ -596,12 +615,49 @@ def make_dedup_key(ticker, company, headline):
     c = re.sub(r'\s+', ' ', c)
     return f"C:{c}|{h}"
 
+# Word-boundary keyword matching. Naive substring checks caused a family of
+# mis-classifications: "deal" matched "Dealings", "director" matched "Directorate",
+# "nav" matched "Navigator", "ai" matched "chairman", "gold" matched "Goldman Sachs".
+# _kw() anchors keywords at word boundaries. A trailing '*' allows suffixes for
+# stems ("fundrais*" matches fundraise/fundraising). Boundaries are only asserted
+# where the keyword edge is alphanumeric, so entries like "re:" still work.
+_KW_PATTERNS: dict[str, re.Pattern] = {}
+
+def _kw(text: str, keyword: str) -> bool:
+    pat = _KW_PATTERNS.get(keyword)
+    if pat is None:
+        stem = keyword.endswith("*")
+        core = re.escape(keyword[:-1] if stem else keyword)
+        prefix = r'\b' if keyword[0].isalnum() else ''
+        if stem:
+            suffix = r'\w*'
+        else:
+            last = keyword[-1]
+            suffix = r'\b' if last.isalnum() else ''
+        pat = re.compile(prefix + core + suffix)
+        _KW_PATTERNS[keyword] = pat
+    return bool(pat.search(text))
+
+def _any_kw(text: str, keywords) -> bool:
+    return any(_kw(text, k) for k in keywords)
+
+# Market/venue tokens that appear in parentheses in company cells but are not tickers.
+_NON_TICKER_TOKENS = {"AIM", "LSE", "FTSE", "PLC", "AQSE", "NEX", "GBP", "GBX", "USD", "EUR"}
+
 def extract_ticker(company_text):
     matches = re.findall(r'\(([A-Z0-9\.]{2,6})\)', company_text)
-    if matches:
-        return matches[-1]
+    # Take the last parenthesised token that isn't a market/venue label,
+    # so "Foo Group (AIM)" doesn't yield ticker "AIM".
+    for m in reversed(matches):
+        if m not in _NON_TICKER_TOKENS:
+            return m
+    # Fallback: match a watchlist name only when the company cell starts with it
+    # and the name isn't a prefix of a longer word — a bare substring check let
+    # short names like "Record" attach to unrelated companies.
+    cl = company_text.lower().strip()
     for ticker, info in WATCHLIST.items():
-        if info["name"].lower() in company_text.lower().strip():
+        name = info["name"].lower()
+        if cl.startswith(name) and (len(cl) == len(name) or not cl[len(name)].isalnum()):
             return ticker
     return None
 
@@ -610,35 +666,41 @@ def clean_company_name(raw_text):
 
 def is_excluded_company(company):
     cl = company.lower()
-    return any(e in cl for e in EXCLUDED_COMPANIES) or any(k in cl for k in EXCLUDED_KEYWORDS)
+    return _any_kw(cl, EXCLUDED_COMPANIES) or _any_kw(cl, EXCLUDED_KEYWORDS)
 
 def is_material_type(headline):
     """Include everything by default, only exclude known noise types."""
     hl = headline.lower()
-    if any(e in hl for e in EXCLUDED_TYPES): return False
+    if _any_kw(hl, EXCLUDED_TYPES): return False
     return True
 
 def is_sector_relevant(company, headline):
     combined = f"{company} {headline}".lower()
-    return any(s in combined for s in RELEVANT_SECTORS)
+    return _any_kw(combined, RELEVANT_SECTORS)
 
 def categorise(headline, source_feed="RNS"):
     h = headline.lower()
     # Early disambiguation: compound phrases that contain keywords from other buckets.
     # "Voting Results" contains 'results' but is admin. "Interim Dividend" contains 'interim'.
+    # "Price Monitoring Extension" contains 'extension' (a Contract keyword).
+    # "Publication of Annual Report" contains 'annual report' (a Results keyword).
     # Without this pre-check the broad keyword cascade below would mis-tag them.
-    if any(w in h for w in [
+    if _any_kw(h, [
         "voting results", "result of agm", "result of egm", "result of meeting",
+        "result of general meeting", "results of general meeting",
         "agm voting", "agm statement", "results of agm", "results of egm",
+        "price monitoring extension", "second price monitoring",
+        "block listing", "block-listing",
+        "publication of annual report", "posting of annual report",
     ]):
         return "Admin"
-    if any(w in h for w in [
+    if _any_kw(h, [
         "interim dividend", "final dividend", "special dividend", "quarterly dividend",
         "dividend declaration", "dividend payment", "dividend timetable", "ex-dividend",
     ]):
         return "Dividend"
     # Results — expanded to catch quarterly reports, half-yearly, interim management statements
-    if any(w in h for w in [
+    if _any_kw(h, [
         "results", "interim", "half-year", "half year", "half-yearly", "half yearly",
         "preliminary", "prelims", "full year", "full-year", "fy results",
         "quarterly report", "q1 report", "q2 report", "q3 report", "q4 report",
@@ -647,15 +709,17 @@ def categorise(headline, source_feed="RNS"):
         "interim management statement", "ims",
     ]): return "Results"
     # Trading Update — expanded to catch shorter-form Q-update headlines
-    if any(w in h for w in [
+    if _any_kw(h, [
         "trading update", "trading statement", "pre-close", "pre close",
         "q1 trading", "q2 trading", "q3 trading", "q4 trading",
         "q1 update", "q2 update", "q3 update", "q4 update",
         "first quarter trading", "second quarter trading", "third quarter trading", "fourth quarter trading",
         "h1 trading", "h2 trading", "year-end trading", "year end trading",
     ]): return "Trading Update"
-    # Company Update — broader operational and strategic update phrasings
-    if any(w in h for w in [
+    # Company Update — broader operational and strategic update phrasings.
+    # Includes CMD / investor-event headlines: material for IR work and previously
+    # falling through to Other, where hiding Other hid them.
+    if _any_kw(h, [
         "company update", "operational update", "business update", "operational performance",
         "strategic update", "strategic review", "strategy update", "strategy",
         "outlook", "guidance", "guidance upgrade", "guidance update",
@@ -664,51 +728,59 @@ def categorise(headline, source_feed="RNS"):
         "year-end update", "year end update", "month-end update", "month end update",
         "interim update", "trading and operational",
         "response to press", "response to media", "response to speculation",
+        "capital markets day", "capital markets event", "cmd",
+        "investor presentation", "investor meet", "investor day", "investor event",
+        "analyst presentation", "analyst day", "site visit",
     ]): return "Company Update"
-    # Contract — broadened
-    if any(w in h for w in [
+    # Buyback — checked before Contract so "Renewal of Buyback Programme" doesn't
+    # mis-tag as Contract via 'renewal', and before Fundraise so capital returns
+    # aren't lumped with raises
+    if _any_kw(h, ["buyback", "buy-back", "buy back", "share purchase", "share repurchase", "repurchase of shares", "transaction in own shares"]): return "Buyback"
+    # Contract — broadened. Word boundaries stop 'deal' matching "Dealings by PDMR".
+    if _any_kw(h, [
         "contract", "partnership", "agreement", "collaboration",
         "awarded", "mandate", "engagement", "deal", "renew", "renewal",
         "new client", "new customer", "framework agreement", "extension",
-        "memorandum of understanding", "mou ", "letter of intent", "loi ",
+        "memorandum of understanding", "mou", "letter of intent", "loi",
     ]): return "Contract"
-    # Buyback — separated from Fundraise so genuine capital returns aren't lumped with raises
-    if any(w in h for w in ["buyback", "buy-back", "buy back", "share purchase", "share repurchase", "repurchase of shares", "transaction in own shares"]): return "Buyback"
     # Fundraise — runs before M&A so 'open offer' / 'primary bid' phrasing doesn't mis-tag as M&A
-    if any(w in h for w in ["placing", "rights issue", "fundrais", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise"]): return "Fundraise"
+    if _any_kw(h, ["placing", "rights issue", "fundrais*", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise", "intention to float", "ipo", "offering"]): return "Fundraise"
     # M&A
-    if any(w in h for w in [
+    if _any_kw(h, [
         "acquisition", "merger", "disposal", "takeover", "offer", "bid",
         "scheme of arrangement", "recommended offer", "recommended cash offer",
         "possible offer", "completion of acquisition", "completion of disposal",
     ]): return "M&A"
-    # Board Change
-    if any(w in h for w in [
+    # Board Change — "directorate change" listed explicitly; the word-boundary on
+    # 'director' below no longer catches it, which is correct (it's a board matter,
+    # not a dealing)
+    if _any_kw(h, [
         "appointment", "resignation", "board change", "non-executive",
         "chief executive", "cfo", "ceo", "chairman", "chair appointment",
         "boardroom change", "succession", "stepping down", "steps down",
         "joins the board", "leaves the board", "new director",
+        "directorate change", "directorate",
     ]): return "Board Change"
     # Shareholding
-    if any(w in h for w in ["holding(s) in company", "tr-1", "notification of major", "major shareholding", "significant shareholding"]): return "Shareholding"
+    if _any_kw(h, ["holding(s) in company", "holdings in company", "tr-1", "notification of major", "major shareholding", "significant shareholding"]): return "Shareholding"
     # Director Dealing
-    if any(w in h for w in ["director", "pdmr", "person discharging", "directors' dealings"]): return "Director Dealing"
+    if _any_kw(h, ["director", "directors", "pdmr", "person discharging", "directors' dealings", "director/pdmr"]): return "Director Dealing"
     # Regulatory
-    if any(w in h for w in ["regulatory", "fca", "compliance", "sanction", "investigation", "enforcement"]): return "Regulatory"
+    if _any_kw(h, ["regulatory", "fca", "compliance", "sanction", "investigation", "enforcement"]): return "Regulatory"
     # Dividend
-    if any(w in h for w in ["dividend", "distribution", "interim dividend", "final dividend", "special dividend"]): return "Dividend"
+    if _any_kw(h, ["dividend", "distribution"]): return "Dividend"
     # Admin — formal regulatory and listing-related boilerplate that's typically non-material.
     # Runs AFTER all material category checks so anything containing both material and admin keywords (e.g. "Result of Q3" containing both Results and "result of") falls into the material bucket first.
-    if any(w in h for w in [
+    if _any_kw(h, [
         "block listing", "block-listing",
-        "total voting rights", "tvr ", "issued share capital",
-        "form 8.3", "form 8.5", "form 8 ", "rule 8.3", "rule 8.5", "rule 8 ",
+        "total voting rights", "tvr", "issued share capital",
+        "form 8.3", "form 8.5", "form 8", "rule 8.3", "rule 8.5", "rule 8",
         "statement of capital",
         "notification of investments", "notification of holdings",
         "compulsory acquisition",
         "stabilisation notice", "pricing notice", "settlement notice",
         "publication of", "document available", "availability of", "documents available",
-        "result of agm", "result of egm", "result of meeting", "voting results", "agm voting", "agm statement",
+        "result of agm", "result of egm", "result of meeting", "result of general meeting", "voting results", "agm voting", "agm statement",
         "person closely associated", "pca dealing",
         "exercise of warrants", "exercise of options", "exercise of share options",
         "share incentive plan", "ltip", "lti award", "rsu award",
@@ -720,6 +792,8 @@ def categorise(headline, source_feed="RNS"):
         "admission to trading", "final terms",
         "prospectus", "circular",
         "agm", "egm", "annual general meeting", "extraordinary general meeting",
+        "change of name", "change of registered office", "registered office",
+        "change of adviser", "change of nominated adviser", "change of broker",
     ]): return "Admin"
     # Non-regulatory sources get their own category if not matched above
     if source_feed in ("UKN", "GNW", "PRN", "MFN", "EQS"):
@@ -739,7 +813,7 @@ def parse_investegate_time(time_text):
     return match2.group(1) if match2 else None
 
 def is_today(time_text):
-    today = date.today()
+    today = today_london()
     abbrevs = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
     return f"{today.day} {abbrevs[today.month]} {today.year}" in time_text
 
@@ -926,8 +1000,31 @@ def parse_shareholding_summary(summary_text: str) -> dict:
     return result
 
 
+# URL guard: the detail endpoints take a raw URL from the client and fetch it
+# server-side. Without a host check that's an open proxy (SSRF) — anyone with
+# access could make this box request arbitrary URLs. Only Investegate
+# announcement pages are legitimate targets.
+from urllib.parse import urlparse
+
+def _is_investegate_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        return parsed.scheme in ("http", "https") and (
+            host == "investegate.co.uk" or host.endswith(".investegate.co.uk")
+        )
+    except Exception:
+        return False
+
+_URL_GUARD_MSG = "URL must be an investegate.co.uk announcement link"
+
 async def fetch_shareholding_detail(url: str) -> ShareholdingDetail:
     """Fetch a TR-1/Holdings announcement and parse the AI summary for structured data."""
+    if not _is_investegate_url(url):
+        return ShareholdingDetail(
+            url=url, company="", fetched_at=datetime.now().isoformat(),
+            error=_URL_GUARD_MSG,
+        )
     async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
         try:
             resp = await client.get(url)
@@ -982,6 +1079,12 @@ async def fetch_shareholding_detail(url: str) -> ShareholdingDetail:
 
 async def fetch_announcement_detail(url: str) -> DetailResponse:
     """Fetch a single Investegate announcement page and extract the RNS body."""
+    if not _is_investegate_url(url):
+        return DetailResponse(
+            url=url, company="", headline="", body_text="", body_html="",
+            key_figures=[], fetched_at=datetime.now().isoformat(),
+            error=_URL_GUARD_MSG,
+        )
     async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
         try:
             resp = await client.get(url)
@@ -1148,12 +1251,18 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
 
 # ── Homepage Scraping ────────────────────────────────────────────────────────
 
+# Serialises scrapes: the background loop, a cold-start warm-up, and a force=true
+# request could otherwise run full scrapes concurrently, doubling the request
+# volume to Investegate for no benefit.
+_scrape_lock = asyncio.Lock()
+
 async def scrape_investegate():
+  async with _scrape_lock:
     errors = []
     raw = []
     seen_keys = set()  # For deduplication
-    today_str = date.today().strftime("%d/%m/%Y")
-    today_archive = date.today().strftime("https://www.investegate.co.uk/today-announcements/%Y-%m-%d")
+    today_str = today_london().strftime("%d/%m/%Y")
+    today_archive = today_london().strftime("https://www.investegate.co.uk/today-announcements/%Y-%m-%d")
 
     # Investegate caps each page at 50 rows (JS-driven "Show 100/200/300" doesn't work via HTTP).
     # Fix: scrape multiple index pages in parallel and deduplicate.
@@ -1168,13 +1277,17 @@ async def scrape_investegate():
     ]
 
     def parse_rows(html_text):
-        """Parse announcement rows from an Investegate HTML page."""
+        """Parse announcement rows from an Investegate HTML page.
+        Returns (results, table_row_count) — the count of 4-cell table rows seen,
+        parsed or not, so the caller can tell an empty feed from broken markup."""
         results = []
+        table_rows = 0
         soup = BeautifulSoup(html_text, "html.parser")
         for row in soup.find_all("tr"):
             cells = row.find_all("td")
             if len(cells) < 4:
                 continue
+            table_rows += 1
             try:
                 time_raw = cells[0].get_text(strip=True)
                 if not is_today(time_raw):
@@ -1197,9 +1310,9 @@ async def scrape_investegate():
                     href = link_tag["href"]
                     url = href if href.startswith("http") else f"https://www.investegate.co.uk{href}"
 
-                # Dedup key: ticker-based (or normalised name fallback) so the same
+                # Dedup key: URL-based (ticker / normalised-name fallback) so the same
                 # announcement scraped from multiple sources collapses to one row
-                dedup_key = make_dedup_key(ticker, company_name, headline)
+                dedup_key = make_dedup_key(ticker, company_name, headline, url)
                 if dedup_key in seen_keys:
                     continue
                 seen_keys.add(dedup_key)
@@ -1213,18 +1326,29 @@ async def scrape_investegate():
                 ))
             except (IndexError, AttributeError):
                 continue
-        return results
+        return results, table_rows
 
     # Fetch all pages in parallel
+    index_rows_parsed = 0
+    index_table_rows = 0
+    pages_ok = 0
     async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
-        import asyncio
         async def fetch_page(url):
-            try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                return url, resp.text, None
-            except httpx.HTTPError as e:
-                return url, None, str(e)
+            # One retry after a short pause — a single transient blip on the
+            # today-archive page (the richest source) otherwise loses most of a
+            # refresh cycle. Deliberately no more than one: retry storms are a
+            # bigger IP-block risk than a thin cycle the daily cache papers over.
+            last_err = None
+            for attempt in (1, 2):
+                try:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    return url, resp.text, None
+                except httpx.HTTPError as e:
+                    last_err = str(e)
+                    if attempt == 1:
+                        await asyncio.sleep(1.0)
+            return url, None, last_err
 
         results = await asyncio.gather(*[fetch_page(u) for u in pages_to_scrape])
 
@@ -1232,8 +1356,33 @@ async def scrape_investegate():
             if err:
                 errors.append(f"Failed: {url} — {err}")
                 continue
-            page_rows = parse_rows(html)
+            pages_ok += 1
+            page_rows, table_rows = parse_rows(html)
+            index_rows_parsed += len(page_rows)
+            index_table_rows += table_rows
             raw.extend(page_rows)
+
+    # Loud failure when the scrape silently breaks: a markup or date-format change
+    # at Investegate produces zero rows from healthy HTTP 200s, indistinguishable
+    # in the UI from a quiet news day. Two signatures:
+    #  - pages fetched fine but NO 4-cell table rows anywhere → markup changed
+    #  - table rows present but none matched today's date after the RNS day has
+    #    started (07:30 London) → date format likely changed
+    # Before 07:30 the second case is normal (tables still show yesterday), so
+    # the time condition avoids a false alarm every early morning.
+    if pages_ok > 0 and index_rows_parsed == 0:
+        if index_table_rows == 0:
+            errors.append(
+                f"Parser warning: {pages_ok} index pages fetched but no announcement "
+                f"table rows found — Investegate markup may have changed"
+            )
+        else:
+            now_london = datetime.now(_LONDON_TZ) if _LONDON_TZ else datetime.now()
+            if (now_london.hour, now_london.minute) >= (7, 30):
+                errors.append(
+                    f"Parser warning: {index_table_rows} table rows seen but none matched "
+                    f"today's date — Investegate date format may have changed"
+                )
 
     # Supplement with direct company-page fetches for watchlist companies.
     # This catches announcements from smaller companies that don't appear on
@@ -1248,7 +1397,7 @@ async def scrape_investegate():
     async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
         async def fetch_company_page(ticker, info):
             found = []
-            today_str = date.today().strftime("%d/%m/%Y")
+            today_str = today_london().strftime("%d/%m/%Y")
             try:
                 # Investegate company pages: e.g. https://www.investegate.co.uk/company/NRR
                 # Tickers with trailing dot (TW., JD., JET2 etc.) are kept as-is — the dot
@@ -1298,7 +1447,7 @@ async def scrape_investegate():
                             if f"--{ticker_slug}/" not in url_lower:
                                 continue
 
-                        dedup_key = make_dedup_key(ticker, info['name'], headline)
+                        dedup_key = make_dedup_key(ticker, info['name'], headline, url)
                         if dedup_key in seen_keys:
                             continue
                         seen_keys.add(dedup_key)
@@ -1361,8 +1510,10 @@ def is_noise_category(ann):
     return ann.category in NOISE_CATEGORIES and not ann.is_watchlist
 
 def filter_announcements(anns):
+    # Watchlist membership overrides the mining/oil/gas exclusion: a watchlist
+    # company whose name happens to contain an excluded keyword must always show.
     return [a for a in anns
-            if not is_excluded_company(a.company)
+            if (a.is_watchlist or not is_excluded_company(a.company))
             and is_material_type(a.headline)
             and not is_noise_category(a)]
 
@@ -1440,19 +1591,20 @@ async def get_rns(
     raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
     total_raw = len(raw)
     if include_all:
-        # Just exclude mining/oil/gas — let the client decide what to hide
-        filtered = [a for a in raw if not is_excluded_company(a.company)]
+        # Just exclude mining/oil/gas — let the client decide what to hide.
+        # Watchlist companies are exempt from the exclusion.
+        filtered = [a for a in raw if a.is_watchlist or not is_excluded_company(a.company)]
     else:
         # Apply EXCLUDED_TYPES headline-level filter; still no category-level filter
         filtered = [a for a in raw
-                    if not is_excluded_company(a.company)
+                    if (a.is_watchlist or not is_excluded_company(a.company))
                     and is_material_type(a.headline)]
     if watchlist_only: filtered = [a for a in filtered if a.is_watchlist]
     ranked = rank_announcements(filtered)
     scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
     return ScrapeResponse(
         announcements=ranked[:limit], total_raw=total_raw, total_filtered=len(filtered),
-        scraped_at=scraped_at, date=date.today().strftime("%A %d %B %Y"),
+        scraped_at=scraped_at, date=today_london().strftime("%A %d %B %Y"),
         source="investegate", errors=list(daily_cache.last_errors),
         default_hidden_categories=sorted(NOISE_CATEGORIES),
     )
@@ -1467,7 +1619,7 @@ async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False
     scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
     return ScrapeResponse(
         announcements=raw[:limit], total_raw=total_raw, total_filtered=total_raw,
-        scraped_at=scraped_at, date=date.today().strftime("%A %d %B %Y"),
+        scraped_at=scraped_at, date=today_london().strftime("%A %d %B %Y"),
         source="investegate", errors=list(daily_cache.last_errors),
         default_hidden_categories=sorted(NOISE_CATEGORIES),
     )
@@ -1592,7 +1744,7 @@ async def reset_watchlist():
 
 @app.get("/api/debug/raw-html")
 async def debug_raw_html():
-    today_url = date.today().strftime("https://www.investegate.co.uk/today-announcements/%Y-%m-%d")
+    today_url = today_london().strftime("https://www.investegate.co.uk/today-announcements/%Y-%m-%d")
     async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
         try:
             resp = await client.get(today_url)
