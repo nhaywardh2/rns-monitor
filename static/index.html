@@ -209,7 +209,8 @@
 <body>
   <div id="root"></div>
   <script>
-/* Precompiled from index.src.html via Babel. Edit index.src.html and recompile, not this. */
+/* Precompiled from index.src.html via Babel. Edit index.src.html and re-run build.js, not this file. */
+import { jsxDEV as _jsxDEV, Fragment as _Fragment } from "react/jsx-dev-runtime";
 const {
   useState,
   useEffect,
@@ -225,7 +226,9 @@ const API_BASE = "";
 // dimmed but stay visible. Self-contained so any card can use it without prop threading.
 const readStore = (() => {
   const KEY = "rns_read_v1";
-  const today = new Date().toISOString().slice(0, 10);
+  // Local calendar day (en-CA gives YYYY-MM-DD). The previous toISOString()
+  // used UTC, so during BST the read-state reset an hour out of step with the feed.
+  const today = new Date().toLocaleDateString("en-CA");
   let ids = new Set();
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
@@ -340,7 +343,7 @@ function StatusDot({
     error: "var(--danger)",
     idle: "var(--text-muted)"
   };
-  return /*#__PURE__*/React.createElement("span", {
+  return /*#__PURE__*/_jsxDEV("span", {
     style: {
       display: "inline-block",
       width: 8,
@@ -351,7 +354,7 @@ function StatusDot({
       marginRight: 8,
       flexShrink: 0
     }
-  });
+  }, void 0, false);
 }
 function FilterPill({
   label,
@@ -359,7 +362,7 @@ function FilterPill({
   onClick,
   count
 }) {
-  return /*#__PURE__*/React.createElement("button", {
+  return /*#__PURE__*/_jsxDEV("button", {
     onClick: onClick,
     style: {
       display: "inline-flex",
@@ -376,24 +379,26 @@ function FilterPill({
       cursor: "pointer",
       transition: "all 0.2s",
       whiteSpace: "nowrap"
-    }
-  }, label, count !== undefined && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: active ? "var(--accent)" : "var(--border)",
-      color: active ? "var(--bg-primary)" : "var(--text-secondary)",
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "1px 7px",
-      borderRadius: 10,
-      fontFamily: "var(--font-mono)"
-    }
-  }, count));
+    },
+    children: [label, count !== undefined && /*#__PURE__*/_jsxDEV("span", {
+      style: {
+        background: active ? "var(--accent)" : "var(--border)",
+        color: active ? "var(--bg-primary)" : "var(--text-secondary)",
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "1px 7px",
+        borderRadius: 10,
+        fontFamily: "var(--font-mono)"
+      },
+      children: count
+    }, void 0, false)]
+  }, void 0, true);
 }
 function CategoryBadge({
   category
 }) {
   const cat = CATEGORY_COLORS[category] || CATEGORY_COLORS["Other"];
-  return /*#__PURE__*/React.createElement("span", {
+  return /*#__PURE__*/_jsxDEV("span", {
     style: {
       padding: "2px 10px",
       borderRadius: 12,
@@ -403,8 +408,9 @@ function CategoryBadge({
       fontWeight: 600,
       letterSpacing: "0.03em",
       textTransform: "uppercase"
-    }
-  }, category);
+    },
+    children: category
+  }, void 0, false);
 }
 
 // ── Shareholding Summary Strip ──
@@ -419,75 +425,85 @@ function ShareholdingStrip({
   const dirColor = dir === "increase" ? "var(--accent)" : dir === "decrease" ? "var(--ma)" : "var(--text-muted)";
   const arrow = dir === "increase" ? "\u25B2" : dir === "decrease" ? "\u25BC" : "";
   const changePP = data.change_pp !== null && data.change_pp !== undefined ? `${data.change_pp > 0 ? "+" : ""}${data.change_pp.toFixed(2)}pp` : "";
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/_jsxDEV("div", {
     style: {
       marginTop: 8,
       padding: "10px 16px",
       background: "rgba(244,114,182,0.06)",
       border: "1px solid rgba(244,114,182,0.12)",
       borderRadius: 8
-    }
-  }, confident && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      flexWrap: "wrap",
-      marginBottom: data.summary ? 8 : 0
-    }
-  }, data.holder && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 600,
-      fontSize: 13,
-      color: "var(--text-primary)"
-    }
-  }, data.holder), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: "var(--font-mono)",
-      fontSize: 12,
-      color: "var(--text-secondary)"
-    }
-  }, data.old_pct.toFixed(2), "%", /*#__PURE__*/React.createElement("span", {
-    style: {
-      margin: "0 4px",
-      color: "var(--text-muted)"
-    }
-  }, "\u2192"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: dirColor,
-      fontWeight: 600
-    }
-  }, data.new_pct.toFixed(2), "%")), changePP && /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 3,
-      padding: "2px 8px",
-      borderRadius: 10,
-      background: dir === "increase" ? "rgba(61,184,106,0.12)" : dir === "decrease" ? "rgba(249,112,102,0.12)" : "rgba(138,158,143,0.08)",
-      color: dirColor,
-      fontSize: 11,
-      fontWeight: 600,
-      fontFamily: "var(--font-mono)"
-    }
-  }, arrow, " ", changePP), data.voting_rights && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--text-muted)",
-      fontFamily: "var(--font-mono)"
-    }
-  }, data.voting_rights, " votes")), data.summary && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--text-secondary)",
-      lineHeight: 1.6
-    }
-  }, data.summary), !data.summary && !confident && data.holder && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--text-secondary)"
-    }
-  }, data.holder, data.new_pct !== null ? ` — ${data.new_pct.toFixed(2)}%` : ""));
+    },
+    children: [confident && /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: data.summary ? 8 : 0
+      },
+      children: [data.holder && /*#__PURE__*/_jsxDEV("span", {
+        style: {
+          fontWeight: 600,
+          fontSize: 13,
+          color: "var(--text-primary)"
+        },
+        children: data.holder
+      }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+        style: {
+          fontFamily: "var(--font-mono)",
+          fontSize: 12,
+          color: "var(--text-secondary)"
+        },
+        children: [data.old_pct.toFixed(2), "%", /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            margin: "0 4px",
+            color: "var(--text-muted)"
+          },
+          children: "\u2192"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            color: dirColor,
+            fontWeight: 600
+          },
+          children: [data.new_pct.toFixed(2), "%"]
+        }, void 0, true)]
+      }, void 0, true), changePP && /*#__PURE__*/_jsxDEV("span", {
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 3,
+          padding: "2px 8px",
+          borderRadius: 10,
+          background: dir === "increase" ? "rgba(61,184,106,0.12)" : dir === "decrease" ? "rgba(249,112,102,0.12)" : "rgba(138,158,143,0.08)",
+          color: dirColor,
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: "var(--font-mono)"
+        },
+        children: [arrow, " ", changePP]
+      }, void 0, true), data.voting_rights && /*#__PURE__*/_jsxDEV("span", {
+        style: {
+          fontSize: 11,
+          color: "var(--text-muted)",
+          fontFamily: "var(--font-mono)"
+        },
+        children: [data.voting_rights, " votes"]
+      }, void 0, true)]
+    }, void 0, true), data.summary && /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-secondary)",
+        lineHeight: 1.6
+      },
+      children: data.summary
+    }, void 0, false), !data.summary && !confident && data.holder && /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-secondary)"
+      },
+      children: [data.holder, data.new_pct !== null ? ` — ${data.new_pct.toFixed(2)}%` : ""]
+    }, void 0, true)]
+  }, void 0, true);
 }
 
 // ── Full Text Toggle ──
@@ -525,45 +541,49 @@ function FullTextToggle({
     return paragraphs;
   };
   const paragraphs = buildParagraphs(text);
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/_jsxDEV("div", {
     style: {
       marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      setShowFull(!showFull);
     },
-    style: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      padding: "6px 14px",
-      border: "1px solid var(--border)",
-      borderRadius: 8,
-      background: "transparent",
-      color: "var(--text-secondary)",
-      fontFamily: "var(--font-sans)",
-      fontSize: 12,
-      fontWeight: 500,
-      cursor: "pointer",
-      transition: "all 0.2s",
-      marginBottom: showFull ? 10 : 0
-    }
-  }, showFull ? "Hide full announcement" : "Show full announcement", /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      transition: "transform 0.2s",
-      transform: showFull ? "rotate(180deg)" : "rotate(0)"
-    }
-  }, "\u25BC")), showFull && /*#__PURE__*/React.createElement("div", {
-    className: "detail-body"
-  }, paragraphs.map((p, i) => /*#__PURE__*/React.createElement("p", {
-    key: i,
-    style: {
-      margin: "0 0 10px 0"
-    }
-  }, p))));
+    children: [/*#__PURE__*/_jsxDEV("button", {
+      onClick: e => {
+        e.stopPropagation();
+        setShowFull(!showFull);
+      },
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 14px",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        background: "transparent",
+        color: "var(--text-secondary)",
+        fontFamily: "var(--font-sans)",
+        fontSize: 12,
+        fontWeight: 500,
+        cursor: "pointer",
+        transition: "all 0.2s",
+        marginBottom: showFull ? 10 : 0
+      },
+      children: [showFull ? "Hide full announcement" : "Show full announcement", /*#__PURE__*/_jsxDEV("span", {
+        style: {
+          fontSize: 10,
+          transition: "transform 0.2s",
+          transform: showFull ? "rotate(180deg)" : "rotate(0)"
+        },
+        children: "▼"
+      }, void 0, false)]
+    }, void 0, true), showFull && /*#__PURE__*/_jsxDEV("div", {
+      className: "detail-body",
+      children: paragraphs.map((p, i) => /*#__PURE__*/_jsxDEV("p", {
+        style: {
+          margin: "0 0 10px 0"
+        },
+        children: p
+      }, i, false))
+    }, void 0, false)]
+  }, void 0, true);
 }
 
 // ── Expandable Announcement Row — dense terminal style ──
@@ -625,165 +645,195 @@ function AnnouncementCard({
   if (isWL) rowClasses.push(tier === "read_across" ? "readacross" : "watchlist");
   if (expanded) rowClasses.push("expanded");
   if (isRead && !expanded) rowClasses.push("read");
-  return /*#__PURE__*/React.createElement("div", {
-    className: rowClasses.join(" ") + " fade-in"
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: toggleExpand
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "row-meta"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "row-time"
-  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
-    className: "row-ticker" + (isWL ? tier === "read_across" ? " readacross" : " watchlist" : "")
-  }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
-    className: "row-tag tier-core"
-  }, "CORE"), tier === "read_across" && /*#__PURE__*/React.createElement("span", {
-    className: "row-tag tier-ra"
-  }, "R/A"), /*#__PURE__*/React.createElement("span", {
-    className: "row-category",
-    style: {
-      color: catColor.color,
-      background: catColor.bg
-    }
-  }, ann.category), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
-    className: "row-source"
-  }, ann.source_feed), /*#__PURE__*/React.createElement("span", {
-    className: "row-spacer"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "row-chevron"
-  }, "\u25BC")), /*#__PURE__*/React.createElement("div", {
-    className: "row-company"
-  }, ann.company), /*#__PURE__*/React.createElement("div", {
-    className: "row-headline"
-  }, ann.headline)), expanded && /*#__PURE__*/React.createElement("div", {
-    className: "expand"
-  }, loading && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "8px 0"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "spinner"
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--text-muted)"
-    }
-  }, "Fetching announcement...")), error && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "8px 10px",
-      background: "rgba(239,68,68,0.06)",
-      border: "1px solid rgba(239,68,68,0.18)",
-      fontSize: 11,
-      color: "var(--danger)",
-      marginBottom: 10
-    }
-  }, "Failed to load: ", error), ann.category === "Shareholding" && shLoading && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "spinner",
-    style: {
-      width: 11,
-      height: 11,
-      borderWidth: 1.5
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      color: "var(--text-muted)"
-    }
-  }, "Loading shareholding data...")), ann.category === "Shareholding" && shData && /*#__PURE__*/React.createElement(ShareholdingStrip, {
-    data: shData
-  }), detail && !loading && /*#__PURE__*/React.createElement(React.Fragment, null, detail.ai_summary && /*#__PURE__*/React.createElement("div", {
-    className: "expand-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "expand-label"
-  }, "Summary"), /*#__PURE__*/React.createElement("div", {
-    className: "expand-summary"
-  }, detail.ai_summary)), detail.key_figures && detail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "expand-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "expand-label"
-  }, "Key figures"), detail.key_figures.map((fig, i) => /*#__PURE__*/React.createElement("span", {
-    key: i,
-    className: "key-figure"
-  }, fig))), /*#__PURE__*/React.createElement(FullTextToggle, {
-    text: detail.body_text
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      alignItems: "center",
-      paddingTop: 8,
-      borderTop: "1px solid var(--border)",
-      marginTop: 8
-    }
-  }, ann.url && /*#__PURE__*/React.createElement("a", {
-    href: ann.url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    className: "expand-link",
-    onClick: e => e.stopPropagation()
-  }, "View on Investegate \u2197"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      color: "var(--text-muted)",
-      fontFamily: "var(--font-mono)",
-      marginLeft: "auto"
-    }
-  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))))));
+  return /*#__PURE__*/_jsxDEV("div", {
+    className: rowClasses.join(" ") + " fade-in",
+    children: [/*#__PURE__*/_jsxDEV("div", {
+      onClick: toggleExpand,
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "row-meta",
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          className: "row-time",
+          children: ann.time
+        }, void 0, false), ann.ticker && /*#__PURE__*/_jsxDEV("span", {
+          className: "row-ticker" + (isWL ? tier === "read_across" ? " readacross" : " watchlist" : ""),
+          children: ann.ticker
+        }, void 0, false), tier === "core" && /*#__PURE__*/_jsxDEV("span", {
+          className: "row-tag tier-core",
+          children: "CORE"
+        }, void 0, false), tier === "read_across" && /*#__PURE__*/_jsxDEV("span", {
+          className: "row-tag tier-ra",
+          children: "R/A"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          className: "row-category",
+          style: {
+            color: catColor.color,
+            background: catColor.bg
+          },
+          children: ann.category
+        }, void 0, false), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/_jsxDEV("span", {
+          className: "row-source",
+          children: ann.source_feed
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          className: "row-spacer"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          className: "row-chevron",
+          children: "▼"
+        }, void 0, false)]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        className: "row-company",
+        children: ann.company
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "row-headline",
+        children: ann.headline
+      }, void 0, false)]
+    }, void 0, true), expanded && /*#__PURE__*/_jsxDEV("div", {
+      className: "expand",
+      children: [loading && /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 0"
+        },
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          className: "spinner"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            fontSize: 11,
+            color: "var(--text-muted)"
+          },
+          children: "Fetching announcement..."
+        }, void 0, false)]
+      }, void 0, true), error && /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          padding: "8px 10px",
+          background: "rgba(239,68,68,0.06)",
+          border: "1px solid rgba(239,68,68,0.18)",
+          fontSize: 11,
+          color: "var(--danger)",
+          marginBottom: 10
+        },
+        children: ["Failed to load: ", error]
+      }, void 0, true), ann.category === "Shareholding" && shLoading && /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 8
+        },
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          className: "spinner",
+          style: {
+            width: 11,
+            height: 11,
+            borderWidth: 1.5
+          }
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            fontSize: 10,
+            color: "var(--text-muted)"
+          },
+          children: "Loading shareholding data..."
+        }, void 0, false)]
+      }, void 0, true), ann.category === "Shareholding" && shData && /*#__PURE__*/_jsxDEV(ShareholdingStrip, {
+        data: shData
+      }, void 0, false), detail && !loading && /*#__PURE__*/_jsxDEV(_Fragment, {
+        children: [detail.ai_summary && /*#__PURE__*/_jsxDEV("div", {
+          className: "expand-section",
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "expand-label",
+            children: "Summary"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+            className: "expand-summary",
+            children: detail.ai_summary
+          }, void 0, false)]
+        }, void 0, true), detail.key_figures && detail.key_figures.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+          className: "expand-section",
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "expand-label",
+            children: "Key figures"
+          }, void 0, false), detail.key_figures.map((fig, i) => /*#__PURE__*/_jsxDEV("span", {
+            className: "key-figure",
+            children: fig
+          }, i, false))]
+        }, void 0, true), /*#__PURE__*/_jsxDEV(FullTextToggle, {
+          text: detail.body_text
+        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+          style: {
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            paddingTop: 8,
+            borderTop: "1px solid var(--border)",
+            marginTop: 8
+          },
+          children: [ann.url && /*#__PURE__*/_jsxDEV("a", {
+            href: ann.url,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "expand-link",
+            onClick: e => e.stopPropagation(),
+            children: "View on Investegate ↗"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontSize: 10,
+              color: "var(--text-muted)",
+              fontFamily: "var(--font-mono)",
+              marginLeft: "auto"
+            },
+            children: new Date(detail.fetched_at).toLocaleTimeString("en-GB")
+          }, void 0, false)]
+        }, void 0, true)]
+      }, void 0, true)]
+    }, void 0, true)]
+  }, void 0, true);
 }
 function SkeletonCard() {
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/_jsxDEV("div", {
     className: "row",
     style: {
       cursor: "default"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      marginBottom: 6
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "skeleton",
-    style: {
-      width: 36,
-      height: 11
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "skeleton",
-    style: {
-      width: 32,
-      height: 11
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "skeleton",
-    style: {
-      width: 64,
-      height: 11
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "skeleton",
-    style: {
-      width: "55%",
-      height: 11,
-      marginBottom: 5
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "skeleton",
-    style: {
-      width: "90%",
-      height: 13
-    }
-  }));
+    },
+    children: [/*#__PURE__*/_jsxDEV("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 6
+      },
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "skeleton",
+        style: {
+          width: 36,
+          height: 11
+        }
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "skeleton",
+        style: {
+          width: 32,
+          height: 11
+        }
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "skeleton",
+        style: {
+          width: 64,
+          height: 11
+        }
+      }, void 0, false)]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      className: "skeleton",
+      style: {
+        width: "55%",
+        height: 11,
+        marginBottom: 5
+      }
+    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+      className: "skeleton",
+      style: {
+        width: "90%",
+        height: 13
+      }
+    }, void 0, false)]
+  }, void 0, true);
 }
 function WatchlistModal({
   watchlist,
@@ -806,7 +856,7 @@ function WatchlistModal({
     outline: "none",
     width: "100%"
   };
-  const tierBtn = (val, label) => /*#__PURE__*/React.createElement("button", {
+  const tierBtn = (val, label) => /*#__PURE__*/_jsxDEV("button", {
     onClick: () => setTier(val),
     style: {
       flex: 1,
@@ -819,9 +869,10 @@ function WatchlistModal({
       fontSize: 12,
       fontWeight: 600,
       cursor: "pointer"
-    }
-  }, label);
-  return /*#__PURE__*/React.createElement("div", {
+    },
+    children: label
+  }, void 0, false);
+  return /*#__PURE__*/_jsxDEV("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -832,192 +883,213 @@ function WatchlistModal({
       justifyContent: "center",
       backdropFilter: "blur(4px)"
     },
-    onClick: onClose
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: e => e.stopPropagation(),
-    className: "fade-up",
-    style: {
-      background: "var(--bg-card)",
-      border: "1px solid var(--border)",
-      borderRadius: 14,
-      padding: 28,
-      width: "100%",
-      maxWidth: 560,
-      maxHeight: "80vh",
-      overflow: "auto",
-      margin: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 20
-    }
-  }, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontSize: 18,
-      fontWeight: 600
-    }
-  }, "Watchlist (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--text-muted)",
-      fontSize: 20,
-      cursor: "pointer"
-    }
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-      marginBottom: 20
-    }
-  }, Object.entries(watchlist).map(([t, info]) => /*#__PURE__*/React.createElement("div", {
-    key: t,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "8px 12px",
-      background: "var(--bg-surface)",
-      border: "1px solid var(--border)",
-      borderRadius: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: "var(--font-mono)",
-      fontSize: 12,
-      fontWeight: 600,
-      color: "var(--accent)",
-      background: "var(--accent-glow)",
-      padding: "2px 8px",
-      borderRadius: 4
-    }
-  }, t), info.tier === "read_across" ? /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      padding: "1px 6px",
-      borderRadius: 4,
-      background: "rgba(249,115,22,0.12)",
-      color: "var(--readacross)"
-    }
-  }, "R/A") : /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      padding: "1px 6px",
-      borderRadius: 4,
-      background: "rgba(240,192,64,0.12)",
-      color: "var(--core)"
-    }
-  }, "CORE"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      color: "var(--text-primary)"
-    }
-  }, info.name), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--text-muted)"
-    }
-  }, info.sector)), /*#__PURE__*/React.createElement("button", {
-    onClick: () => onRemove(t),
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--text-muted)",
-      cursor: "pointer",
-      fontSize: 14,
-      padding: "2px 6px"
-    },
-    onMouseOver: e => e.target.style.color = "var(--danger)",
-    onMouseOut: e => e.target.style.color = "var(--text-muted)"
-  }, "\u2715")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      borderTop: "1px solid var(--border)",
-      paddingTop: 16,
-      display: "flex",
-      flexDirection: "column",
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "var(--text-secondary)",
-      marginBottom: 4
-    }
-  }, "Add to watchlist"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    value: ticker,
-    onChange: e => setTicker(e.target.value),
-    placeholder: "Ticker",
-    style: {
-      ...is,
-      maxWidth: 90,
-      fontFamily: "var(--font-mono)"
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    value: name,
-    onChange: e => setName(e.target.value),
-    placeholder: "Company name",
-    style: is
-  })), /*#__PURE__*/React.createElement("input", {
-    value: sector,
-    onChange: e => setSector(e.target.value),
-    placeholder: "Sector (optional)",
-    style: is
-  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--text-muted)",
-      marginBottom: 6
-    }
-  }, "Tier"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, tierBtn("core", "Core"), tierBtn("read_across", "Read-across"))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (ticker && name) {
-        onAdd(ticker.toUpperCase(), name, sector, tier);
-        setTicker("");
-        setName("");
-        setSector("");
-        setTier("core");
-      }
-    },
-    disabled: !ticker || !name,
-    style: {
-      background: ticker && name ? "var(--accent)" : "var(--border)",
-      color: ticker && name ? "var(--bg-primary)" : "var(--text-muted)",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px 16px",
-      fontFamily: "var(--font-sans)",
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: ticker && name ? "pointer" : "not-allowed"
-    }
-  }, "Add company"))));
+    children: /*#__PURE__*/_jsxDEV("div", {
+      onClick: e => e.stopPropagation(),
+      className: "fade-up",
+      style: {
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderRadius: 14,
+        padding: 28,
+        width: "100%",
+        maxWidth: 560,
+        maxHeight: "80vh",
+        overflow: "auto",
+        margin: 20
+      },
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20
+        },
+        children: [/*#__PURE__*/_jsxDEV("h2", {
+          style: {
+            fontSize: 18,
+            fontWeight: 600
+          },
+          children: ["Watchlist (", Object.keys(watchlist).length, ")"]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+          onClick: onClose,
+          style: {
+            background: "none",
+            border: "none",
+            color: "var(--text-muted)",
+            fontSize: 20,
+            cursor: "pointer"
+          },
+          children: "✕"
+        }, void 0, false)]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          marginBottom: 20
+        },
+        children: Object.entries(watchlist).map(([t, info]) => /*#__PURE__*/_jsxDEV("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 12px",
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 8
+          },
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap"
+            },
+            children: [/*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--accent)",
+                background: "var(--accent-glow)",
+                padding: "2px 8px",
+                borderRadius: 4
+              },
+              children: t
+            }, void 0, false), info.tier === "read_across" ? /*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                padding: "1px 6px",
+                borderRadius: 4,
+                background: "rgba(249,115,22,0.12)",
+                color: "var(--readacross)"
+              },
+              children: "R/A"
+            }, void 0, false) : /*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                padding: "1px 6px",
+                borderRadius: 4,
+                background: "rgba(240,192,64,0.12)",
+                color: "var(--core)"
+              },
+              children: "CORE"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 13,
+                color: "var(--text-primary)"
+              },
+              children: info.name
+            }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 11,
+                color: "var(--text-muted)"
+              },
+              children: info.sector
+            }, void 0, false)]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+            onClick: () => onRemove(t),
+            style: {
+              background: "none",
+              border: "none",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              fontSize: 14,
+              padding: "2px 6px"
+            },
+            onMouseOver: e => e.target.style.color = "var(--danger)",
+            onMouseOut: e => e.target.style.color = "var(--text-muted)",
+            children: "✕"
+          }, void 0, false)]
+        }, t, true))
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          borderTop: "1px solid var(--border)",
+          paddingTop: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10
+        },
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--text-secondary)",
+            marginBottom: 4
+          },
+          children: "Add to watchlist"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+          style: {
+            display: "flex",
+            gap: 8
+          },
+          children: [/*#__PURE__*/_jsxDEV("input", {
+            value: ticker,
+            onChange: e => setTicker(e.target.value),
+            placeholder: "Ticker",
+            style: {
+              ...is,
+              maxWidth: 90,
+              fontFamily: "var(--font-mono)"
+            }
+          }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+            value: name,
+            onChange: e => setName(e.target.value),
+            placeholder: "Company name",
+            style: is
+          }, void 0, false)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("input", {
+          value: sector,
+          onChange: e => setSector(e.target.value),
+          placeholder: "Sector (optional)",
+          style: is
+        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            style: {
+              fontSize: 11,
+              color: "var(--text-muted)",
+              marginBottom: 6
+            },
+            children: "Tier"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              display: "flex",
+              gap: 8
+            },
+            children: [tierBtn("core", "Core"), tierBtn("read_across", "Read-across")]
+          }, void 0, true)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+          onClick: () => {
+            if (ticker && name) {
+              onAdd(ticker.toUpperCase(), name, sector, tier);
+              setTicker("");
+              setName("");
+              setSector("");
+              setTier("core");
+            }
+          },
+          disabled: !ticker || !name,
+          style: {
+            background: ticker && name ? "var(--accent)" : "var(--border)",
+            color: ticker && name ? "var(--bg-primary)" : "var(--text-muted)",
+            border: "none",
+            borderRadius: 8,
+            padding: "10px 16px",
+            fontFamily: "var(--font-sans)",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: ticker && name ? "pointer" : "not-allowed"
+          },
+          children: "Add company"
+        }, void 0, false)]
+      }, void 0, true)]
+    }, void 0, true)
+  }, void 0, false);
 }
 
 // ── Read-Across View ──
@@ -1051,27 +1123,28 @@ function ReadAcrossView({
     fetchRA();
   }, [fetchRA, refreshTick]);
   if (raLoading && !raData) {
-    return /*#__PURE__*/React.createElement("div", {
+    return /*#__PURE__*/_jsxDEV("div", {
       style: {
         display: "flex",
         flexDirection: "column",
         gap: 10
-      }
-    }, [0, 1, 2].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
-      key: i,
-      index: i
-    })));
+      },
+      children: [0, 1, 2].map(i => /*#__PURE__*/_jsxDEV(SkeletonCard, {
+        index: i
+      }, i, false))
+    }, void 0, false);
   }
   if (raError && !raData) {
-    return /*#__PURE__*/React.createElement("div", {
+    return /*#__PURE__*/_jsxDEV("div", {
       style: {
         padding: 20,
         background: "rgba(239,68,68,0.08)",
         border: "1px solid rgba(239,68,68,0.2)",
         borderRadius: 8,
         color: "var(--danger)"
-      }
-    }, "Failed to load read-across: ", raError);
+      },
+      children: ["Failed to load read-across: ", raError]
+    }, void 0, true);
   }
   if (!raData) return null;
   const {
@@ -1123,720 +1196,798 @@ function ReadAcrossView({
       block: "center"
     });
   };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "fade-up"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 20,
-      padding: "14px 18px",
-      background: triggerCount > 0 ? "rgba(240,192,64,0.08)" : "var(--bg-card)",
-      border: `1px solid ${triggerCount > 0 ? "rgba(240,192,64,0.25)" : "var(--border)"}`,
-      borderRadius: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: triggerCount > 0 ? 12 : 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 8,
-      height: 8,
-      borderRadius: "50%",
-      background: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)",
-      animation: triggerCount > 0 ? "pulse-dot 1.5s infinite" : "none"
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)"
-    }
-  }, triggerCount === 0 ? "No live read-across triggers yet today" : `${triggerCount} live read-across ${triggerCount === 1 ? "trigger" : "triggers"} today`)), triggerCount > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 8
-    }
-  }, Object.entries(triggered).map(([ra_ticker, anns]) => {
-    const raCompany = read_across.find(r => r.ticker === ra_ticker);
-    const affectedCores = Object.keys(matrix[ra_ticker] || {});
-    return /*#__PURE__*/React.createElement("div", {
-      key: ra_ticker,
-      onClick: () => scrollToRow(ra_ticker),
+  return /*#__PURE__*/_jsxDEV("div", {
+    className: "fade-up",
+    children: [/*#__PURE__*/_jsxDEV("div", {
       style: {
-        padding: "10px 14px",
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        cursor: "pointer",
-        transition: "all 0.15s"
+        marginBottom: 20,
+        padding: "14px 18px",
+        background: triggerCount > 0 ? "rgba(240,192,64,0.08)" : "var(--bg-card)",
+        border: `1px solid ${triggerCount > 0 ? "rgba(240,192,64,0.25)" : "var(--border)"}`,
+        borderRadius: 10
       },
-      onMouseOver: e => {
-        e.currentTarget.style.borderColor = "var(--watchlist)";
-      },
-      onMouseOut: e => {
-        e.currentTarget.style.borderColor = "var(--border)";
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap",
-        marginBottom: 4
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        fontWeight: 700,
-        color: "var(--watchlist)",
-        background: "rgba(240,192,64,0.1)",
-        padding: "2px 6px",
-        borderRadius: 4
-      }
-    }, ra_ticker), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: "var(--text-primary)"
-      }
-    }, raCompany?.name || ra_ticker), /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: "auto",
-        fontSize: 11,
-        color: "var(--text-muted)",
-        fontFamily: "var(--font-mono)"
-      }
-    }, anns[0].time)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: "var(--text-secondary)",
-        marginBottom: 6
-      }
-    }, anns.slice(0, 3).map((a, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        marginBottom: 4,
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement(CategoryBadge, {
-      category: a.category
-    }), /*#__PURE__*/React.createElement("span", null, a.headline))), anns.length > 3 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: "var(--text-muted)",
-        marginTop: 4
-      }
-    }, "+ ", anns.length - 3, " more")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: "var(--text-muted)"
-      }
-    }, "Reads across to ", affectedCores.length, " core ", affectedCores.length === 1 ? "company" : "companies", ": ", affectedCores.join(", ")));
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap",
-      marginBottom: 16,
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement(FilterPill, {
-    label: "All types",
-    active: typeFilter === "ALL",
-    onClick: () => setTypeFilter("ALL")
-  }), Object.entries(RT).map(([k, r]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    onClick: () => setTypeFilter(k),
-    style: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      padding: "6px 14px",
-      borderRadius: 20,
-      border: `1px solid ${typeFilter === k ? r.border : "var(--border)"}`,
-      background: typeFilter === k ? r.bg : "transparent",
-      color: typeFilter === k ? r.color : "var(--text-secondary)",
-      fontFamily: "var(--font-sans)",
-      fontSize: 13,
-      fontWeight: 500,
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 14,
-      height: 14,
-      borderRadius: 3,
-      background: r.bg,
-      border: `1px solid ${r.border}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 8,
-      fontWeight: 700,
-      color: r.color,
-      fontFamily: "var(--font-mono)"
-    }
-  }, r.short)), r.label))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      overflowX: "auto",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: {
-      borderCollapse: "collapse",
-      minWidth: "100%",
-      fontSize: 11
-    }
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
-    style: {
-      background: "var(--bg-surface)"
-    }
-  }, /*#__PURE__*/React.createElement("th", {
-    style: {
-      padding: "12px 14px",
-      textAlign: "left",
-      borderBottom: "1px solid var(--border)",
-      borderRight: "1px solid var(--border)",
-      position: "sticky",
-      left: 0,
-      background: "var(--bg-surface)",
-      zIndex: 2,
-      minWidth: 180
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      fontWeight: 700,
-      textTransform: "uppercase",
-      letterSpacing: "0.08em",
-      color: "var(--text-muted)"
-    }
-  }, "Read-across \u2193  Core \u2192")), activeCore.map(c => /*#__PURE__*/React.createElement("th", {
-    key: c.ticker,
-    title: `${c.name} · ${c.sector}`,
-    style: {
-      padding: "10px 8px",
-      borderBottom: "1px solid var(--border)",
-      borderRight: "1px solid var(--border)",
-      minWidth: 64,
-      background: "var(--bg-surface)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "var(--font-mono)",
-      fontSize: 10,
-      fontWeight: 700,
-      color: "var(--accent)",
-      letterSpacing: "0.04em"
-    }
-  }, c.ticker), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 9,
-      color: "var(--text-muted)",
-      marginTop: 2,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      maxWidth: 56
-    }
-  }, c.sector.split(" / ")[0]))))), /*#__PURE__*/React.createElement("tbody", null, read_across.map((ra, ri) => {
-    const rowData = matrix[ra.ticker] || {};
-    const triggered_here = isTriggered(ra.ticker);
-    const rowBg = triggered_here ? "rgba(240,192,64,0.05)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
-    const stickyBg = triggered_here ? "rgba(240,192,64,0.08)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
-    return /*#__PURE__*/React.createElement("tr", {
-      key: ra.ticker,
-      ref: el => rowRefs.current[ra.ticker] = el,
-      style: {
-        background: rowBg
-      }
-    }, /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: "10px 14px",
-        borderRight: "1px solid var(--border)",
-        borderBottom: "1px solid var(--border)",
-        position: "sticky",
-        left: 0,
-        zIndex: 1,
-        background: stickyBg,
-        borderLeft: triggered_here ? "3px solid var(--watchlist)" : "3px solid transparent"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        fontWeight: 700,
-        color: triggered_here ? "var(--watchlist)" : "var(--accent)",
-        background: triggered_here ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
-        padding: "2px 6px",
-        borderRadius: 4
-      }
-    }, ra.ticker), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: "var(--text-primary)"
-      }
-    }, ra.name), triggered_here && /*#__PURE__*/React.createElement("span", {
-      style: {
-        padding: "1px 6px",
-        borderRadius: 4,
-        background: "var(--watchlist)",
-        color: "var(--bg-primary)",
-        fontSize: 9,
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        animation: "pulse-dot 2s infinite"
-      }
-    }, "LIVE")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: "var(--text-muted)",
-        marginTop: 2,
-        paddingLeft: 2
-      }
-    }, ra.sector)), activeCore.map(c => {
-      const rel = rowData[c.ticker];
-      const cellKey = `${ra.ticker}-${c.ticker}`;
-      const isSelected = selectedCell === cellKey;
-      const visible = rel && filterMatch(rel);
-      const r = visible ? RT[rel.type] : null;
-      return /*#__PURE__*/React.createElement("td", {
-        key: c.ticker,
+      children: [/*#__PURE__*/_jsxDEV("div", {
         style: {
-          padding: "6px 8px",
-          textAlign: "center",
-          borderRight: "1px solid var(--border)",
-          borderBottom: "1px solid var(--border)",
-          cursor: visible ? "pointer" : "default",
-          background: isSelected ? "rgba(61,184,106,0.12)" : "transparent",
-          transition: "background 0.15s"
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: triggerCount > 0 ? 12 : 0
         },
-        onClick: () => handleCellClick(ra.ticker, c.ticker)
-      }, visible && r && /*#__PURE__*/React.createElement("div", {
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)",
+            animation: triggerCount > 0 ? "pulse-dot 1.5s infinite" : "none"
+          }
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600,
+            color: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)"
+          },
+          children: triggerCount === 0 ? "No live read-across triggers yet today" : `${triggerCount} live read-across ${triggerCount === 1 ? "trigger" : "triggers"} today`
+        }, void 0, false)]
+      }, void 0, true), triggerCount > 0 && /*#__PURE__*/_jsxDEV("div", {
         style: {
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          gap: 3
-        }
-      }, /*#__PURE__*/React.createElement("div", {
+          gap: 8
+        },
+        children: Object.entries(triggered).map(([ra_ticker, anns]) => {
+          const raCompany = read_across.find(r => r.ticker === ra_ticker);
+          const affectedCores = Object.keys(matrix[ra_ticker] || {});
+          return /*#__PURE__*/_jsxDEV("div", {
+            onClick: () => scrollToRow(ra_ticker),
+            style: {
+              padding: "10px 14px",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              cursor: "pointer",
+              transition: "all 0.15s"
+            },
+            onMouseOver: e => {
+              e.currentTarget.style.borderColor = "var(--watchlist)";
+            },
+            onMouseOut: e => {
+              e.currentTarget.style.borderColor = "var(--border)";
+            },
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+                marginBottom: 4
+              },
+              children: [/*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--watchlist)",
+                  background: "rgba(240,192,64,0.1)",
+                  padding: "2px 6px",
+                  borderRadius: 4
+                },
+                children: ra_ticker
+              }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--text-primary)"
+                },
+                children: raCompany?.name || ra_ticker
+              }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  marginLeft: "auto",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-mono)"
+                },
+                children: anns[0].time
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 12,
+                color: "var(--text-secondary)",
+                marginBottom: 6
+              },
+              children: [anns.slice(0, 3).map((a, i) => /*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  marginBottom: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  flexWrap: "wrap"
+                },
+                children: [/*#__PURE__*/_jsxDEV(CategoryBadge, {
+                  category: a.category
+                }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+                  children: a.headline
+                }, void 0, false)]
+              }, i, true)), anns.length > 3 && /*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  marginTop: 4
+                },
+                children: ["+ ", anns.length - 3, " more"]
+              }, void 0, true)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 11,
+                color: "var(--text-muted)"
+              },
+              children: ["Reads across to ", affectedCores.length, " core ", affectedCores.length === 1 ? "company" : "companies", ": ", affectedCores.join(", ")]
+            }, void 0, true)]
+          }, ra_ticker, true);
+        })
+      }, void 0, false)]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 16,
+        alignItems: "center"
+      },
+      children: [/*#__PURE__*/_jsxDEV(FilterPill, {
+        label: "All types",
+        active: typeFilter === "ALL",
+        onClick: () => setTypeFilter("ALL")
+      }, void 0, false), Object.entries(RT).map(([k, r]) => /*#__PURE__*/_jsxDEV("button", {
+        onClick: () => setTypeFilter(k),
         style: {
-          width: 26,
-          height: 26,
-          borderRadius: 6,
-          background: triggered_here ? r.bg : isSelected ? r.bg : "rgba(255,255,255,0.03)",
-          border: `1px solid ${triggered_here ? r.border : isSelected ? r.border : "rgba(255,255,255,0.06)"}`,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 14px",
+          borderRadius: 20,
+          border: `1px solid ${typeFilter === k ? r.border : "var(--border)"}`,
+          background: typeFilter === k ? r.bg : "transparent",
+          color: typeFilter === k ? r.color : "var(--text-secondary)",
+          fontFamily: "var(--font-sans)",
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: "pointer"
+        },
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            width: 14,
+            height: 14,
+            borderRadius: 3,
+            background: r.bg,
+            border: `1px solid ${r.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          },
+          children: /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontSize: 8,
+              fontWeight: 700,
+              color: r.color,
+              fontFamily: "var(--font-mono)"
+            },
+            children: r.short
+          }, void 0, false)
+        }, void 0, false), r.label]
+      }, k, true))]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        overflowX: "auto",
+        borderRadius: 12,
+        border: "1px solid var(--border)",
+        marginBottom: 16
+      },
+      children: /*#__PURE__*/_jsxDEV("table", {
+        style: {
+          borderCollapse: "collapse",
+          minWidth: "100%",
+          fontSize: 11
+        },
+        children: [/*#__PURE__*/_jsxDEV("thead", {
+          children: /*#__PURE__*/_jsxDEV("tr", {
+            style: {
+              background: "var(--bg-surface)"
+            },
+            children: [/*#__PURE__*/_jsxDEV("th", {
+              style: {
+                padding: "12px 14px",
+                textAlign: "left",
+                borderBottom: "1px solid var(--border)",
+                borderRight: "1px solid var(--border)",
+                position: "sticky",
+                left: 0,
+                background: "var(--bg-surface)",
+                zIndex: 2,
+                minWidth: 180
+              },
+              children: /*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "var(--text-muted)"
+                },
+                children: "Read-across ↓  Core →"
+              }, void 0, false)
+            }, void 0, false), activeCore.map(c => /*#__PURE__*/_jsxDEV("th", {
+              title: `${c.name} · ${c.sector}`,
+              style: {
+                padding: "10px 8px",
+                borderBottom: "1px solid var(--border)",
+                borderRight: "1px solid var(--border)",
+                minWidth: 64,
+                background: "var(--bg-surface)"
+              },
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--accent)",
+                  letterSpacing: "0.04em"
+                },
+                children: c.ticker
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontSize: 9,
+                  color: "var(--text-muted)",
+                  marginTop: 2,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: 56
+                },
+                children: c.sector.split(" / ")[0]
+              }, void 0, false)]
+            }, c.ticker, true))]
+          }, void 0, true)
+        }, void 0, false), /*#__PURE__*/_jsxDEV("tbody", {
+          children: read_across.map((ra, ri) => {
+            const rowData = matrix[ra.ticker] || {};
+            const triggered_here = isTriggered(ra.ticker);
+            const rowBg = triggered_here ? "rgba(240,192,64,0.05)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+            const stickyBg = triggered_here ? "rgba(240,192,64,0.08)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+            return /*#__PURE__*/_jsxDEV("tr", {
+              ref: el => rowRefs.current[ra.ticker] = el,
+              style: {
+                background: rowBg
+              },
+              children: [/*#__PURE__*/_jsxDEV("td", {
+                style: {
+                  padding: "10px 14px",
+                  borderRight: "1px solid var(--border)",
+                  borderBottom: "1px solid var(--border)",
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 1,
+                  background: stickyBg,
+                  borderLeft: triggered_here ? "3px solid var(--watchlist)" : "3px solid transparent"
+                },
+                children: [/*#__PURE__*/_jsxDEV("div", {
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap"
+                  },
+                  children: [/*#__PURE__*/_jsxDEV("span", {
+                    style: {
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: triggered_here ? "var(--watchlist)" : "var(--accent)",
+                      background: triggered_here ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+                      padding: "2px 6px",
+                      borderRadius: 4
+                    },
+                    children: ra.ticker
+                  }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+                    style: {
+                      fontSize: 11,
+                      color: "var(--text-primary)"
+                    },
+                    children: ra.name
+                  }, void 0, false), triggered_here && /*#__PURE__*/_jsxDEV("span", {
+                    style: {
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                      background: "var(--watchlist)",
+                      color: "var(--bg-primary)",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      animation: "pulse-dot 2s infinite"
+                    },
+                    children: "LIVE"
+                  }, void 0, false)]
+                }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+                  style: {
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                    marginTop: 2,
+                    paddingLeft: 2
+                  },
+                  children: ra.sector
+                }, void 0, false)]
+              }, void 0, true), activeCore.map(c => {
+                const rel = rowData[c.ticker];
+                const cellKey = `${ra.ticker}-${c.ticker}`;
+                const isSelected = selectedCell === cellKey;
+                const visible = rel && filterMatch(rel);
+                const r = visible ? RT[rel.type] : null;
+                return /*#__PURE__*/_jsxDEV("td", {
+                  style: {
+                    padding: "6px 8px",
+                    textAlign: "center",
+                    borderRight: "1px solid var(--border)",
+                    borderBottom: "1px solid var(--border)",
+                    cursor: visible ? "pointer" : "default",
+                    background: isSelected ? "rgba(61,184,106,0.12)" : "transparent",
+                    transition: "background 0.15s"
+                  },
+                  onClick: () => handleCellClick(ra.ticker, c.ticker),
+                  children: visible && r && /*#__PURE__*/_jsxDEV("div", {
+                    style: {
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 3
+                    },
+                    children: [/*#__PURE__*/_jsxDEV("div", {
+                      style: {
+                        width: 26,
+                        height: 26,
+                        borderRadius: 6,
+                        background: triggered_here ? r.bg : isSelected ? r.bg : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${triggered_here ? r.border : isSelected ? r.border : "rgba(255,255,255,0.06)"}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: triggered_here ? `0 0 10px ${r.bg}` : "none",
+                        transition: "all 0.15s"
+                      },
+                      children: /*#__PURE__*/_jsxDEV("span", {
+                        style: {
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: r.color,
+                          fontFamily: "var(--font-mono)"
+                        },
+                        children: r.short
+                      }, void 0, false)
+                    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                      style: {
+                        display: "flex",
+                        gap: 1.5
+                      },
+                      children: [1, 2, 3].map(s => /*#__PURE__*/_jsxDEV("div", {
+                        style: {
+                          width: 4,
+                          height: 4,
+                          borderRadius: "50%",
+                          background: s <= rel.strength ? r.color : "var(--border)",
+                          opacity: s <= rel.strength ? 1 : 0.5
+                        }
+                      }, s, false))
+                    }, void 0, false)]
+                  }, void 0, true)
+                }, c.ticker, false);
+              })]
+            }, ra.ticker, true);
+          })
+        }, void 0, false)]
+      }, void 0, true)
+    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        display: "flex",
+        gap: 16,
+        marginBottom: 24,
+        flexWrap: "wrap",
+        fontSize: 11,
+        color: "var(--text-muted)",
+        alignItems: "center"
+      },
+      children: [Object.entries(RT).map(([k, r]) => /*#__PURE__*/_jsxDEV("div", {
+        style: {
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          boxShadow: triggered_here ? `0 0 10px ${r.bg}` : "none",
-          transition: "all 0.15s"
-        }
-      }, /*#__PURE__*/React.createElement("span", {
+          gap: 6
+        },
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            width: 16,
+            height: 16,
+            borderRadius: 4,
+            background: r.bg,
+            border: `1px solid ${r.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          },
+          children: /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontSize: 8,
+              fontWeight: 700,
+              color: r.color,
+              fontFamily: "var(--font-mono)"
+            },
+            children: r.short
+          }, void 0, false)
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          children: r.label
+        }, void 0, false)]
+      }, k, true)), /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        },
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            display: "flex",
+            gap: 2
+          },
+          children: [1, 2, 3].map(s => /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              background: "var(--accent)",
+              opacity: 0.3 + s * 0.23
+            }
+          }, s, false))
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          children: "Strength (1 to 3)"
+        }, void 0, false)]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        },
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            width: 12,
+            height: 12,
+            borderRadius: 3,
+            background: "rgba(240,192,64,0.15)",
+            border: "1px solid rgba(240,192,64,0.4)"
+          }
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          children: "Live trigger today"
+        }, void 0, false)]
+      }, void 0, true)]
+    }, void 0, true), selectedCell && (() => {
+      const [ra_ticker, core_ticker] = selectedCell.split("-");
+      const rel = matrix[ra_ticker]?.[core_ticker];
+      if (!rel) return null;
+      const ra = read_across.find(r => r.ticker === ra_ticker);
+      const coreComp = core.find(c => c.ticker === core_ticker);
+      const r = RT[rel.type];
+      const liveAnns = triggered[ra_ticker] || [];
+      const topAnn = liveAnns[0];
+      const liveDetail = topAnn ? liveDetails[topAnn.url] : null;
+      return /*#__PURE__*/_jsxDEV("div", {
+        className: "fade-up",
+        style: {
+          marginBottom: 24,
+          padding: "18px 22px",
+          background: "var(--bg-card)",
+          border: `1px solid ${liveAnns.length > 0 ? "rgba(240,192,64,0.3)" : r.border}`,
+          borderRadius: 12
+        },
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 14,
+            flexWrap: "wrap"
+          },
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              fontWeight: 700,
+              color: liveAnns.length > 0 ? "var(--watchlist)" : "var(--accent)",
+              background: liveAnns.length > 0 ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+              padding: "3px 8px",
+              borderRadius: 5
+            },
+            children: ra.ticker
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontSize: 13,
+              color: "var(--text-primary)",
+              fontWeight: 500
+            },
+            children: ra.name
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              color: "var(--text-muted)"
+            },
+            children: "→"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              fontWeight: 700,
+              color: "var(--accent)",
+              background: "var(--accent-glow)",
+              padding: "3px 8px",
+              borderRadius: 5
+            },
+            children: coreComp.ticker
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              fontSize: 13,
+              color: "var(--text-primary)",
+              fontWeight: 500
+            },
+            children: coreComp.name
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            style: {
+              padding: "3px 10px",
+              borderRadius: 10,
+              background: r.bg,
+              border: `1px solid ${r.border}`,
+              color: r.color,
+              fontSize: 11,
+              fontWeight: 700
+            },
+            children: r.label
+          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              display: "flex",
+              gap: 3,
+              alignItems: "center"
+            },
+            children: [1, 2, 3].map(s => /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: s <= rel.strength ? r.color : "var(--border)"
+              }
+            }, s, false))
+          }, void 0, false)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          style: {
+            marginBottom: liveAnns.length > 0 ? 18 : 0
+          },
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            style: {
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--text-muted)",
+              marginBottom: 8
+            },
+            children: "Read-across rationale"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("p", {
+            style: {
+              fontSize: 13,
+              color: "var(--text-primary)",
+              lineHeight: 1.7
+            },
+            children: rel.note
+          }, void 0, false)]
+        }, void 0, true), liveAnns.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+          style: {
+            paddingTop: 16,
+            borderTop: "1px dashed rgba(240,192,64,0.3)"
+          },
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12
+            },
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              style: {
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--watchlist)",
+                animation: "pulse-dot 1.5s infinite"
+              }
+            }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+              style: {
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--watchlist)"
+              },
+              children: ["Live today · ", liveAnns.length, " announcement", liveAnns.length === 1 ? "" : "s", " from ", ra.ticker]
+            }, void 0, true)]
+          }, void 0, true), liveAnns.map((ann, i) => /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              padding: "12px 14px",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              marginBottom: i < liveAnns.length - 1 ? 8 : 0
+            },
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 6,
+                flexWrap: "wrap"
+              },
+              children: [/*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-muted)"
+                },
+                children: ann.time
+              }, void 0, false), /*#__PURE__*/_jsxDEV(CategoryBadge, {
+                category: ann.category
+              }, void 0, false), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  fontSize: 9,
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--text-muted)",
+                  border: "1px solid var(--border)"
+                },
+                children: ann.source_feed
+              }, void 0, false)]
+            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 13,
+                color: "var(--text-primary)",
+                fontWeight: 500,
+                marginBottom: 6
+              },
+              children: ann.headline
+            }, void 0, false), i === 0 && loadingDetail && /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 0"
+              },
+              children: [/*#__PURE__*/_jsxDEV("span", {
+                className: "spinner",
+                style: {
+                  width: 12,
+                  height: 12,
+                  borderWidth: 1.5
+                }
+              }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  fontSize: 11,
+                  color: "var(--text-muted)"
+                },
+                children: "Loading summary..."
+              }, void 0, false)]
+            }, void 0, true), i === 0 && liveDetail && liveDetail.ai_summary && /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                marginTop: 8,
+                padding: "10px 12px",
+                background: "var(--bg-primary)",
+                borderRadius: 6,
+                border: "1px solid var(--border)"
+              },
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: 4
+                },
+                children: "Summary"
+              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontSize: 12,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.6
+                },
+                children: liveDetail.ai_summary
+              }, void 0, false)]
+            }, void 0, true), i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                marginTop: 8
+              },
+              children: [/*#__PURE__*/_jsxDEV("div", {
+                style: {
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: 6
+                },
+                children: "Key figures"
+              }, void 0, false), liveDetail.key_figures.slice(0, 5).map((fig, j) => /*#__PURE__*/_jsxDEV("div", {
+                className: "key-figure",
+                style: {
+                  margin: "0 0 4px 0",
+                  fontSize: 11
+                },
+                children: fig
+              }, j, false))]
+            }, void 0, true), ann.url && /*#__PURE__*/_jsxDEV("a", {
+              href: ann.url,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              onClick: e => e.stopPropagation(),
+              style: {
+                display: "inline-block",
+                marginTop: 10,
+                fontSize: 11,
+                color: "var(--accent)",
+                textDecoration: "none"
+              },
+              children: "View full announcement ↗"
+            }, void 0, false)]
+          }, i, true))]
+        }, void 0, true)]
+      }, void 0, true);
+    })(), inactiveCore.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        padding: "14px 18px",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderRadius: 10
+      },
+      children: [/*#__PURE__*/_jsxDEV("div", {
         style: {
           fontSize: 10,
           fontWeight: 700,
-          color: r.color,
-          fontFamily: "var(--font-mono)"
-        }
-      }, r.short)), /*#__PURE__*/React.createElement("div", {
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: "var(--text-muted)",
+          marginBottom: 8
+        },
+        children: "Core companies with no current read-across mapping"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
         style: {
           display: "flex",
-          gap: 1.5
-        }
-      }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
-        key: s,
+          gap: 6,
+          flexWrap: "wrap",
+          marginBottom: 6
+        },
+        children: inactiveCore.map(c => /*#__PURE__*/_jsxDEV("span", {
+          title: `${c.name} · ${c.sector}`,
+          style: {
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            fontWeight: 600,
+            color: "var(--text-muted)",
+            background: "var(--bg-surface)",
+            padding: "3px 8px",
+            borderRadius: 4,
+            border: "1px solid var(--border)"
+          },
+          children: c.ticker
+        }, c.ticker, false))
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
         style: {
-          width: 4,
-          height: 4,
-          borderRadius: "50%",
-          background: s <= rel.strength ? r.color : "var(--border)",
-          opacity: s <= rel.strength ? 1 : 0.5
-        }
-      })))));
-    }));
-  })))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 16,
-      marginBottom: 24,
-      flexWrap: "wrap",
-      fontSize: 11,
-      color: "var(--text-muted)",
-      alignItems: "center"
-    }
-  }, Object.entries(RT).map(([k, r]) => /*#__PURE__*/React.createElement("div", {
-    key: k,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 16,
-      height: 16,
-      borderRadius: 4,
-      background: r.bg,
-      border: `1px solid ${r.border}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 8,
-      fontWeight: 700,
-      color: r.color,
-      fontFamily: "var(--font-mono)"
-    }
-  }, r.short)), /*#__PURE__*/React.createElement("span", null, r.label))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 2
-    }
-  }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
-    key: s,
-    style: {
-      width: 5,
-      height: 5,
-      borderRadius: "50%",
-      background: "var(--accent)",
-      opacity: 0.3 + s * 0.23
-    }
-  }))), /*#__PURE__*/React.createElement("span", null, "Strength (1 to 3)")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 12,
-      height: 12,
-      borderRadius: 3,
-      background: "rgba(240,192,64,0.15)",
-      border: "1px solid rgba(240,192,64,0.4)"
-    }
-  }), /*#__PURE__*/React.createElement("span", null, "Live trigger today"))), selectedCell && (() => {
-    const [ra_ticker, core_ticker] = selectedCell.split("-");
-    const rel = matrix[ra_ticker]?.[core_ticker];
-    if (!rel) return null;
-    const ra = read_across.find(r => r.ticker === ra_ticker);
-    const coreComp = core.find(c => c.ticker === core_ticker);
-    const r = RT[rel.type];
-    const liveAnns = triggered[ra_ticker] || [];
-    const topAnn = liveAnns[0];
-    const liveDetail = topAnn ? liveDetails[topAnn.url] : null;
-    return /*#__PURE__*/React.createElement("div", {
-      className: "fade-up",
-      style: {
-        marginBottom: 24,
-        padding: "18px 22px",
-        background: "var(--bg-card)",
-        border: `1px solid ${liveAnns.length > 0 ? "rgba(240,192,64,0.3)" : r.border}`,
-        borderRadius: 12
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 14,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "var(--font-mono)",
-        fontSize: 12,
-        fontWeight: 700,
-        color: liveAnns.length > 0 ? "var(--watchlist)" : "var(--accent)",
-        background: liveAnns.length > 0 ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
-        padding: "3px 8px",
-        borderRadius: 5
-      }
-    }, ra.ticker), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        color: "var(--text-primary)",
-        fontWeight: 500
-      }
-    }, ra.name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: "var(--text-muted)"
-      }
-    }, "\u2192"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "var(--font-mono)",
-        fontSize: 12,
-        fontWeight: 700,
-        color: "var(--accent)",
-        background: "var(--accent-glow)",
-        padding: "3px 8px",
-        borderRadius: 5
-      }
-    }, coreComp.ticker), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        color: "var(--text-primary)",
-        fontWeight: 500
-      }
-    }, coreComp.name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        padding: "3px 10px",
-        borderRadius: 10,
-        background: r.bg,
-        border: `1px solid ${r.border}`,
-        color: r.color,
-        fontSize: 11,
-        fontWeight: 700
-      }
-    }, r.label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 3,
-        alignItems: "center"
-      }
-    }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
-      key: s,
-      style: {
-        width: 6,
-        height: 6,
-        borderRadius: "50%",
-        background: s <= rel.strength ? r.color : "var(--border)"
-      }
-    })))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: liveAnns.length > 0 ? 18 : 0
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        color: "var(--text-muted)",
-        marginBottom: 8
-      }
-    }, "Read-across rationale"), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 13,
-        color: "var(--text-primary)",
-        lineHeight: 1.7
-      }
-    }, rel.note)), liveAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        paddingTop: 16,
-        borderTop: "1px dashed rgba(240,192,64,0.3)"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        marginBottom: 12
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        background: "var(--watchlist)",
-        animation: "pulse-dot 1.5s infinite"
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        color: "var(--watchlist)"
-      }
-    }, "Live today \xB7 ", liveAnns.length, " announcement", liveAnns.length === 1 ? "" : "s", " from ", ra.ticker)), liveAnns.map((ann, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        padding: "12px 14px",
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        marginBottom: i < liveAnns.length - 1 ? 8 : 0
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        marginBottom: 6,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        color: "var(--text-muted)"
-      }
-    }, ann.time), /*#__PURE__*/React.createElement(CategoryBadge, {
-      category: ann.category
-    }), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
-      style: {
-        padding: "1px 6px",
-        borderRadius: 3,
-        fontSize: 9,
-        fontFamily: "var(--font-mono)",
-        color: "var(--text-muted)",
-        border: "1px solid var(--border)"
-      }
-    }, ann.source_feed)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: "var(--text-primary)",
-        fontWeight: 500,
-        marginBottom: 6
-      }
-    }, ann.headline), i === 0 && loadingDetail && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 0"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "spinner",
-      style: {
-        width: 12,
-        height: 12,
-        borderWidth: 1.5
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: "var(--text-muted)"
-      }
-    }, "Loading summary...")), i === 0 && liveDetail && liveDetail.ai_summary && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 8,
-        padding: "10px 12px",
-        background: "var(--bg-primary)",
-        borderRadius: 6,
-        border: "1px solid var(--border)"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        fontWeight: 700,
-        color: "var(--text-muted)",
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        marginBottom: 4
-      }
-    }, "Summary"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: "var(--text-secondary)",
-        lineHeight: 1.6
-      }
-    }, liveDetail.ai_summary)), i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 8
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        fontWeight: 700,
-        color: "var(--text-muted)",
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        marginBottom: 6
-      }
-    }, "Key figures"), liveDetail.key_figures.slice(0, 5).map((fig, j) => /*#__PURE__*/React.createElement("div", {
-      key: j,
-      className: "key-figure",
-      style: {
-        margin: "0 0 4px 0",
-        fontSize: 11
-      }
-    }, fig))), ann.url && /*#__PURE__*/React.createElement("a", {
-      href: ann.url,
-      target: "_blank",
-      rel: "noopener noreferrer",
-      onClick: e => e.stopPropagation(),
-      style: {
-        display: "inline-block",
-        marginTop: 10,
-        fontSize: 11,
-        color: "var(--accent)",
-        textDecoration: "none"
-      }
-    }, "View full announcement \u2197")))));
-  })(), inactiveCore.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 18px",
-      background: "var(--bg-card)",
-      border: "1px solid var(--border)",
-      borderRadius: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      fontWeight: 700,
-      textTransform: "uppercase",
-      letterSpacing: "0.08em",
-      color: "var(--text-muted)",
-      marginBottom: 8
-    }
-  }, "Core companies with no current read-across mapping"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      flexWrap: "wrap",
-      marginBottom: 6
-    }
-  }, inactiveCore.map(c => /*#__PURE__*/React.createElement("span", {
-    key: c.ticker,
-    title: `${c.name} · ${c.sector}`,
-    style: {
-      fontFamily: "var(--font-mono)",
-      fontSize: 10,
-      fontWeight: 600,
-      color: "var(--text-muted)",
-      background: "var(--bg-surface)",
-      padding: "3px 8px",
-      borderRadius: 4,
-      border: "1px solid var(--border)"
-    }
-  }, c.ticker))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "var(--text-muted)"
-    }
-  }, "No current read-across company maps to these directly.")));
+          fontSize: 10,
+          color: "var(--text-muted)"
+        },
+        children: "No current read-across company maps to these directly."
+      }, void 0, false)]
+    }, void 0, true)]
+  }, void 0, true);
 }
 function App() {
   // Restore saved view preferences (null on first ever visit)
@@ -1904,12 +2055,19 @@ function App() {
       return next;
     });
   };
+
+  // Guards against out-of-order responses: with auto-refresh on, a manual
+  // Refresh mid-cycle puts two requests in flight, and the older one can
+  // resolve last, overwriting newer data. Only the latest request may setData.
+  const fetchSeqRef = useRef(0);
   const fetchData = useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     setStatus("loading");
     try {
       const r = await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
+      if (seq !== fetchSeqRef.current) return; // a newer request superseded this one
       setData(j);
       setStatus("connected");
       setLastRefresh(new Date());
@@ -1921,6 +2079,7 @@ function App() {
         defaultsAppliedRef.current = true;
       }
     } catch (e) {
+      if (seq !== fetchSeqRef.current) return;
       console.error(e);
       setStatus("error");
     }
@@ -2016,396 +2175,501 @@ function App() {
     value,
     count,
     dotColor
-  }) => /*#__PURE__*/React.createElement("div", {
+  }) => /*#__PURE__*/_jsxDEV("div", {
     className: "filter-row" + (filter === value ? " active" : ""),
-    onClick: () => setFilter(value)
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "filter-label"
-  }, dotColor && /*#__PURE__*/React.createElement("span", {
-    className: "filter-dot",
-    style: {
-      background: dotColor
-    }
-  }), label), /*#__PURE__*/React.createElement("span", {
-    className: "filter-count"
-  }, count));
+    onClick: () => setFilter(value),
+    children: [/*#__PURE__*/_jsxDEV("span", {
+      className: "filter-label",
+      children: [dotColor && /*#__PURE__*/_jsxDEV("span", {
+        className: "filter-dot",
+        style: {
+          background: dotColor
+        }
+      }, void 0, false), label]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
+      className: "filter-count",
+      children: count
+    }, void 0, false)]
+  }, void 0, true);
   const SourceRow = ({
     label,
     value,
     count
-  }) => /*#__PURE__*/React.createElement("div", {
+  }) => /*#__PURE__*/_jsxDEV("div", {
     className: "filter-row" + (sourceFilter === value ? " active" : ""),
-    onClick: () => setSourceFilter(value)
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "filter-label"
-  }, label), /*#__PURE__*/React.createElement("span", {
-    className: "filter-count"
-  }, count));
+    onClick: () => setSourceFilter(value),
+    children: [/*#__PURE__*/_jsxDEV("span", {
+      className: "filter-label",
+      children: label
+    }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+      className: "filter-count",
+      children: count
+    }, void 0, false)]
+  }, void 0, true);
 
   // Sidebar filter content — rendered inline (desktop) or inside the mobile drawer
-  const sidebarContent = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("input", {
-    className: "sidebar-search",
-    value: searchText,
-    onChange: e => setSearchText(e.target.value),
-    placeholder: "Search ticker, company, headline..."
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, "Tier"), /*#__PURE__*/React.createElement(TierRow, {
-    label: "All",
-    value: "all",
-    count: allAnns.length
-  }), /*#__PURE__*/React.createElement(TierRow, {
-    label: "Watchlist",
-    value: "watchlist",
-    count: wlCount,
-    dotColor: "var(--watchlist)"
-  }), /*#__PURE__*/React.createElement(TierRow, {
-    label: "Core",
-    value: "core",
-    count: coreCount,
-    dotColor: "var(--core)"
-  }), /*#__PURE__*/React.createElement(TierRow, {
-    label: "Read-across",
-    value: "read_across",
-    count: raCount,
-    dotColor: "var(--readacross)"
-  }), /*#__PURE__*/React.createElement(TierRow, {
-    label: "Sector relevant",
-    value: "sector",
-    count: secCount,
-    dotColor: "var(--accent)"
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, "Source"), /*#__PURE__*/React.createElement(SourceRow, {
-    label: "All",
-    value: "all",
-    count: allAnns.length
-  }), /*#__PURE__*/React.createElement(SourceRow, {
-    label: "RNS only",
-    value: "rns",
-    count: rnsCount
-  }), /*#__PURE__*/React.createElement(SourceRow, {
-    label: "Non-Reg only",
-    value: "nonreg",
-    count: nonregCount
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, /*#__PURE__*/React.createElement("span", null, "Sort")), /*#__PURE__*/React.createElement("div", {
-    className: "filter-row" + (sortMode === "relevance" ? " active" : ""),
-    onClick: () => setSortMode("relevance")
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "filter-label"
-  }, "Relevance")), /*#__PURE__*/React.createElement("div", {
-    className: "filter-row" + (sortMode === "latest" ? " active" : ""),
-    onClick: () => setSortMode("latest")
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "filter-label"
-  }, "Latest first"))), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-section"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-label"
-  }, /*#__PURE__*/React.createElement("span", null, "Categories"), excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      cursor: "pointer",
-      color: "var(--text-secondary)",
-      textTransform: "none",
-      letterSpacing: 0,
-      fontSize: 9
-    },
-    onClick: () => setExcludedCats(new Set())
-  }, "show all")), /*#__PURE__*/React.createElement("div", {
-    className: "filter-row" + (categoryFilter === "all" && excludedCats.size === 0 ? " active" : ""),
-    onClick: () => {
-      setCategoryFilter("all");
-      setExcludedCats(new Set());
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "filter-label"
-  }, "All types")), sortedCats.map(cat => {
-    const isExcluded = excludedCats.has(cat);
-    const isActive = categoryFilter === cat;
-    const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
-    const cls = "filter-row" + (isActive ? " active" : "") + (isExcluded ? " excluded" : "");
-    return /*#__PURE__*/React.createElement("div", {
-      key: cat,
-      className: cls
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "filter-label",
-      onClick: () => {
-        if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
-      },
+  const sidebarContent = /*#__PURE__*/_jsxDEV(_Fragment, {
+    children: [/*#__PURE__*/_jsxDEV("div", {
+      className: "sidebar-section",
+      children: /*#__PURE__*/_jsxDEV("input", {
+        className: "sidebar-search",
+        value: searchText,
+        onChange: e => setSearchText(e.target.value),
+        placeholder: "Search ticker, company, headline..."
+      }, void 0, false)
+    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+      className: "sidebar-section",
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "sidebar-label",
+        children: "Tier"
+      }, void 0, false), /*#__PURE__*/_jsxDEV(TierRow, {
+        label: "All",
+        value: "all",
+        count: allAnns.length
+      }, void 0, false), /*#__PURE__*/_jsxDEV(TierRow, {
+        label: "Watchlist",
+        value: "watchlist",
+        count: wlCount,
+        dotColor: "var(--watchlist)"
+      }, void 0, false), /*#__PURE__*/_jsxDEV(TierRow, {
+        label: "Core",
+        value: "core",
+        count: coreCount,
+        dotColor: "var(--core)"
+      }, void 0, false), /*#__PURE__*/_jsxDEV(TierRow, {
+        label: "Read-across",
+        value: "read_across",
+        count: raCount,
+        dotColor: "var(--readacross)"
+      }, void 0, false), /*#__PURE__*/_jsxDEV(TierRow, {
+        label: "Sector relevant",
+        value: "sector",
+        count: secCount,
+        dotColor: "var(--accent)"
+      }, void 0, false)]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      className: "sidebar-section",
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "sidebar-label",
+        children: "Source"
+      }, void 0, false), /*#__PURE__*/_jsxDEV(SourceRow, {
+        label: "All",
+        value: "all",
+        count: allAnns.length
+      }, void 0, false), /*#__PURE__*/_jsxDEV(SourceRow, {
+        label: "RNS only",
+        value: "rns",
+        count: rnsCount
+      }, void 0, false), /*#__PURE__*/_jsxDEV(SourceRow, {
+        label: "Non-Reg only",
+        value: "nonreg",
+        count: nonregCount
+      }, void 0, false)]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      className: "sidebar-section",
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "sidebar-label",
+        children: /*#__PURE__*/_jsxDEV("span", {
+          children: "Sort"
+        }, void 0, false)
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "filter-row" + (sortMode === "relevance" ? " active" : ""),
+        onClick: () => setSortMode("relevance"),
+        children: /*#__PURE__*/_jsxDEV("span", {
+          className: "filter-label",
+          children: "Relevance"
+        }, void 0, false)
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "filter-row" + (sortMode === "latest" ? " active" : ""),
+        onClick: () => setSortMode("latest"),
+        children: /*#__PURE__*/_jsxDEV("span", {
+          className: "filter-label",
+          children: "Latest first"
+        }, void 0, false)
+      }, void 0, false)]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      className: "sidebar-section",
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "sidebar-label",
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          children: "Categories"
+        }, void 0, false), excludedCats.size > 0 && /*#__PURE__*/_jsxDEV("span", {
+          style: {
+            cursor: "pointer",
+            color: "var(--text-secondary)",
+            textTransform: "none",
+            letterSpacing: 0,
+            fontSize: 9
+          },
+          onClick: () => setExcludedCats(new Set()),
+          children: "show all"
+        }, void 0, false)]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        className: "filter-row" + (categoryFilter === "all" && excludedCats.size === 0 ? " active" : ""),
+        onClick: () => {
+          setCategoryFilter("all");
+          setExcludedCats(new Set());
+        },
+        children: /*#__PURE__*/_jsxDEV("span", {
+          className: "filter-label",
+          children: "All types"
+        }, void 0, false)
+      }, void 0, false), sortedCats.map(cat => {
+        const isExcluded = excludedCats.has(cat);
+        const isActive = categoryFilter === cat;
+        const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
+        const cls = "filter-row" + (isActive ? " active" : "") + (isExcluded ? " excluded" : "");
+        return /*#__PURE__*/_jsxDEV("div", {
+          className: cls,
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            className: "filter-label",
+            onClick: () => {
+              if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
+            },
+            style: {
+              flex: 1
+            },
+            children: [/*#__PURE__*/_jsxDEV("span", {
+              className: "filter-dot",
+              style: {
+                background: catColor
+              }
+            }, void 0, false), cat]
+          }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
+            className: "filter-count",
+            onClick: () => {
+              if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
+            },
+            children: catCounts[cat]
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            className: "filter-toggle-hide",
+            onClick: e => {
+              e.stopPropagation();
+              toggleExcludeCat(cat);
+              if (categoryFilter === cat) setCategoryFilter("all");
+            },
+            title: isExcluded ? "Restore" : "Hide",
+            style: isExcluded ? {
+              opacity: 1,
+              color: "var(--danger)"
+            } : undefined,
+            children: isExcluded ? "\u21BA" : "\u2715"
+          }, void 0, false)]
+        }, cat, true);
+      })]
+    }, void 0, true)]
+  }, void 0, true);
+  return /*#__PURE__*/_jsxDEV(_Fragment, {
+    children: [!isMobile ? /*#__PURE__*/_jsxDEV("div", {
+      className: "toolbar",
+      children: [/*#__PURE__*/_jsxDEV("span", {
+        className: "brand",
+        children: [/*#__PURE__*/_jsxDEV("span", {
+          children: "h2"
+        }, void 0, false), "Radnor"]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
+        className: "toolbar-tag",
+        children: "RNS Monitor"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-tab" + (tab === "feed" ? " active" : ""),
+        onClick: () => setTab("feed"),
+        children: "Feed"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-tab" + (tab === "readacross" ? " active" : ""),
+        onClick: () => setTab("readacross"),
+        children: "Read-across"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+        className: "toolbar-spacer"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+        className: "toolbar-meta",
+        children: [/*#__PURE__*/_jsxDEV(StatusDot, {
+          status: status
+        }, void 0, false), status === "connected" && lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-btn primary",
+        onClick: fetchData,
+        disabled: status === "loading",
+        children: status === "loading" ? "..." : "Refresh"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-btn",
+        onClick: () => setAutoRefresh(!autoRefresh),
+        style: autoRefresh ? {
+          borderColor: "var(--accent)",
+          color: "var(--accent)"
+        } : undefined,
+        children: ["Auto ", autoRefresh ? "ON" : "OFF"]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-btn",
+        onClick: () => setShowWatchlist(true),
+        children: ["WL (", Object.keys(watchlist).length, ")"]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-btn icon",
+        onClick: () => setConfigOpen(!configOpen),
+        title: "Backend URL",
+        children: "⚙"
+      }, void 0, false)]
+    }, void 0, true) : /*#__PURE__*/_jsxDEV(_Fragment, {
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "toolbar",
+        children: [tab === "feed" && /*#__PURE__*/_jsxDEV("button", {
+          className: "toolbar-icon-btn",
+          onClick: () => setDrawerOpen(true),
+          title: "Filters",
+          children: "☰"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+          className: "brand",
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            children: "h2"
+          }, void 0, false), "Radnor"]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
+          className: "toolbar-spacer"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+          className: "toolbar-btn primary",
+          onClick: fetchData,
+          disabled: status === "loading",
+          children: status === "loading" ? "..." : "Refresh"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+          className: "toolbar-icon-btn",
+          onClick: () => setMenuOpen(!menuOpen),
+          title: "More",
+          children: "⋮"
+        }, void 0, false)]
+      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        className: "mobile-tabbar",
+        children: [/*#__PURE__*/_jsxDEV("button", {
+          className: "mobile-tab" + (tab === "feed" ? " active" : ""),
+          onClick: () => setTab("feed"),
+          children: "Feed"
+        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+          className: "mobile-tab" + (tab === "readacross" ? " active" : ""),
+          onClick: () => setTab("readacross"),
+          children: "Read-across"
+        }, void 0, false)]
+      }, void 0, true)]
+    }, void 0, true), isMobile && menuOpen && /*#__PURE__*/_jsxDEV(_Fragment, {
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "scrim clear",
+        onClick: () => setMenuOpen(false)
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "overflow-menu",
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          className: "overflow-item",
+          onClick: () => {
+            setAutoRefresh(!autoRefresh);
+          },
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            children: "Auto-refresh"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            className: "overflow-val",
+            style: autoRefresh ? {
+              color: "var(--accent)"
+            } : undefined,
+            children: autoRefresh ? "ON" : "OFF"
+          }, void 0, false)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          className: "overflow-item",
+          onClick: () => {
+            setShowWatchlist(true);
+            setMenuOpen(false);
+          },
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            children: "Watchlist"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            className: "overflow-val",
+            children: Object.keys(watchlist).length
+          }, void 0, false)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          className: "overflow-item",
+          onClick: () => {
+            setConfigOpen(!configOpen);
+            setMenuOpen(false);
+          },
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            children: "Backend URL"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
+            className: "overflow-val",
+            children: "⚙"
+          }, void 0, false)]
+        }, void 0, true)]
+      }, void 0, true)]
+    }, void 0, true), configOpen && /*#__PURE__*/_jsxDEV("div", {
       style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "filter-dot",
-      style: {
-        background: catColor
-      }
-    }), cat), /*#__PURE__*/React.createElement("span", {
-      className: "filter-count",
-      onClick: () => {
-        if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
-      }
-    }, catCounts[cat]), /*#__PURE__*/React.createElement("span", {
-      className: "filter-toggle-hide",
-      onClick: e => {
-        e.stopPropagation();
-        toggleExcludeCat(cat);
-        if (categoryFilter === cat) setCategoryFilter("all");
+        padding: "10px 16px",
+        background: "var(--bg-sidebar)",
+        borderBottom: "1px solid var(--border)",
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        flexWrap: "wrap"
       },
-      title: isExcluded ? "Restore" : "Hide",
-      style: isExcluded ? {
-        opacity: 1,
-        color: "var(--danger)"
-      } : undefined
-    }, isExcluded ? "\u21BA" : "\u2715"));
-  })));
-  return /*#__PURE__*/React.createElement(React.Fragment, null, !isMobile ? /*#__PURE__*/React.createElement("div", {
-    className: "toolbar"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "brand"
-  }, /*#__PURE__*/React.createElement("span", null, "h2"), "Radnor"), /*#__PURE__*/React.createElement("span", {
-    className: "toolbar-tag"
-  }, "RNS Monitor"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-tab" + (tab === "feed" ? " active" : ""),
-    onClick: () => setTab("feed")
-  }, "Feed"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-tab" + (tab === "readacross" ? " active" : ""),
-    onClick: () => setTab("readacross")
-  }, "Read-across"), /*#__PURE__*/React.createElement("span", {
-    className: "toolbar-spacer"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "toolbar-meta"
-  }, /*#__PURE__*/React.createElement(StatusDot, {
-    status: status
-  }), status === "connected" && lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn primary",
-    onClick: fetchData,
-    disabled: status === "loading"
-  }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn",
-    onClick: () => setAutoRefresh(!autoRefresh),
-    style: autoRefresh ? {
-      borderColor: "var(--accent)",
-      color: "var(--accent)"
-    } : undefined
-  }, "Auto ", autoRefresh ? "ON" : "OFF"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn",
-    onClick: () => setShowWatchlist(true)
-  }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn icon",
-    onClick: () => setConfigOpen(!configOpen),
-    title: "Backend URL"
-  }, "\u2699")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "toolbar"
-  }, tab === "feed" && /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-icon-btn",
-    onClick: () => setDrawerOpen(true),
-    title: "Filters"
-  }, "\u2630"), /*#__PURE__*/React.createElement("span", {
-    className: "brand"
-  }, /*#__PURE__*/React.createElement("span", null, "h2"), "Radnor"), /*#__PURE__*/React.createElement("span", {
-    className: "toolbar-spacer"
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn primary",
-    onClick: fetchData,
-    disabled: status === "loading"
-  }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-icon-btn",
-    onClick: () => setMenuOpen(!menuOpen),
-    title: "More"
-  }, "\u22EE")), /*#__PURE__*/React.createElement("div", {
-    className: "mobile-tabbar"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "mobile-tab" + (tab === "feed" ? " active" : ""),
-    onClick: () => setTab("feed")
-  }, "Feed"), /*#__PURE__*/React.createElement("button", {
-    className: "mobile-tab" + (tab === "readacross" ? " active" : ""),
-    onClick: () => setTab("readacross")
-  }, "Read-across"))), isMobile && menuOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "scrim clear",
-    onClick: () => setMenuOpen(false)
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "overflow-menu"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "overflow-item",
-    onClick: () => {
-      setAutoRefresh(!autoRefresh);
-    }
-  }, /*#__PURE__*/React.createElement("span", null, "Auto-refresh"), /*#__PURE__*/React.createElement("span", {
-    className: "overflow-val",
-    style: autoRefresh ? {
-      color: "var(--accent)"
-    } : undefined
-  }, autoRefresh ? "ON" : "OFF")), /*#__PURE__*/React.createElement("div", {
-    className: "overflow-item",
-    onClick: () => {
-      setShowWatchlist(true);
-      setMenuOpen(false);
-    }
-  }, /*#__PURE__*/React.createElement("span", null, "Watchlist"), /*#__PURE__*/React.createElement("span", {
-    className: "overflow-val"
-  }, Object.keys(watchlist).length)), /*#__PURE__*/React.createElement("div", {
-    className: "overflow-item",
-    onClick: () => {
-      setConfigOpen(!configOpen);
-      setMenuOpen(false);
-    }
-  }, /*#__PURE__*/React.createElement("span", null, "Backend URL"), /*#__PURE__*/React.createElement("span", {
-    className: "overflow-val"
-  }, "\u2699")))), configOpen && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "10px 16px",
-      background: "var(--bg-sidebar)",
-      borderBottom: "1px solid var(--border)",
-      display: "flex",
-      gap: 8,
-      alignItems: "center",
-      flexWrap: "wrap"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--text-muted)",
-      fontFamily: "var(--font-mono)"
-    }
-  }, "Backend URL:"), /*#__PURE__*/React.createElement("input", {
-    value: backendUrl,
-    onChange: e => setBackendUrl(e.target.value),
-    style: {
-      flex: 1,
-      minWidth: 160,
-      maxWidth: 400,
-      background: "var(--bg-surface)",
-      border: "1px solid var(--border)",
-      padding: "5px 10px",
-      color: "var(--text-primary)",
-      fontFamily: "var(--font-mono)",
-      fontSize: 11,
-      outline: "none"
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn primary",
-    onClick: () => {
-      fetchData();
-      setConfigOpen(false);
-    }
-  }, "Connect")), isMobile && drawerOpen && tab === "feed" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "scrim",
-    onClick: () => setDrawerOpen(false)
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "drawer"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "drawer-head"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "drawer-head-title"
-  }, "Filters"), /*#__PURE__*/React.createElement("button", {
-    className: "toolbar-btn primary",
-    onClick: () => setDrawerOpen(false)
-  }, "Done")), /*#__PURE__*/React.createElement("div", {
-    className: "drawer-body"
-  }, sidebarContent))), /*#__PURE__*/React.createElement("div", {
-    className: "layout"
-  }, tab === "feed" && !isMobile && /*#__PURE__*/React.createElement("aside", {
-    className: "sidebar"
-  }, sidebarContent), /*#__PURE__*/React.createElement("main", {
-    className: "main",
-    style: tab !== "feed" || isMobile ? {
-      gridColumn: "1 / -1"
-    } : undefined
-  }, tab === "readacross" && /*#__PURE__*/React.createElement(ReadAcrossView, {
-    backendUrl: backendUrl,
-    refreshTick: lastRefresh ? lastRefresh.getTime() : 0
-  }), tab === "feed" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "feed-header"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "feed-counts"
-  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, anns.length), " showing"), /*#__PURE__*/React.createElement("span", null, "/ ", allAnns.length, " total"), wlCount > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "var(--watchlist)"
-    }
-  }, wlCount, " watchlist"), excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "var(--danger)"
-    }
-  }, excludedCats.size, " categories hidden"), isMobile && /*#__PURE__*/React.createElement("span", {
-    style: {
-      marginLeft: "auto",
-      display: "flex",
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement(StatusDot, {
-    status: status
-  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), data?.errors?.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10,
-      padding: "6px 10px",
-      background: "rgba(239,68,68,0.06)",
-      border: "1px solid rgba(239,68,68,0.18)",
-      fontSize: 11,
-      color: "var(--danger)",
-      fontFamily: "var(--font-mono)"
-    }
-  }, data.errors.length, " scrape error", data.errors.length === 1 ? "" : "s", ": ", data.errors.slice(0, 3).map(e => e.split(":")[0]).join(", "), data.errors.length > 3 ? ` +${data.errors.length - 3} more` : ""), status === "error" && !data && /*#__PURE__*/React.createElement("div", {
-    className: "empty"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      marginBottom: 6,
-      color: "var(--text-primary)"
-    }
-  }, "Can't reach the backend"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11
-    }
-  }, "Check ", /*#__PURE__*/React.createElement("code", {
-    style: {
-      fontFamily: "var(--font-mono)",
-      color: "var(--accent)"
-    }
-  }, backendUrl), " is running.")), status === "loading" && !data && /*#__PURE__*/React.createElement("div", {
-    className: "grid"
-  }, [0, 1, 2, 3, 4, 5, 6, 7].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
-    key: i
-  }))), anns.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "grid"
-  }, anns.map((a, i) => /*#__PURE__*/React.createElement(AnnouncementCard, {
-    key: `${a.company}-${a.headline}-${i}`,
-    ann: a,
-    index: i,
-    backendUrl: backendUrl,
-    tier: tierFor(a.ticker)
-  }))), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
-    className: "empty"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      marginBottom: 6,
-      color: "var(--text-primary)"
-    }
-  }, "Nothing matches"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11
-    }
-  }, "Broaden the filters or unhide categories in the sidebar."))))), showWatchlist && /*#__PURE__*/React.createElement(WatchlistModal, {
-    watchlist: watchlist,
-    onClose: () => setShowWatchlist(false),
-    onAdd: handleAdd,
-    onRemove: handleRemove
-  }));
+      children: [/*#__PURE__*/_jsxDEV("span", {
+        style: {
+          fontSize: 11,
+          color: "var(--text-muted)",
+          fontFamily: "var(--font-mono)"
+        },
+        children: "Backend URL:"
+      }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
+        value: backendUrl,
+        onChange: e => setBackendUrl(e.target.value),
+        style: {
+          flex: 1,
+          minWidth: 160,
+          maxWidth: 400,
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border)",
+          padding: "5px 10px",
+          color: "var(--text-primary)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          outline: "none"
+        }
+      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+        className: "toolbar-btn primary",
+        onClick: () => {
+          fetchData();
+          setConfigOpen(false);
+        },
+        children: "Connect"
+      }, void 0, false)]
+    }, void 0, true), isMobile && drawerOpen && tab === "feed" && /*#__PURE__*/_jsxDEV(_Fragment, {
+      children: [/*#__PURE__*/_jsxDEV("div", {
+        className: "scrim",
+        onClick: () => setDrawerOpen(false)
+      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        className: "drawer",
+        children: [/*#__PURE__*/_jsxDEV("div", {
+          className: "drawer-head",
+          children: [/*#__PURE__*/_jsxDEV("span", {
+            className: "drawer-head-title",
+            children: "Filters"
+          }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
+            className: "toolbar-btn primary",
+            onClick: () => setDrawerOpen(false),
+            children: "Done"
+          }, void 0, false)]
+        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+          className: "drawer-body",
+          children: sidebarContent
+        }, void 0, false)]
+      }, void 0, true)]
+    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      className: "layout",
+      children: [tab === "feed" && !isMobile && /*#__PURE__*/_jsxDEV("aside", {
+        className: "sidebar",
+        children: sidebarContent
+      }, void 0, false), /*#__PURE__*/_jsxDEV("main", {
+        className: "main",
+        style: tab !== "feed" || isMobile ? {
+          gridColumn: "1 / -1"
+        } : undefined,
+        children: [tab === "readacross" && /*#__PURE__*/_jsxDEV(ReadAcrossView, {
+          backendUrl: backendUrl,
+          refreshTick: lastRefresh ? lastRefresh.getTime() : 0
+        }, void 0, false), tab === "feed" && /*#__PURE__*/_jsxDEV(_Fragment, {
+          children: [/*#__PURE__*/_jsxDEV("div", {
+            className: "feed-header",
+            children: /*#__PURE__*/_jsxDEV("div", {
+              className: "feed-counts",
+              children: [/*#__PURE__*/_jsxDEV("span", {
+                children: [/*#__PURE__*/_jsxDEV("strong", {
+                  children: anns.length
+                }, void 0, false), " showing"]
+              }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
+                children: ["/ ", allAnns.length, " total"]
+              }, void 0, true), wlCount > 0 && /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  color: "var(--watchlist)"
+                },
+                children: [wlCount, " watchlist"]
+              }, void 0, true), excludedCats.size > 0 && /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  color: "var(--danger)"
+                },
+                children: [excludedCats.size, " categories hidden"]
+              }, void 0, true), isMobile && /*#__PURE__*/_jsxDEV("span", {
+                style: {
+                  marginLeft: "auto",
+                  display: "flex",
+                  alignItems: "center"
+                },
+                children: [/*#__PURE__*/_jsxDEV(StatusDot, {
+                  status: status
+                }, void 0, false), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status]
+              }, void 0, true)]
+            }, void 0, true)
+          }, void 0, false), data?.errors?.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+            style: {
+              marginBottom: 10,
+              padding: "6px 10px",
+              background: "rgba(239,68,68,0.06)",
+              border: "1px solid rgba(239,68,68,0.18)",
+              fontSize: 11,
+              color: "var(--danger)",
+              fontFamily: "var(--font-mono)"
+            },
+            children: [data.errors.length, " scrape error", data.errors.length === 1 ? "" : "s", ": ", data.errors.slice(0, 3).map(e => e.split(":")[0]).join(", "), data.errors.length > 3 ? ` +${data.errors.length - 3} more` : ""]
+          }, void 0, true), status === "error" && !data && /*#__PURE__*/_jsxDEV("div", {
+            className: "empty",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 6,
+                color: "var(--text-primary)"
+              },
+              children: "Can't reach the backend"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 11
+              },
+              children: ["Check ", /*#__PURE__*/_jsxDEV("code", {
+                style: {
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--accent)"
+                },
+                children: backendUrl
+              }, void 0, false), " is running."]
+            }, void 0, true)]
+          }, void 0, true), status === "loading" && !data && /*#__PURE__*/_jsxDEV("div", {
+            className: "grid",
+            children: [0, 1, 2, 3, 4, 5, 6, 7].map(i => /*#__PURE__*/_jsxDEV(SkeletonCard, {}, i, false))
+          }, void 0, false), anns.length > 0 && /*#__PURE__*/_jsxDEV("div", {
+            className: "grid",
+            children: anns.map((a, i) => /*#__PURE__*/_jsxDEV(AnnouncementCard, {
+              ann: a,
+              index: i,
+              backendUrl: backendUrl,
+              tier: tierFor(a.ticker)
+            }, a.url || `${a.company}|${a.headline}`, false))
+          }, void 0, false), data && anns.length === 0 && /*#__PURE__*/_jsxDEV("div", {
+            className: "empty",
+            children: [/*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 6,
+                color: "var(--text-primary)"
+              },
+              children: "Nothing matches"
+            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+              style: {
+                fontSize: 11
+              },
+              children: "Broaden the filters or unhide categories in the sidebar."
+            }, void 0, false)]
+          }, void 0, true)]
+        }, void 0, true)]
+      }, void 0, true)]
+    }, void 0, true), showWatchlist && /*#__PURE__*/_jsxDEV(WatchlistModal, {
+      watchlist: watchlist,
+      onClose: () => setShowWatchlist(false),
+      onAdd: handleAdd,
+      onRemove: handleRemove
+    }, void 0, false)]
+  }, void 0, true);
 }
-ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById("root"));
+ReactDOM.render(/*#__PURE__*/_jsxDEV(App, {}, void 0, false), document.getElementById("root"));
   </script>
 </body>
 </html>
