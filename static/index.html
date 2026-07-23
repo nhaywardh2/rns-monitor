@@ -1911,11 +1911,14 @@ function App() {
   // Refresh mid-cycle puts two requests in flight, and the older one can
   // resolve last, overwriting newer data. Only the latest request may setData.
   const fetchSeqRef = useRef(0);
-  const fetchData = useCallback(async () => {
+  const [hardRefreshing, setHardRefreshing] = useState(false);
+  const fetchData = useCallback(async opts => {
+    const hard = !!(opts && opts.hard);
     const seq = ++fetchSeqRef.current;
     setStatus("loading");
+    if (hard) setHardRefreshing(true);
     try {
-      const r = await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000`);
+      const r = await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000${hard ? "&hard=true" : ""}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       if (seq !== fetchSeqRef.current) return; // a newer request superseded this one
@@ -1933,8 +1936,16 @@ function App() {
       if (seq !== fetchSeqRef.current) return;
       console.error(e);
       setStatus("error");
+    } finally {
+      if (seq === fetchSeqRef.current) setHardRefreshing(false);
     }
   }, [backendUrl]);
+  // Hard refresh: wipes the server-side cache and rescrapes Investegate from
+  // scratch, so what comes back is exactly what the site shows for today right
+  // now. Takes noticeably longer than a normal refresh (full scrape, ~10-30s).
+  const hardRefresh = useCallback(() => fetchData({
+    hard: true
+  }), [fetchData]);
   const fetchWatchlist = useCallback(async () => {
     try {
       const r = await fetch(`${backendUrl}/api/watchlist`);
@@ -2203,6 +2214,11 @@ function App() {
     disabled: status === "loading"
   }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn",
+    onClick: hardRefresh,
+    disabled: status === "loading",
+    title: "Clears the server cache and rescrapes Investegate from scratch — slower, but guarantees the feed matches today's announcements exactly"
+  }, hardRefreshing ? "Rescraping..." : "Hard refresh"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
     onClick: () => setAutoRefresh(!autoRefresh),
     style: autoRefresh ? {
       borderColor: "var(--accent)",
@@ -2247,6 +2263,14 @@ function App() {
   }), /*#__PURE__*/React.createElement("div", {
     className: "overflow-menu"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      hardRefresh();
+      setMenuOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Hard refresh"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val"
+  }, hardRefreshing ? "..." : "\u27F3")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
     onClick: () => {
       setAutoRefresh(!autoRefresh);
