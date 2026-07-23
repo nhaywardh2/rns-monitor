@@ -1007,10 +1007,13 @@
       // Refresh mid-cycle puts two requests in flight, and the older one can
       // resolve last, overwriting newer data. Only the latest request may setData.
       const fetchSeqRef = useRef(0);
-      const fetchData=useCallback(async()=>{
+      const [hardRefreshing,setHardRefreshing]=useState(false);
+      const fetchData=useCallback(async(opts)=>{
+        const hard = !!(opts && opts.hard);
         const seq = ++fetchSeqRef.current;
         setStatus("loading");
-        try{const r=await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000`);if(!r.ok)throw new Error(`HTTP ${r.status}`);
+        if(hard)setHardRefreshing(true);
+        try{const r=await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000${hard?"&hard=true":""}`);if(!r.ok)throw new Error(`HTTP ${r.status}`);
           const j=await r.json();
           if(seq!==fetchSeqRef.current)return; // a newer request superseded this one
           setData(j);setStatus("connected");setLastRefresh(new Date());
@@ -1022,7 +1025,12 @@
             defaultsAppliedRef.current=true;
           }
         }catch(e){if(seq!==fetchSeqRef.current)return;console.error(e);setStatus("error");}
+        finally{if(seq===fetchSeqRef.current)setHardRefreshing(false);}
       },[backendUrl]);
+      // Hard refresh: wipes the server-side cache and rescrapes Investegate from
+      // scratch, so what comes back is exactly what the site shows for today right
+      // now. Takes noticeably longer than a normal refresh (full scrape, ~10-30s).
+      const hardRefresh=useCallback(()=>fetchData({hard:true}),[fetchData]);
 
       const fetchWatchlist=useCallback(async()=>{
         try{const r=await fetch(`${backendUrl}/api/watchlist`);if(r.ok){const j=await r.json();setWatchlist(j.watchlist||{});}}catch{}
@@ -1160,6 +1168,10 @@
               <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>
                 {status==="loading"?"...":"Refresh"}
               </button>
+              <button className="toolbar-btn" onClick={hardRefresh} disabled={status==="loading"}
+                title="Clears the server cache and rescrapes Investegate from scratch — slower, but guarantees the feed matches today's announcements exactly">
+                {hardRefreshing?"Rescraping...":"Hard refresh"}
+              </button>
               <button className={"toolbar-btn"} onClick={()=>setAutoRefresh(!autoRefresh)} style={autoRefresh?{borderColor:"var(--accent)",color:"var(--accent)"}:undefined}>
                 Auto {autoRefresh?"ON":"OFF"}
               </button>
@@ -1187,6 +1199,10 @@
             <>
               <div className="scrim clear" onClick={()=>setMenuOpen(false)}/>
               <div className="overflow-menu">
+                <div className="overflow-item" onClick={()=>{hardRefresh();setMenuOpen(false);}}>
+                  <span>Hard refresh</span>
+                  <span className="overflow-val">{hardRefreshing?"...":"\u27F3"}</span>
+                </div>
                 <div className="overflow-item" onClick={()=>{setAutoRefresh(!autoRefresh);}}>
                   <span>Auto-refresh</span>
                   <span className="overflow-val" style={autoRefresh?{color:"var(--accent)"}:undefined}>{autoRefresh?"ON":"OFF"}</span>

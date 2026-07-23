@@ -63,8 +63,14 @@ async def _periodic_scrape_loop():
     log.info(f"Background scraper starting (interval: {SCRAPE_INTERVAL_SECONDS}s)")
     while True:
         try:
-            await scrape_investegate()
+            # Hard ceiling on scrape duration. A single trickling response can hold
+            # a read alive past the per-request timeout; without this, one hung scrape
+            # holds the scrape lock indefinitely, merges stop, the midnight cache wipe
+            # never runs, and the app serves yesterday's snapshot all morning.
+            await asyncio.wait_for(scrape_investegate(), timeout=240)
             log.info(f"Background scrape complete. Cache has {daily_cache.count} announcements.")
+        except asyncio.TimeoutError:
+            log.error("Background scrape exceeded 240s and was cancelled — will retry next interval.")
         except asyncio.CancelledError:
             log.info("Background scraper cancelled — shutting down.")
             raise
@@ -463,6 +469,30 @@ class DailyCache:
         self._save()
         return [Announcement(**v) for v in self.announcements.values()]
 
+    def clear(self):
+        """Wipe the cache entirely. Used by the hard-refresh path."""
+        self.announcements = {}
+        self.cache_date = today_london().isoformat()
+        self.last_scrape = None
+        self._save()
+
+    def get_today(self) -> list:
+        """Return cached announcements for TODAY only. This is the serve-time gate:
+        endpoints must read through this, never through .announcements directly.
+        Two layers: _check_date wipes the cache if the calendar day has rolled over,
+        and the date_str filter drops any individual entry stamped with another day.
+        Between them, yesterday's announcements cannot reach the frontend even if
+        the background scraper stalls overnight and the midnight wipe never runs."""
+        self._check_date()
+        today_str = today_london().strftime("%d/%m/%Y")
+        out = []
+        for v in self.announcements.values():
+            ann = Announcement(**v)
+            if ann.date_str and ann.date_str != today_str:
+                continue
+            out.append(ann)
+        return out
+
     @property
     def count(self):
         self._check_date()
@@ -812,10 +842,20 @@ def parse_investegate_time(time_text):
     match2 = re.search(r'(\d{1,2}:\d{2})', time_text)
     return match2.group(1) if match2 else None
 
+_MONTH_NUM = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,"jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
+_DATE_RE = re.compile(r'\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b', re.IGNORECASE)
+
 def is_today(time_text):
+    """True if the text contains today's date (London). Parses the date out and
+    compares numerically — the old substring containment meant '1 Jul 2026'
+    matched '11 Jul 2026', and leading-zero day formats needed luck to work."""
+    m = _DATE_RE.search(time_text)
+    if not m:
+        return False
     today = today_london()
-    abbrevs = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
-    return f"{today.day} {abbrevs[today.month]} {today.year}" in time_text
+    return (int(m.group(1)) == today.day
+            and _MONTH_NUM[m.group(2).lower()[:3]] == today.month
+            and int(m.group(3)) == today.year)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -1255,9 +1295,20 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
 # request could otherwise run full scrapes concurrently, doubling the request
 # volume to Investegate for no benefit.
 _scrape_lock = asyncio.Lock()
+_SCRAPE_FRESHNESS_SECONDS = 60
 
-async def scrape_investegate():
+async def scrape_investegate(force: bool = False):
   async with _scrape_lock:
+    # Freshness check INSIDE the lock: several requests arriving on a cold start
+    # (the frontend fires /api/rns and /api/readacross together) queue on the lock,
+    # and without this check each would run its own full scrape back to back.
+    # Whoever queued behind a scrape that just finished gets the fresh cache instead.
+    # force=True (hard refresh) always scrapes.
+    if not force and daily_cache.last_scrape is not None:
+        age = (datetime.now() - daily_cache.last_scrape).total_seconds()
+        if age < _SCRAPE_FRESHNESS_SECONDS:
+            cached = daily_cache.get_today()
+            return cached, len(cached), list(daily_cache.last_errors)
     errors = []
     raw = []
     seen_keys = set()  # For deduplication
@@ -1566,7 +1617,7 @@ async def _ensure_cache_warm(force: bool = False):
     never scraped at all (cold start) or if force=True is passed. A cache that has been
     scraped and legitimately found 0 announcements (quiet day, source down) is left alone."""
     if force or daily_cache.last_scrape is None:
-        await scrape_investegate()
+        await scrape_investegate(force=force)
 
 @app.get("/api/rns", response_model=ScrapeResponse)
 async def get_rns(
@@ -1574,7 +1625,8 @@ async def get_rns(
     include_all: bool = Query(False),
     limit: int = Query(2000),
     include_fundraise: bool = Query(False, description="Legacy alias — noise filtering is now client-side"),
-    force: bool = Query(False, description="Bypass cache and trigger a fresh scrape"),
+    force: bool = Query(False, description="Bypass cache freshness and trigger a fresh scrape"),
+    hard: bool = Query(False, description="Clear the cache entirely before scraping — guarantees the response contains only what Investegate shows right now for today"),
 ):
     """Read announcements from the daily cache (kept warm by the background scraper).
     Returns instantly when the cache is populated. Cold-cache and force=true paths
@@ -1587,8 +1639,12 @@ async def get_rns(
 
     `include_all=true` additionally bypasses the headline-level material-type filter
     (EXCLUDED_TYPES); without it, factsheets, NAVs, and reissue notices are dropped."""
-    await _ensure_cache_warm(force=force)
-    raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
+    if hard:
+        daily_cache.clear()
+        await scrape_investegate(force=True)
+    else:
+        await _ensure_cache_warm(force=force)
+    raw = apply_live_watchlist(daily_cache.get_today())
     total_raw = len(raw)
     if include_all:
         # Just exclude mining/oil/gas — let the client decide what to hide.
@@ -1614,7 +1670,7 @@ async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False
     """Like /api/rns but with no headline-level or category-level filtering at all.
     Reads from cache."""
     await _ensure_cache_warm(force=force)
-    raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
+    raw = apply_live_watchlist(daily_cache.get_today())
     total_raw = len(raw)
     scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
     return ScrapeResponse(
@@ -1676,7 +1732,7 @@ async def get_readacross():
     # Cold-start safety: if cache is empty, kick off a synchronous scrape so first call returns data
     await _ensure_cache_warm()
     # Pull today's announcements from the daily cache
-    today_anns = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
+    today_anns = apply_live_watchlist(daily_cache.get_today())
 
     # Group triggered read-across announcements by ticker
     triggered: dict[str, list[dict]] = {}
@@ -1715,7 +1771,7 @@ async def get_readacross():
 async def get_rns_by_ticker(ticker: str):
     ticker = ticker.upper()
     await _ensure_cache_warm()
-    raw = apply_live_watchlist([Announcement(**v) for v in daily_cache.announcements.values()])
+    raw = apply_live_watchlist(daily_cache.get_today())
     return {"ticker": ticker, "company": WATCHLIST.get(ticker, {}).get("name", "Unknown"),
             "announcements": [a for a in raw if a.ticker == ticker], "errors": list(daily_cache.last_errors)}
 
