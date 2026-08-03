@@ -36,16 +36,18 @@
       --core: #f0c040;
       --readacross: #f97316;
       --readacross-bg: rgba(249,115,22,0.06);
-      /* Category accent colours — kept restrained */
+      /* Category accent colours, kept restrained.
+         Note: --director and --regulatory deliberately avoid gold and orange, because those
+         are reserved for the core (gold) and read-across (orange) tier highlights. */
       --results: #5ba8f7;
       --trading: #a78bfa;
       --ma: #f97066;
       --fundraise: #34d399;
-      --director: #fbbf24;
+      --director: #a8a29e;
       --company-update: #60a5fa;
       --contract: #2dd4bf;
       --board-change: #c084fc;
-      --regulatory: #fb923c;
+      --regulatory: #f43f5e;
       --dividend: #a3e635;
       --shareholding: #f472b6;
       --buyback: #22d3ee;
@@ -53,10 +55,58 @@
       --nonreg: #38bdf8;
       --other: #8a9e8f;
       --danger: #ef4444;
+      --new-cue: #3db86a;
       --font-sans: 'DM Sans', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
       --sidebar-w: 224px;
       --toolbar-h: 48px;
+    }
+
+    /* Light theme. Applied by setting data-theme="light" on <html>. Every colour token is
+       re-pointed, so components need no theme-specific code of their own. Category hues are
+       darkened for legible contrast on white. */
+    html[data-theme="light"] {
+      --bg-primary: #f1f4f3;
+      --bg-sidebar: #e8eceb;
+      --bg-toolbar: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f4f8f6;
+      --bg-card-active: #ecf5f0;
+      --bg-surface: #f7f9f8;
+      --bg-detail: #fafbfa;
+      --border: #d7dedb;
+      --border-strong: #b9c4bf;
+      --border-active: #8cbf9f;
+      --text-primary: #14201b;
+      --text-secondary: #4a5c53;
+      --text-muted: #74847c;
+      --text-dim: #9aa6a0;
+      --accent: #1f8a4c;
+      --accent-dim: #166638;
+      --accent-glow: rgba(31,138,76,0.10);
+      --watchlist: #a67608;
+      --watchlist-bg: rgba(166,118,8,0.09);
+      --watchlist-border: rgba(166,118,8,0.30);
+      --core: #a67608;
+      --readacross: #c2410c;
+      --readacross-bg: rgba(194,65,12,0.08);
+      --results: #1d6fd0;
+      --trading: #6d3fd4;
+      --ma: #cf3527;
+      --fundraise: #0f8a5f;
+      --director: #6f6a66;
+      --company-update: #2563eb;
+      --contract: #0d8f86;
+      --board-change: #7c33c8;
+      --regulatory: #d01b3c;
+      --dividend: #4d7c0f;
+      --shareholding: #be1873;
+      --buyback: #0e7490;
+      --admin: #5c6b78;
+      --nonreg: #0369a1;
+      --other: #6b7280;
+      --danger: #dc2626;
+      --new-cue: #1f8a4c;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); min-height:100vh; }
@@ -152,12 +202,16 @@
     .feed-counts { display:flex; gap:14px; font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
     .feed-counts span strong { color:var(--text-secondary); font-weight:500; }
 
-    /* Grid */
-    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; }
-    @media (max-width: 680px) { .grid { grid-template-columns:1fr; } }
+    /* Grid.
+       align-items:start is important: without it, grid items stretch to the tallest in their
+       row, so expanding one card inflated its neighbour into a tall empty box. */
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; align-items:start; }
+    .grid.cols-1 { grid-template-columns:1fr; }
+    .grid.cols-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 680px) { .grid, .grid.cols-1, .grid.cols-2 { grid-template-columns:1fr; } }
 
     /* Announcement row — dense */
-    .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:all 0.12s; padding:9px 12px; }
+    .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:background-color 0.12s, border-color 0.12s; padding:9px 12px; }
     .row:hover { background:var(--bg-card-hover); border-left-color:var(--accent-dim); }
     .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
     .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
@@ -165,9 +219,22 @@
     /* Read-across rows: orange highlight, distinct from the gold of core watchlist rows */
     .row.readacross { border-left-color:var(--readacross); background:var(--readacross-bg); }
     .row.readacross:hover { background:rgba(249,115,22,0.11); }
-    /* Read rows: dimmed but fully legible. Hovering restores full strength so re-reading is easy. */
-    .row.read { opacity:0.5; }
-    .row.read:hover { opacity:1; }
+    /* Read rows: the CONTENT dims, not the whole row, so the gold/orange tier bar on the left
+       keeps its full strength and a read watchlist item is still identifiable at a glance.
+       Hovering restores full opacity so re-reading is easy. */
+    .row.read .row-body { opacity:0.45; }
+    .row.read:hover .row-body { opacity:1; }
+    .row-body { transition:opacity 0.12s; }
+    /* New since the last refresh: a small accent flag plus a brief pulse on arrival. */
+    .row.is-new { box-shadow:inset 0 0 0 1px var(--accent-glow); }
+    .row.is-new .row-new-dot { display:inline-block; }
+    .row-new-dot { display:none; width:5px; height:5px; border-radius:50%; background:var(--new-cue); flex-shrink:0; animation:pulse-dot 2s ease-in-out 3; }
+    /* Keyboard focus ring for j/k navigation. */
+    .row.focused { outline:1px solid var(--accent); outline-offset:-1px; }
+    .row:focus-visible { outline:1px solid var(--accent); outline-offset:-1px; }
+    .row-read-btn { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:10px; padding:0 2px; line-height:1; flex-shrink:0; transition:color 0.12s; }
+    .row-read-btn:hover { color:var(--accent); }
+    .row-ra-map { font-family:var(--font-mono); font-size:9px; color:var(--readacross); background:var(--readacross-bg); padding:1px 5px; flex-shrink:0; }
     .row-meta { display:flex; align-items:center; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:nowrap; }
     .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
     .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
@@ -204,6 +271,72 @@
 
     /* Empty / error states */
     .empty { text-align:center; padding:60px 20px; background:var(--bg-card); border:1px solid var(--border); color:var(--text-muted); font-size:13px; }
+
+    /* ── Active filter chips ────────────────────────────────────────────────
+       Shows what is currently narrowing the feed, so an unexpectedly short list always has a
+       visible explanation. Matters most on mobile, where the sidebar is hidden in a drawer. */
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-family:var(--font-mono); letter-spacing:0.04em; text-transform:uppercase; color:var(--text-secondary); background:var(--bg-surface); border:1px solid var(--border); padding:3px 8px; }
+    .chip-x { cursor:pointer; color:var(--text-muted); font-size:11px; line-height:1; }
+    .chip-x:hover { color:var(--danger); }
+    .chip.clear-all { cursor:pointer; border-color:var(--border-strong); color:var(--text-muted); }
+    .chip.clear-all:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ── Options panel ──────────────────────────────────────────────────────
+       Centred dialog on desktop, bottom sheet on mobile. */
+    .sheet-wrap { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+    .sheet { background:var(--bg-card); border:1px solid var(--border-strong); width:100%; max-width:520px; max-height:84vh; overflow:auto; margin:20px; }
+    .sheet-head { position:sticky; top:0; background:var(--bg-card); display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); z-index:2; }
+    .sheet-title { font-size:15px; font-weight:600; }
+    .sheet-body { padding:6px 18px 18px; }
+    .opt-group { padding:14px 0; border-bottom:1px solid var(--border); }
+    .opt-group:last-child { border-bottom:none; }
+    .opt-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
+    .opt-hint { font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.45; }
+    .seg { display:flex; gap:6px; flex-wrap:wrap; }
+    .seg-btn { flex:1; min-width:78px; padding:9px 10px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:600; cursor:pointer; transition:border-color 0.12s, color 0.12s, background-color 0.12s; }
+    .seg-btn:hover { border-color:var(--border-strong); color:var(--text-primary); }
+    .seg-btn.on { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
+    .opt-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; }
+    .opt-row-text { font-size:13px; color:var(--text-primary); }
+    /* Accessible switch built from a button so it works with keyboard and touch. */
+    .switch { position:relative; width:38px; height:20px; flex-shrink:0; border-radius:20px; border:1px solid var(--border-strong); background:var(--bg-surface); cursor:pointer; transition:background-color 0.15s, border-color 0.15s; }
+    .switch.on { background:var(--accent); border-color:var(--accent); }
+    .switch-knob { position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--text-muted); transition:transform 0.15s, background-color 0.15s; }
+    .switch.on .switch-knob { transform:translateX(18px); background:var(--bg-primary); }
+    .opt-action { width:100%; text-align:left; padding:11px 12px; margin-bottom:6px; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; cursor:pointer; transition:border-color 0.12s, color 0.12s; }
+    .opt-action:hover { border-color:var(--accent); color:var(--accent); }
+    /* Per-category colour overrides */
+    .swatch-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; }
+    .swatch-row { display:flex; align-items:center; gap:8px; padding:5px 7px; background:var(--bg-surface); border:1px solid var(--border); }
+    .swatch-row input[type="color"] { width:22px; height:22px; padding:0; border:1px solid var(--border); background:transparent; cursor:pointer; flex-shrink:0; }
+    .swatch-name { font-size:11px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .swatch-reset { margin-left:auto; cursor:pointer; color:var(--text-dim); font-size:11px; flex-shrink:0; }
+    .swatch-reset:hover { color:var(--danger); }
+
+    /* ── Floating detail window ─────────────────────────────────────────────
+       Alternative to inline expansion. Full-screen sheet on mobile. */
+    .float-panel { background:var(--bg-card); border:1px solid var(--border-strong); width:100%; max-width:760px; max-height:88vh; display:flex; flex-direction:column; margin:20px; }
+    .float-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .float-body { overflow-y:auto; padding:14px 16px; }
+    .float-close { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:14px; line-height:1; padding:5px 9px; cursor:pointer; flex-shrink:0; }
+    .float-close:hover { border-color:var(--danger); color:var(--danger); }
+    .float-panel .expand { border-top:none; padding:0; background:transparent; }
+    @media (max-width: 680px) {
+      .sheet, .float-panel { margin:0; max-width:none; max-height:100vh; height:100vh; border:none; }
+      .sheet-wrap { align-items:stretch; }
+      .seg-btn { min-width:64px; font-size:12px; padding:11px 8px; }
+      .swatch-list { grid-template-columns:1fr 1fr; }
+    }
+
+    /* When the "dim once read" option is off, keep read rows at full strength. */
+    html.no-read-dim .row.read .row-body { opacity:1; }
+    /* Watchlist modal grouping */
+    .wl-group-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin:12px 0 6px; }
+    /* Light theme: the shimmer skeleton needs a lighter gradient to read correctly. */
+    html[data-theme="light"] .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-sidebar) 50%,var(--bg-card) 75%); background-size:200% 100%; }
+    html[data-theme="light"] .sheet-wrap { background:rgba(20,32,27,0.42); }
+    html[data-theme="light"] .scrim { background:rgba(20,32,27,0.42); }
   </style>
 </head>
 <body>
@@ -219,58 +352,91 @@ const {
 } = React;
 const API_BASE = "";
 
-// ── Read-state store ──────────────────────────────────────────────────────
-// Tracks which announcements have been opened. Persists in the browser, keyed
-// per day so it resets each morning in step with the daily feed. Read rows are
-// dimmed but stay visible. Self-contained so any card can use it without prop threading.
-const readStore = (() => {
-  const KEY = "rns_read_v1";
-  // Local calendar day (en-CA gives YYYY-MM-DD). The previous toISOString()
-  // used UTC, so during BST the read-state reset an hour out of step with the feed.
-  const today = new Date().toLocaleDateString("en-CA");
+// Stable identity for an announcement. Used for read state, new-item tracking and as the
+// React key. Deliberately excludes the array index: keying by index meant every filter
+// change or refresh remounted the cards, losing expansion state and replaying animations.
+const annId = ann => ann.url || `${ann.ticker || ann.company}|${ann.headline}`;
+
+// A per-day localStorage set. Used for both read state and seen state; both reset each
+// morning in step with the daily feed.
+function makeDaySet(storageKey) {
+  const today = new Date().toISOString().slice(0, 10);
   let ids = new Set();
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const raw = JSON.parse(localStorage.getItem(storageKey) || "{}");
     if (raw && raw.date === today && Array.isArray(raw.ids)) ids = new Set(raw.ids);
   } catch (e) {}
   const persist = () => {
     try {
-      localStorage.setItem(KEY, JSON.stringify({
+      localStorage.setItem(storageKey, JSON.stringify({
         date: today,
         ids: [...ids]
       }));
     } catch (e) {}
   };
   return {
-    keyFor: ann => ann.url || `${ann.ticker || ann.company}|${ann.headline}`,
     has: k => ids.has(k),
+    size: () => ids.size,
     mark: k => {
       if (!ids.has(k)) {
         ids.add(k);
         persist();
       }
+    },
+    unmark: k => {
+      if (ids.delete(k)) persist();
+    },
+    markAll: keys => {
+      let changed = false;
+      keys.forEach(k => {
+        if (!ids.has(k)) {
+          ids.add(k);
+          changed = true;
+        }
+      });
+      if (changed) persist();
+    },
+    clear: () => {
+      ids = new Set();
+      persist();
     }
   };
-})();
+}
 
-// ── Filter-preference store ──────────────────────────────────────────────
-// Persists the user's view settings (tier, source, sort, category filter and
-// hidden categories) in the browser so the feed opens the way they left it.
+// Which announcements have been opened. Read rows dim their content but stay visible.
+const readStore = makeDaySet("rns_read_v1");
+// Which announcements the user has already had sight of. Anything absent from this set on a
+// later refresh is genuinely new and gets flagged in the feed.
+const seenStore = makeDaySet("rns_seen_v1");
+
+// ── Preference store ─────────────────────────────────────────────────────
+// Persists view settings (filters, sort, theme, tag colours, expand style, density) so the
+// app opens the way it was left.
+const PREFS_KEY = "rns_prefs_v1";
 const prefsStore = {
-  KEY: "rns_prefs_v1",
   load: () => {
     try {
-      return JSON.parse(localStorage.getItem("rns_prefs_v1") || "null");
+      return JSON.parse(localStorage.getItem(PREFS_KEY) || "null");
     } catch (e) {
       return null;
     }
   },
   save: p => {
     try {
-      localStorage.setItem("rns_prefs_v1", JSON.stringify(p));
+      localStorage.setItem(PREFS_KEY, JSON.stringify(p));
     } catch (e) {}
   }
 };
+
+// Theme is applied to <html> so every CSS variable swaps at once.
+const applyTheme = theme => {
+  try {
+    document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
+  } catch (e) {}
+};
+
+// ── Category colours ─────────────────────────────────────────────────────
+// All colours reference CSS variables so they follow the active theme automatically.
 const CATEGORY_COLORS = {
   "Results": {
     color: "var(--results)",
@@ -297,7 +463,7 @@ const CATEGORY_COLORS = {
     bg: "rgba(52,211,153,0.10)"
   },
   "Buyback": {
-    color: "#22d3ee",
+    color: "var(--buyback)",
     bg: "rgba(34,211,238,0.10)"
   },
   "Board Change": {
@@ -306,26 +472,26 @@ const CATEGORY_COLORS = {
   },
   "Director Dealing": {
     color: "var(--director)",
-    bg: "rgba(251,191,36,0.10)"
+    bg: "rgba(168,162,158,0.12)"
   },
   "Shareholding": {
-    color: "#f472b6",
+    color: "var(--shareholding)",
     bg: "rgba(244,114,182,0.10)"
   },
   "Regulatory": {
     color: "var(--regulatory)",
-    bg: "rgba(251,146,60,0.10)"
+    bg: "rgba(244,63,94,0.10)"
   },
   "Dividend": {
     color: "var(--dividend)",
     bg: "rgba(163,230,53,0.10)"
   },
   "Non-Reg": {
-    color: "#38bdf8",
+    color: "var(--nonreg)",
     bg: "rgba(56,189,248,0.10)"
   },
   "Admin": {
-    color: "#94a3b8",
+    color: "var(--admin)",
     bg: "rgba(148,163,184,0.10)"
   },
   "Other": {
@@ -333,6 +499,54 @@ const CATEGORY_COLORS = {
     bg: "rgba(138,158,143,0.08)"
   }
 };
+
+// Categories that carry real IR signal. Used by the "Semantic" colour scheme, which greys
+// out procedural announcements so the material ones are what catch the eye.
+const MATERIAL_CATEGORIES = new Set(["Results", "Trading Update", "Company Update", "M&A", "Contract", "Board Change", "Regulatory"]);
+const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
+const hexToRgba = (hex, alpha) => {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+  if (!m) return "transparent";
+  return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
+};
+
+// Resolve the colour for a category tag under the active scheme, honouring any per-category
+// override the user has picked in Options.
+function makeCatColor(scheme, custom) {
+  return cat => {
+    const override = custom && custom[cat];
+    if (override) return {
+      color: override,
+      bg: hexToRgba(override, 0.13)
+    };
+    if (scheme === "mono") return {
+      color: "var(--text-secondary)",
+      bg: "transparent"
+    };
+    if (scheme === "semantic") {
+      return MATERIAL_CATEGORIES.has(cat) ? CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"] : {
+        color: "var(--text-muted)",
+        bg: "transparent"
+      };
+    }
+    return CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"];
+  };
+}
+
+// "07:05" plus a relative age, for feeds being scanned through the morning.
+function relativeAge(hhmm) {
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  const now = new Date();
+  const then = new Date(now);
+  then.setHours(h, m, 0, 0);
+  let mins = Math.round((now - then) / 60000);
+  if (mins < 0) return null;
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h${mins % 60 ? ` ${mins % 60}m` : ""}`;
+}
 function StatusDot({
   status
 }) {
@@ -571,9 +785,16 @@ function FullTextToggle({
 // ── Expandable Announcement Row — dense terminal style ──
 function AnnouncementCard({
   ann,
-  index,
   backendUrl,
-  tier
+  tier,
+  isNew,
+  isFocused,
+  expandStyle,
+  catColorFor,
+  showRelative,
+  raTargets,
+  readVersion,
+  onFocusRow
 }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -582,10 +803,16 @@ function AnnouncementCard({
   const [shData, setShData] = useState(null);
   const [shLoading, setShLoading] = useState(false);
   const shFetched = useRef(false);
-  const readKey = readStore.keyFor(ann);
-  const [isRead, setIsRead] = useState(() => readStore.has(readKey));
+  const id = annId(ann);
+  const [isRead, setIsRead] = useState(() => readStore.has(id));
+  const asModal = expandStyle === "modal";
 
-  // Auto-fetch shareholding detail for Shareholding rows when expanded
+  // Re-sync from the store when a bulk action (mark all read / clear) changes it.
+  useEffect(() => {
+    setIsRead(readStore.has(id));
+  }, [readVersion, id]);
+
+  // Auto-fetch shareholding detail for Shareholding rows when opened
   useEffect(() => {
     if (expanded && ann.category === "Shareholding" && ann.url && !shFetched.current) {
       shFetched.current = true;
@@ -595,6 +822,19 @@ function AnnouncementCard({
       }).catch(() => {}).finally(() => setShLoading(false));
     }
   }, [expanded, ann.category, ann.url, backendUrl]);
+
+  // Close the floating window on Escape.
+  useEffect(() => {
+    if (!(expanded && asModal)) return;
+    const onKey = e => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded, asModal]);
   const fetchDetail = async () => {
     if (!ann.url) return;
     if (detail) return;
@@ -616,50 +856,36 @@ function AnnouncementCard({
     const next = !expanded;
     setExpanded(next);
     if (next) {
-      readStore.mark(readKey);
+      readStore.mark(id);
       setIsRead(true);
       if (!detail) fetchDetail();
     }
   };
-  const catColor = CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"];
-  const isWL = ann.is_watchlist;
-  const rowClasses = ["row"];
-  if (isWL) rowClasses.push(tier === "read_across" ? "readacross" : "watchlist");
-  if (expanded) rowClasses.push("expanded");
-  if (isRead && !expanded) rowClasses.push("read");
-  return /*#__PURE__*/React.createElement("div", {
-    className: rowClasses.join(" ") + " fade-in"
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: toggleExpand
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "row-meta"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "row-time"
-  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
-    className: "row-ticker" + (isWL ? tier === "read_across" ? " readacross" : " watchlist" : "")
-  }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
-    className: "row-tag tier-core"
-  }, "CORE"), tier === "read_across" && /*#__PURE__*/React.createElement("span", {
-    className: "row-tag tier-ra"
-  }, "R/A"), /*#__PURE__*/React.createElement("span", {
-    className: "row-category",
-    style: {
-      color: catColor.color,
-      background: catColor.bg
+
+  // Mark read/unread without opening the announcement.
+  const toggleRead = e => {
+    e.stopPropagation();
+    if (isRead) {
+      readStore.unmark(id);
+      setIsRead(false);
+    } else {
+      readStore.mark(id);
+      setIsRead(true);
     }
-  }, ann.category), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
-    className: "row-source"
-  }, ann.source_feed), /*#__PURE__*/React.createElement("span", {
-    className: "row-spacer"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "row-chevron"
-  }, "▼")), /*#__PURE__*/React.createElement("div", {
-    className: "row-company"
-  }, ann.company), /*#__PURE__*/React.createElement("div", {
-    className: "row-headline"
-  }, ann.headline)), expanded && /*#__PURE__*/React.createElement("div", {
-    className: "expand"
-  }, loading && /*#__PURE__*/React.createElement("div", {
+  };
+  const catColor = catColorFor(ann.category);
+  const isWL = ann.is_watchlist;
+  const isRA = tier === "read_across";
+  const rowClasses = ["row"];
+  if (isWL) rowClasses.push(isRA ? "readacross" : "watchlist");
+  if (expanded && !asModal) rowClasses.push("expanded");
+  if (isRead && !expanded) rowClasses.push("read");
+  if (isNew) rowClasses.push("is-new");
+  if (isFocused) rowClasses.push("focused");
+  const age = showRelative ? relativeAge(ann.time) : null;
+
+  // Shared detail content, used inline and in the floating window.
+  const detailContent = /*#__PURE__*/React.createElement(React.Fragment, null, loading && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -740,7 +966,111 @@ function AnnouncementCard({
       fontFamily: "var(--font-mono)",
       marginLeft: "auto"
     }
-  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))))));
+  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB")))));
+  return /*#__PURE__*/React.createElement("div", {
+    id: `row-${id}`,
+    className: rowClasses.join(" "),
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": expanded,
+    onFocus: onFocusRow,
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleExpand();
+      }
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-body",
+    onClick: toggleExpand
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-new-dot",
+    title: "New since your last refresh"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, ann.time, age ? ` · ${age}` : ""), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker" + (isWL ? isRA ? " readacross" : " watchlist" : "")
+  }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-core"
+  }, "CORE"), isRA && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-ra"
+  }, "R/A"), isRA && raTargets && raTargets.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "row-ra-map",
+    title: `Reads across to ${raTargets.join(", ")}`
+  }, "→ ", raTargets.join(" ")), /*#__PURE__*/React.createElement("span", {
+    className: "row-category",
+    style: {
+      color: catColor.color,
+      background: catColor.bg
+    }
+  }, ann.category), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
+    className: "row-source"
+  }, ann.source_feed), /*#__PURE__*/React.createElement("span", {
+    className: "row-spacer"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "row-read-btn",
+    onClick: toggleRead,
+    title: isRead ? "Mark as unread" : "Mark as read"
+  }, isRead ? "\u25CB" : "\u25CF"), /*#__PURE__*/React.createElement("span", {
+    className: "row-chevron"
+  }, asModal ? "\u2197" : "\u25BC")), /*#__PURE__*/React.createElement("div", {
+    className: "row-company"
+  }, ann.company), /*#__PURE__*/React.createElement("div", {
+    className: "row-headline"
+  }, ann.headline)), expanded && !asModal && /*#__PURE__*/React.createElement("div", {
+    className: "expand"
+  }, detailContent), expanded && asModal && /*#__PURE__*/React.createElement("div", {
+    className: "sheet-wrap",
+    onClick: e => {
+      e.stopPropagation();
+      setExpanded(false);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "float-panel",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "float-head"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta",
+    style: {
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker" + (isWL ? isRA ? " readacross" : " watchlist" : "")
+  }, ann.ticker), /*#__PURE__*/React.createElement("span", {
+    className: "row-category",
+    style: {
+      color: catColor.color,
+      background: catColor.bg
+    }
+  }, ann.category)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-secondary)"
+    }
+  }, ann.company), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600,
+      marginTop: 2
+    }
+  }, ann.headline)), /*#__PURE__*/React.createElement("button", {
+    className: "float-close",
+    onClick: () => setExpanded(false),
+    title: "Close (Esc)"
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "float-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand"
+  }, detailContent)))));
 }
 function SkeletonCard() {
   return /*#__PURE__*/React.createElement("div", {
@@ -787,6 +1117,267 @@ function SkeletonCard() {
     }
   }));
 }
+
+// Small reusable pieces for the options panel
+function Switch({
+  on,
+  onClick
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    className: "switch" + (on ? " on" : ""),
+    onClick: onClick,
+    role: "switch",
+    "aria-checked": on
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "switch-knob"
+  }));
+}
+function Seg({
+  value,
+  options,
+  onChange
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "seg"
+  }, options.map(o => /*#__PURE__*/React.createElement("button", {
+    key: o.v,
+    className: "seg-btn" + (value === o.v ? " on" : ""),
+    onClick: () => onChange(o.v)
+  }, o.l)));
+}
+function OptRow({
+  label,
+  on,
+  onToggle
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "opt-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "opt-row-text"
+  }, label), /*#__PURE__*/React.createElement(Switch, {
+    on: on,
+    onClick: onToggle
+  }));
+}
+
+// ── Options panel ────────────────────────────────────────────────────────
+// Centred dialog on desktop, full-height sheet on mobile.
+function OptionsModal({
+  opts,
+  setOpt,
+  onClose,
+  onMarkAllRead,
+  onClearRead,
+  onMarkAllSeen,
+  onResetCategories,
+  onResetOptions,
+  hiddenCount,
+  readCount
+}) {
+  const [showSwatches, setShowSwatches] = useState(false);
+  const custom = opts.customColors || {};
+  const setCustom = (cat, hex) => setOpt("customColors", {
+    ...custom,
+    [cat]: hex
+  });
+  const clearCustom = cat => {
+    const n = {
+      ...custom
+    };
+    delete n[cat];
+    setOpt("customColors", n);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sheet-wrap",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sheet-title"
+  }, "Options"), /*#__PURE__*/React.createElement("button", {
+    className: "float-close",
+    onClick: onClose,
+    title: "Close (Esc)"
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Appearance"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.theme,
+    onChange: v => setOpt("theme", v),
+    options: [{
+      v: "dark",
+      l: "Dark"
+    }, {
+      v: "light",
+      l: "Light"
+    }]
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Tag colours"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.tagScheme,
+    onChange: v => setOpt("tagScheme", v),
+    options: [{
+      v: "vivid",
+      l: "Vivid"
+    }, {
+      v: "semantic",
+      l: "Semantic"
+    }, {
+      v: "mono",
+      l: "Mono"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Vivid gives every category its own colour. Semantic greys out procedural types (Admin, Shareholding, Director Dealing, Buyback, Fundraise, Dividend) so material news stands out. Mono drops tag colour entirely."), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => setShowSwatches(s => !s)
+  }, showSwatches ? "Hide" : "Customise", " individual tag colours", Object.keys(custom).length > 0 ? ` (${Object.keys(custom).length} set)` : ""), showSwatches && /*#__PURE__*/React.createElement("div", {
+    className: "swatch-list"
+  }, ALL_CATEGORIES.map(cat => /*#__PURE__*/React.createElement("div", {
+    className: "swatch-row",
+    key: cat
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "color",
+    value: custom[cat] || "#888888",
+    onChange: e => setCustom(cat, e.target.value),
+    title: `Colour for ${cat}`
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "swatch-name"
+  }, cat), custom[cat] && /*#__PURE__*/React.createElement("span", {
+    className: "swatch-reset",
+    title: "Reset this tag",
+    onClick: () => clearCustom(cat)
+  }, "↻"))))), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Opening an announcement"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.expandStyle,
+    onChange: v => setOpt("expandStyle", v),
+    options: [{
+      v: "inline",
+      l: "Read in line"
+    }, {
+      v: "modal",
+      l: "Floating window"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "In line keeps you in the feed. A floating window gives the full text more room, which suits longer announcements and small screens.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Feed density"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.columns,
+    onChange: v => setOpt("columns", v),
+    options: [{
+      v: "auto",
+      l: "Auto"
+    }, {
+      v: "1",
+      l: "1 column"
+    }, {
+      v: "2",
+      l: "2 columns"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "A single column keeps the relevance ranking in a clean top-to-bottom order. Auto fits as many columns as the window allows.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Behaviour"), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Show relative time (07:05 · 22m)",
+    on: opts.showRelative,
+    onToggle: () => setOpt("showRelative", !opts.showRelative)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Flag new items since last refresh",
+    on: opts.flagNew,
+    onToggle: () => setOpt("flagNew", !opts.flagNew)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Show read-across target on rows",
+    on: opts.showRaMap,
+    onToggle: () => setOpt("showRaMap", !opts.showRaMap)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Dim announcements once read",
+    on: opts.dimRead,
+    onToggle: () => setOpt("dimRead", !opts.dimRead)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Keyboard shortcuts (j/k, Enter, /)",
+    on: opts.keyboardNav,
+    onToggle: () => setOpt("keyboardNav", !opts.keyboardNav)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "j and k move, Enter opens, Esc closes, / jumps to search, r refreshes. Shift+R runs a hard refresh.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Auto-refresh interval"), /*#__PURE__*/React.createElement(Seg, {
+    value: String(opts.refreshSecs),
+    onChange: v => setOpt("refreshSecs", Number(v)),
+    options: [{
+      v: "60",
+      l: "60s"
+    }, {
+      v: "120",
+      l: "2 min"
+    }, {
+      v: "300",
+      l: "5 min"
+    }]
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Actions"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onMarkAllRead
+  }, "Mark everything showing as read"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onClearRead
+  }, "Clear read state", readCount ? ` (${readCount} marked)` : ""), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onMarkAllSeen
+  }, "Clear the new-item flags"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onResetCategories
+  }, "Reset hidden categories to defaults", hiddenCount === 0 ? " (nothing hidden now)" : ` (${hiddenCount} hidden)`), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onResetOptions
+  }, "Reset all options to defaults")))));
+}
+
+// ── Active filter chips ──────────────────────────────────────────────────
+function FilterChips({
+  items,
+  onClearAll
+}) {
+  if (items.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "chips"
+  }, items.map(it => /*#__PURE__*/React.createElement("span", {
+    className: "chip",
+    key: it.key
+  }, it.label, /*#__PURE__*/React.createElement("span", {
+    className: "chip-x",
+    onClick: it.onClear,
+    title: "Clear"
+  }, "✕"))), items.length > 1 && /*#__PURE__*/React.createElement("span", {
+    className: "chip clear-all",
+    onClick: onClearAll
+  }, "Clear all"));
+}
 function WatchlistModal({
   watchlist,
   onClose,
@@ -797,10 +1388,11 @@ function WatchlistModal({
   const [name, setName] = useState("");
   const [sector, setSector] = useState("");
   const [tier, setTier] = useState("core");
+  const [q, setQ] = useState("");
   const is = {
     background: "var(--bg-surface)",
     border: "1px solid var(--border)",
-    borderRadius: 6,
+    borderRadius: 0,
     padding: "8px 12px",
     color: "var(--text-primary)",
     fontFamily: "var(--font-sans)",
@@ -809,75 +1401,18 @@ function WatchlistModal({
     width: "100%"
   };
   const tierBtn = (val, label) => /*#__PURE__*/React.createElement("button", {
-    onClick: () => setTier(val),
-    style: {
-      flex: 1,
-      padding: "8px 10px",
-      borderRadius: 6,
-      border: `1px solid ${tier === val ? "var(--accent)" : "var(--border)"}`,
-      background: tier === val ? "var(--accent-glow)" : "transparent",
-      color: tier === val ? "var(--accent)" : "var(--text-secondary)",
-      fontFamily: "var(--font-sans)",
-      fontSize: 12,
-      fontWeight: 600,
-      cursor: "pointer"
-    }
+    className: "seg-btn" + (tier === val ? " on" : ""),
+    onClick: () => setTier(val)
   }, label);
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "fixed",
-      inset: 0,
-      zIndex: 1000,
-      background: "rgba(0,0,0,0.7)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      backdropFilter: "blur(4px)"
-    },
-    onClick: onClose
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: e => e.stopPropagation(),
-    className: "fade-up",
-    style: {
-      background: "var(--bg-card)",
-      border: "1px solid var(--border)",
-      borderRadius: 14,
-      padding: 28,
-      width: "100%",
-      maxWidth: 560,
-      maxHeight: "80vh",
-      overflow: "auto",
-      margin: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 20
-    }
-  }, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontSize: 18,
-      fontWeight: 600
-    }
-  }, "Watchlist (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--text-muted)",
-      fontSize: 20,
-      cursor: "pointer"
-    }
-  }, "✕")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-      marginBottom: 20
-    }
-  }, Object.entries(watchlist).map(([t, info]) => /*#__PURE__*/React.createElement("div", {
+
+  // Grouped and searchable: a flat list of 40+ names was hard to scan.
+  const entries = Object.entries(watchlist);
+  const ql = q.trim().toLowerCase();
+  const match = ([t, info]) => !ql || t.toLowerCase().includes(ql) || (info.name || "").toLowerCase().includes(ql) || (info.sector || "").toLowerCase().includes(ql);
+  const sortFn = (a, b) => (a[1].name || a[0]).localeCompare(b[1].name || b[0]);
+  const core = entries.filter(e => (e[1].tier || "core") !== "read_across").filter(match).sort(sortFn);
+  const ra = entries.filter(e => (e[1].tier || "core") === "read_across").filter(match).sort(sortFn);
+  const renderRow = ([t, info]) => /*#__PURE__*/React.createElement("div", {
     key: t,
     style: {
       display: "flex",
@@ -886,14 +1421,15 @@ function WatchlistModal({
       padding: "8px 12px",
       background: "var(--bg-surface)",
       border: "1px solid var(--border)",
-      borderRadius: 8
+      marginBottom: 4
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
       gap: 10,
-      flexWrap: "wrap"
+      flexWrap: "wrap",
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -902,29 +1438,12 @@ function WatchlistModal({
       fontWeight: 600,
       color: "var(--accent)",
       background: "var(--accent-glow)",
-      padding: "2px 8px",
-      borderRadius: 4
+      padding: "2px 8px"
     }
-  }, t), info.tier === "read_across" ? /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      padding: "1px 6px",
-      borderRadius: 4,
-      background: "rgba(249,115,22,0.12)",
-      color: "var(--readacross)"
-    }
+  }, t), (info.tier || "core") === "read_across" ? /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-ra"
   }, "R/A") : /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      padding: "1px 6px",
-      borderRadius: 4,
-      background: "rgba(240,192,64,0.12)",
-      color: "var(--core)"
-    }
+    className: "row-tag tier-core"
   }, "CORE"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
@@ -947,21 +1466,52 @@ function WatchlistModal({
     },
     onMouseOver: e => e.target.style.color = "var(--danger)",
     onMouseOut: e => e.target.style.color = "var(--text-muted)"
-  }, "✕")))), /*#__PURE__*/React.createElement("div", {
+  }, "✕"));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sheet-wrap",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sheet-title"
+  }, "Watchlist (", entries.length, ")"), /*#__PURE__*/React.createElement("button", {
+    className: "float-close",
+    onClick: onClose,
+    title: "Close (Esc)"
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-body"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "sidebar-search",
+    value: q,
+    onChange: e => setQ(e.target.value),
+    placeholder: "Search watchlist...",
+    style: {
+      marginBottom: 4
+    }
+  }), core.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "wl-group-label"
+  }, "Core (", core.length, ")"), core.map(renderRow)), ra.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "wl-group-label"
+  }, "Read-across (", ra.length, ")"), ra.map(renderRow)), core.length === 0 && ra.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-muted)",
+      padding: "14px 0"
+    }
+  }, "No companies match that search."), /*#__PURE__*/React.createElement("div", {
     style: {
       borderTop: "1px solid var(--border)",
       paddingTop: 16,
+      marginTop: 14,
       display: "flex",
       flexDirection: "column",
       gap: 10
     }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: "var(--text-secondary)",
-      marginBottom: 4
-    }
+    className: "opt-label"
   }, "Add to watchlist"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -973,7 +1523,7 @@ function WatchlistModal({
     placeholder: "Ticker",
     style: {
       ...is,
-      maxWidth: 90,
+      maxWidth: 100,
       fontFamily: "var(--font-mono)"
     }
   }), /*#__PURE__*/React.createElement("input", {
@@ -993,10 +1543,7 @@ function WatchlistModal({
       marginBottom: 6
     }
   }, "Tier"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
+    className: "seg"
   }, tierBtn("core", "Core"), tierBtn("read_across", "Read-across"))), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if (ticker && name) {
@@ -1012,17 +1559,14 @@ function WatchlistModal({
       background: ticker && name ? "var(--accent)" : "var(--border)",
       color: ticker && name ? "var(--bg-primary)" : "var(--text-muted)",
       border: "none",
-      borderRadius: 8,
       padding: "10px 16px",
       fontFamily: "var(--font-sans)",
       fontSize: 13,
       fontWeight: 600,
       cursor: ticker && name ? "pointer" : "not-allowed"
     }
-  }, "Add company"))));
+  }, "Add company")))));
 }
-
-// ── Read-Across View ──
 function ReadAcrossView({
   backendUrl,
   refreshTick
@@ -1840,8 +2384,23 @@ function ReadAcrossView({
     }
   }, "No current read-across company maps to these directly.")));
 }
+
+// Defaults for everything in the Options panel.
+const OPTION_DEFAULTS = {
+  theme: "dark",
+  tagScheme: "vivid",
+  customColors: {},
+  expandStyle: "inline",
+  columns: "auto",
+  showRelative: true,
+  flagNew: true,
+  showRaMap: true,
+  dimRead: true,
+  keyboardNav: true,
+  refreshSecs: 120
+};
 function App() {
-  // Restore saved view preferences (null on first ever visit)
+  // Restore saved preferences (null on first ever visit)
   const savedPrefs = useMemo(() => prefsStore.load(), []);
   const [data, setData] = useState(null);
   const [status, setStatus] = useState("idle");
@@ -1859,12 +2418,30 @@ function App() {
   const [tab, setTab] = useState("feed");
   const [excludedCats, setExcludedCats] = useState(() => savedPrefs?.excludedCats ? new Set(savedPrefs.excludedCats) : new Set());
   const [sourceFilter, setSourceFilter] = useState(() => savedPrefs?.sourceFilter ?? "all"); // all | rns | nonreg
-  // If we restored saved prefs, skip the server-default category seeding so the user's choices win.
   const defaultsAppliedRef = useRef(savedPrefs != null);
+  // Options, merged over defaults so a new option added later still has a sane value.
+  const [opts, setOpts] = useState(() => ({
+    ...OPTION_DEFAULTS,
+    ...(savedPrefs?.options || {})
+  }));
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const setOpt = (k, v) => setOpts(prev => ({
+    ...prev,
+    [k]: v
+  }));
+  // New-item tracking, read-state bumping, keyboard focus
+  const [newIds, setNewIds] = useState(() => new Set());
+  const [readVersion, setReadVersion] = useState(0);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const [raMap, setRaMap] = useState({});
+  const serverDefaultsRef = useRef([]); // server's default_hidden_categories, for "reset"
+  const searchRef = useRef(null);
+  const isHardRef = useRef(false);
+
   // Responsive state
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 880);
-  const [drawerOpen, setDrawerOpen] = useState(false); // mobile filter drawer
-  const [menuOpen, setMenuOpen] = useState(false); // mobile overflow menu
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     const onResize = () => {
       const m = window.innerWidth < 880;
@@ -1877,27 +2454,28 @@ function App() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  // Close mobile overlays on Escape
-  useEffect(() => {
-    const onKey = e => {
-      if (e.key === "Escape") {
-        if (menuOpen) setMenuOpen(false);else if (drawerOpen) setDrawerOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [menuOpen, drawerOpen]);
 
-  // Persist view preferences whenever they change (search is intentionally not saved)
+  // Theme and read-dimming are applied on <html> so all CSS variables swap together.
+  useEffect(() => {
+    applyTheme(opts.theme);
+  }, [opts.theme]);
+  useEffect(() => {
+    try {
+      document.documentElement.classList.toggle("no-read-dim", !opts.dimRead);
+    } catch (e) {}
+  }, [opts.dimRead]);
+
+  // Persist filters and options together.
   useEffect(() => {
     prefsStore.save({
       filter,
       categoryFilter,
       sortMode,
       sourceFilter,
-      excludedCats: [...excludedCats]
+      excludedCats: [...excludedCats],
+      options: opts
     });
-  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats]);
+  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, opts]);
   const NONREG_SOURCES = ["GNW", "UKN", "PRN", "MFN", "EQS"];
   const toggleExcludeCat = cat => {
     setExcludedCats(prev => {
@@ -1907,45 +2485,41 @@ function App() {
     });
   };
 
-  // Guards against out-of-order responses: with auto-refresh on, a manual
-  // Refresh mid-cycle puts two requests in flight, and the older one can
-  // resolve last, overwriting newer data. Only the latest request may setData.
-  const fetchSeqRef = useRef(0);
-  const [hardRefreshing, setHardRefreshing] = useState(false);
-  const fetchData = useCallback(async opts => {
-    const hard = !!(opts && opts.hard);
-    const seq = ++fetchSeqRef.current;
-    setStatus("loading");
-    if (hard) setHardRefreshing(true);
+  // hard=true asks the backend to clear its cache and rescrape synchronously. force=true is
+  // sent alongside so an older backend without the hard flag still does a fresh scrape.
+  const fetchData = useCallback(async (hard = false) => {
+    setStatus(hard ? "loading" : "loading");
+    isHardRef.current = hard;
     try {
-      const r = await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000${hard ? "&hard=true" : ""}`);
+      const qs = `include_all=true&limit=2000${hard ? "&force=true&hard=true" : ""}`;
+      const r = await fetch(`${backendUrl}/api/rns?${qs}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
-      if (seq !== fetchSeqRef.current) return; // a newer request superseded this one
       setData(j);
       setStatus("connected");
       setLastRefresh(new Date());
-      // First-load only: pre-populate excludedCats with the categories the server suggests
-      // hiding by default (Fundraise, Buyback, Director Dealing, Shareholding, Admin, Dividend).
-      // After this, the user is in full control — refreshes won't reset their choices.
+      if (Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current = j.default_hidden_categories;
+      // First load only: adopt the server's suggested hidden categories.
       if (!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)) {
         setExcludedCats(new Set(j.default_hidden_categories));
         defaultsAppliedRef.current = true;
       }
+      // Work out what is new since the previous look. The first visit of the day establishes
+      // the baseline silently, otherwise every announcement would be flagged at 07:00.
+      const ids = (j.announcements || []).map(annId);
+      if (seenStore.size() === 0) {
+        seenStore.markAll(ids);
+        setNewIds(new Set());
+      } else {
+        const fresh = ids.filter(id => !seenStore.has(id));
+        seenStore.markAll(ids);
+        if (fresh.length > 0) setNewIds(new Set(fresh));
+      }
     } catch (e) {
-      if (seq !== fetchSeqRef.current) return;
       console.error(e);
       setStatus("error");
-    } finally {
-      if (seq === fetchSeqRef.current) setHardRefreshing(false);
     }
   }, [backendUrl]);
-  // Hard refresh: wipes the server-side cache and rescrapes Investegate from
-  // scratch, so what comes back is exactly what the site shows for today right
-  // now. Takes noticeably longer than a normal refresh (full scrape, ~10-30s).
-  const hardRefresh = useCallback(() => fetchData({
-    hard: true
-  }), [fetchData]);
   const fetchWatchlist = useCallback(async () => {
     try {
       const r = await fetch(`${backendUrl}/api/watchlist`);
@@ -1955,16 +2529,32 @@ function App() {
       }
     } catch {}
   }, [backendUrl]);
+
+  // The read-across matrix gives each read-across ticker the core name(s) it maps to, so a
+  // row can show "-> CML" without opening the read-across tab.
+  const fetchRaMap = useCallback(async () => {
+    try {
+      const r = await fetch(`${backendUrl}/api/readacross`);
+      if (!r.ok) return;
+      const j = await r.json();
+      const m = {};
+      Object.entries(j.matrix || {}).forEach(([ra, links]) => {
+        m[ra] = Object.keys(links || {});
+      });
+      setRaMap(m);
+    } catch {}
+  }, [backendUrl]);
   useEffect(() => {
     fetchData();
     fetchWatchlist();
-  }, [fetchData, fetchWatchlist]);
+    fetchRaMap();
+  }, [fetchData, fetchWatchlist, fetchRaMap]);
   useEffect(() => {
-    if (autoRefresh) intervalRef.current = setInterval(fetchData, 120000);
+    if (autoRefresh) intervalRef.current = setInterval(() => fetchData(false), (opts.refreshSecs || 120) * 1000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [autoRefresh, fetchData]);
+  }, [autoRefresh, fetchData, opts.refreshSecs]);
   const handleAdd = async (t, n, s, tier) => {
     try {
       await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier || "core"}`, {
@@ -1984,8 +2574,6 @@ function App() {
     } catch {}
   };
   const allAnns = data?.announcements || [];
-
-  // Derived counts — recomputed only when the source data or watchlist changes
   const {
     wlCount,
     coreCount,
@@ -2011,13 +2599,10 @@ function App() {
       sortedCats: Object.entries(cc).sort((a, b) => b[1] - a[1]).map(([c]) => c)
     };
   }, [allAnns, watchlist]);
-
-  // Filtered + sorted feed — recomputed only when data or any filter input changes
   const anns = useMemo(() => {
     let out = allAnns;
     if (filter === "watchlist") out = out.filter(a => a.is_watchlist);else if (filter === "core") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core");else if (filter === "read_across") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across");else if (filter === "sector") out = out.filter(a => a.sector_relevant);
     if (categoryFilter !== "all") out = out.filter(a => a.category === categoryFilter);
-    // No watchlist override on excluded categories — if a category is hidden, it stays hidden.
     if (excludedCats.size > 0) out = out.filter(a => !excludedCats.has(a.category));
     if (sourceFilter === "rns") out = out.filter(a => !a.source_feed || a.source_feed === "RNS");else if (sourceFilter === "nonreg") out = out.filter(a => NONREG_SOURCES.includes(a.source_feed));
     if (searchText) {
@@ -2030,6 +2615,151 @@ function App() {
     return out;
   }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode]);
   const tierFor = ticker => watchlist[ticker]?.tier;
+  const catColorFor = useMemo(() => makeCatColor(opts.tagScheme, opts.customColors), [opts.tagScheme, opts.customColors]);
+  const newCount = useMemo(() => anns.filter(a => newIds.has(annId(a))).length, [anns, newIds]);
+  const anyModalOpen = optionsOpen || showWatchlist;
+
+  // ── Bulk actions ───────────────────────────────────────────────────────
+  const markAllRead = () => {
+    readStore.markAll(anns.map(annId));
+    setReadVersion(v => v + 1);
+  };
+  const clearRead = () => {
+    readStore.clear();
+    setReadVersion(v => v + 1);
+  };
+  const markAllSeen = () => {
+    seenStore.markAll(allAnns.map(annId));
+    setNewIds(new Set());
+  };
+  const resetCategories = () => {
+    setExcludedCats(new Set(serverDefaultsRef.current || []));
+    setCategoryFilter("all");
+  };
+  const resetOptions = () => setOpts({
+    ...OPTION_DEFAULTS
+  });
+  const clearAllFilters = () => {
+    setFilter("all");
+    setCategoryFilter("all");
+    setSourceFilter("all");
+    setSearchText("");
+  };
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!opts.keyboardNav) return;
+    const onKey = e => {
+      const t = e.target;
+      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+      if (e.key === "Escape") {
+        if (menuOpen) {
+          setMenuOpen(false);
+          return;
+        }
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          return;
+        }
+        if (optionsOpen) {
+          setOptionsOpen(false);
+          return;
+        }
+        if (showWatchlist) {
+          setShowWatchlist(false);
+          return;
+        }
+        if (typing) {
+          t.blur();
+          return;
+        }
+        setFocusedIdx(-1);
+        return;
+      }
+      if (typing || anyModalOpen || tab !== "feed") return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current && searchRef.current.focus();
+        return;
+      }
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedIdx(i => Math.min((i < 0 ? -1 : i) + 1, anns.length - 1));
+        return;
+      }
+      if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedIdx(i => Math.max((i < 0 ? 0 : i) - 1, 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        if (focusedIdx < 0 || focusedIdx >= anns.length) return;
+        e.preventDefault();
+        const el = document.getElementById(`row-${annId(anns[focusedIdx])}`);
+        const body = el && el.querySelector(".row-body");
+        if (body) body.click();
+        return;
+      }
+      if (e.key === "r") {
+        e.preventDefault();
+        fetchData(false);
+        return;
+      }
+      if (e.key === "R") {
+        e.preventDefault();
+        fetchData(true);
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [opts.keyboardNav, anns, focusedIdx, menuOpen, drawerOpen, optionsOpen, showWatchlist, anyModalOpen, tab, fetchData]);
+
+  // Keep the keyboard-focused row in view.
+  useEffect(() => {
+    if (focusedIdx < 0 || focusedIdx >= anns.length) return;
+    const el = document.getElementById(`row-${annId(anns[focusedIdx])}`);
+    if (el && el.scrollIntoView) el.scrollIntoView({
+      block: "nearest"
+    });
+  }, [focusedIdx, anns]);
+
+  // ── Active filter chips ────────────────────────────────────────────────
+  const chipItems = useMemo(() => {
+    const items = [];
+    const tierLabels = {
+      watchlist: "Watchlist",
+      core: "Core",
+      read_across: "Read-across",
+      sector: "Sector relevant"
+    };
+    if (filter !== "all") items.push({
+      key: "tier",
+      label: `Tier: ${tierLabels[filter] || filter}`,
+      onClear: () => setFilter("all")
+    });
+    if (sourceFilter !== "all") items.push({
+      key: "src",
+      label: `Source: ${sourceFilter === "rns" ? "RNS only" : "Non-Reg only"}`,
+      onClear: () => setSourceFilter("all")
+    });
+    if (categoryFilter !== "all") items.push({
+      key: "cat",
+      label: `Type: ${categoryFilter}`,
+      onClear: () => setCategoryFilter("all")
+    });
+    if (searchText) items.push({
+      key: "q",
+      label: `Search: ${searchText}`,
+      onClear: () => setSearchText("")
+    });
+    if (excludedCats.size > 0) items.push({
+      key: "hid",
+      label: `${excludedCats.size} type${excludedCats.size === 1 ? "" : "s"} hidden`,
+      onClear: resetCategories
+    });
+    return items;
+  }, [filter, sourceFilter, categoryFilter, searchText, excludedCats]);
 
   // Sidebar filter helpers
   const TierRow = ({
@@ -2062,11 +2792,10 @@ function App() {
   }, label), /*#__PURE__*/React.createElement("span", {
     className: "filter-count"
   }, count));
-
-  // Sidebar filter content — rendered inline (desktop) or inside the mobile drawer
   const sidebarContent = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "sidebar-section"
   }, /*#__PURE__*/React.createElement("input", {
+    ref: searchRef,
     className: "sidebar-search",
     value: searchText,
     onChange: e => setSearchText(e.target.value),
@@ -2133,7 +2862,12 @@ function App() {
     className: "sidebar-section"
   }, /*#__PURE__*/React.createElement("div", {
     className: "sidebar-label"
-  }, /*#__PURE__*/React.createElement("span", null, "Categories"), excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, "Categories"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
       cursor: "pointer",
       color: "var(--text-secondary)",
@@ -2142,7 +2876,17 @@ function App() {
       fontSize: 9
     },
     onClick: () => setExcludedCats(new Set())
-  }, "show all")), /*#__PURE__*/React.createElement("div", {
+  }, "show all"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      cursor: "pointer",
+      color: "var(--text-secondary)",
+      textTransform: "none",
+      letterSpacing: 0,
+      fontSize: 9
+    },
+    onClick: resetCategories,
+    title: "Restore the default hidden categories"
+  }, "defaults"))), /*#__PURE__*/React.createElement("div", {
     className: "filter-row" + (categoryFilter === "all" && excludedCats.size === 0 ? " active" : ""),
     onClick: () => {
       setCategoryFilter("all");
@@ -2153,7 +2897,7 @@ function App() {
   }, "All types")), sortedCats.map(cat => {
     const isExcluded = excludedCats.has(cat);
     const isActive = categoryFilter === cat;
-    const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
+    const catColor = catColorFor(cat).color;
     const cls = "filter-row" + (isActive ? " active" : "") + (isExcluded ? " excluded" : "");
     return /*#__PURE__*/React.createElement("div", {
       key: cat,
@@ -2190,6 +2934,7 @@ function App() {
       } : undefined
     }, isExcluded ? "\u21BA" : "\u2715"));
   })));
+  const gridClass = "grid" + (opts.columns === "1" ? " cols-1" : opts.columns === "2" ? " cols-2" : "");
   return /*#__PURE__*/React.createElement(React.Fragment, null, !isMobile ? /*#__PURE__*/React.createElement("div", {
     className: "toolbar"
   }, /*#__PURE__*/React.createElement("span", {
@@ -2210,14 +2955,14 @@ function App() {
     status: status
   }), status === "connected" && lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn primary",
-    onClick: fetchData,
+    onClick: () => fetchData(false),
     disabled: status === "loading"
   }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn",
-    onClick: hardRefresh,
+    onClick: () => fetchData(true),
     disabled: status === "loading",
-    title: "Clears the server cache and rescrapes Investegate from scratch — slower, but guarantees the feed matches today's announcements exactly"
-  }, hardRefreshing ? "Rescraping..." : "Hard refresh"), /*#__PURE__*/React.createElement("button", {
+    title: "Clear the server cache and rescrape from scratch (Shift+R)"
+  }, "Hard refresh"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn",
     onClick: () => setAutoRefresh(!autoRefresh),
     style: autoRefresh ? {
@@ -2229,8 +2974,12 @@ function App() {
     onClick: () => setShowWatchlist(true)
   }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn icon",
-    onClick: () => setConfigOpen(!configOpen),
-    title: "Backend URL"
+    onClick: () => setOpt("theme", opts.theme === "dark" ? "light" : "dark"),
+    title: "Toggle light / dark"
+  }, opts.theme === "dark" ? "\u263C" : "\u263D"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn icon",
+    onClick: () => setOptionsOpen(true),
+    title: "Options"
   }, "⚙")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "toolbar"
   }, tab === "feed" && /*#__PURE__*/React.createElement("button", {
@@ -2243,7 +2992,7 @@ function App() {
     className: "toolbar-spacer"
   }), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn primary",
-    onClick: fetchData,
+    onClick: () => fetchData(false),
     disabled: status === "loading"
   }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-icon-btn",
@@ -2265,12 +3014,12 @@ function App() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
     onClick: () => {
-      hardRefresh();
+      fetchData(true);
       setMenuOpen(false);
     }
   }, /*#__PURE__*/React.createElement("span", null, "Hard refresh"), /*#__PURE__*/React.createElement("span", {
     className: "overflow-val"
-  }, hardRefreshing ? "..." : "\u27F3")), /*#__PURE__*/React.createElement("div", {
+  }, "↻")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
     onClick: () => {
       setAutoRefresh(!autoRefresh);
@@ -2283,6 +3032,13 @@ function App() {
   }, autoRefresh ? "ON" : "OFF")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
     onClick: () => {
+      setOpt("theme", opts.theme === "dark" ? "light" : "dark");
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Theme"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val"
+  }, opts.theme === "dark" ? "Dark" : "Light")), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
       setShowWatchlist(true);
       setMenuOpen(false);
     }
@@ -2291,10 +3047,10 @@ function App() {
   }, Object.keys(watchlist).length)), /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
     onClick: () => {
-      setConfigOpen(!configOpen);
+      setOptionsOpen(true);
       setMenuOpen(false);
     }
-  }, /*#__PURE__*/React.createElement("span", null, "Backend URL"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, "Options"), /*#__PURE__*/React.createElement("span", {
     className: "overflow-val"
   }, "⚙")))), configOpen && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2367,11 +3123,14 @@ function App() {
     style: {
       color: "var(--watchlist)"
     }
-  }, wlCount, " watchlist"), excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
+  }, wlCount, " watchlist"), opts.flagNew && newCount > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "var(--danger)"
-    }
-  }, excludedCats.size, " categories hidden"), isMobile && /*#__PURE__*/React.createElement("span", {
+      color: "var(--accent)",
+      cursor: "pointer"
+    },
+    onClick: markAllSeen,
+    title: "Clear the new flags"
+  }, newCount, " new"), isMobile && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: "auto",
       display: "flex",
@@ -2379,7 +3138,10 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(StatusDot, {
     status: status
-  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), data?.errors?.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), /*#__PURE__*/React.createElement(FilterChips, {
+    items: chipItems,
+    onClearAll: clearAllFilters
+  }), data?.errors?.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10,
       padding: "6px 10px",
@@ -2408,18 +3170,29 @@ function App() {
       color: "var(--accent)"
     }
   }, backendUrl), " is running.")), status === "loading" && !data && /*#__PURE__*/React.createElement("div", {
-    className: "grid"
+    className: gridClass
   }, [0, 1, 2, 3, 4, 5, 6, 7].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
     key: i
   }))), anns.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "grid"
-  }, anns.map((a, i) => /*#__PURE__*/React.createElement(AnnouncementCard, {
-    key: a.url || `${a.company}|${a.headline}`,
-    ann: a,
-    index: i,
-    backendUrl: backendUrl,
-    tier: tierFor(a.ticker)
-  }))), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: gridClass
+  }, anns.map((a, i) => {
+    const id = annId(a);
+    const tier = tierFor(a.ticker);
+    return /*#__PURE__*/React.createElement(AnnouncementCard, {
+      key: id,
+      ann: a,
+      backendUrl: backendUrl,
+      tier: tier,
+      isNew: opts.flagNew && newIds.has(id),
+      isFocused: focusedIdx === i,
+      expandStyle: opts.expandStyle,
+      catColorFor: catColorFor,
+      showRelative: opts.showRelative,
+      raTargets: opts.showRaMap && tier === "read_across" ? raMap[a.ticker] : null,
+      readVersion: readVersion,
+      onFocusRow: () => setFocusedIdx(i)
+    });
+  })), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2437,6 +3210,17 @@ function App() {
     onClose: () => setShowWatchlist(false),
     onAdd: handleAdd,
     onRemove: handleRemove
+  }), optionsOpen && /*#__PURE__*/React.createElement(OptionsModal, {
+    opts: opts,
+    setOpt: setOpt,
+    onClose: () => setOptionsOpen(false),
+    onMarkAllRead: markAllRead,
+    onClearRead: clearRead,
+    onMarkAllSeen: markAllSeen,
+    onResetCategories: resetCategories,
+    onResetOptions: resetOptions,
+    hiddenCount: excludedCats.size,
+    readCount: readStore.size()
   }));
 }
 ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById("root"));
