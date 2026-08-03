@@ -37,16 +37,18 @@
       --core: #f0c040;
       --readacross: #f97316;
       --readacross-bg: rgba(249,115,22,0.06);
-      /* Category accent colours — kept restrained */
+      /* Category accent colours, kept restrained.
+         Note: --director and --regulatory deliberately avoid gold and orange, because those
+         are reserved for the core (gold) and read-across (orange) tier highlights. */
       --results: #5ba8f7;
       --trading: #a78bfa;
       --ma: #f97066;
       --fundraise: #34d399;
-      --director: #fbbf24;
+      --director: #a8a29e;
       --company-update: #60a5fa;
       --contract: #2dd4bf;
       --board-change: #c084fc;
-      --regulatory: #fb923c;
+      --regulatory: #f43f5e;
       --dividend: #a3e635;
       --shareholding: #f472b6;
       --buyback: #22d3ee;
@@ -54,10 +56,58 @@
       --nonreg: #38bdf8;
       --other: #8a9e8f;
       --danger: #ef4444;
+      --new-cue: #3db86a;
       --font-sans: 'DM Sans', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
       --sidebar-w: 224px;
       --toolbar-h: 48px;
+    }
+
+    /* Light theme. Applied by setting data-theme="light" on <html>. Every colour token is
+       re-pointed, so components need no theme-specific code of their own. Category hues are
+       darkened for legible contrast on white. */
+    html[data-theme="light"] {
+      --bg-primary: #f1f4f3;
+      --bg-sidebar: #e8eceb;
+      --bg-toolbar: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f4f8f6;
+      --bg-card-active: #ecf5f0;
+      --bg-surface: #f7f9f8;
+      --bg-detail: #fafbfa;
+      --border: #d7dedb;
+      --border-strong: #b9c4bf;
+      --border-active: #8cbf9f;
+      --text-primary: #14201b;
+      --text-secondary: #4a5c53;
+      --text-muted: #74847c;
+      --text-dim: #9aa6a0;
+      --accent: #1f8a4c;
+      --accent-dim: #166638;
+      --accent-glow: rgba(31,138,76,0.10);
+      --watchlist: #a67608;
+      --watchlist-bg: rgba(166,118,8,0.09);
+      --watchlist-border: rgba(166,118,8,0.30);
+      --core: #a67608;
+      --readacross: #c2410c;
+      --readacross-bg: rgba(194,65,12,0.08);
+      --results: #1d6fd0;
+      --trading: #6d3fd4;
+      --ma: #cf3527;
+      --fundraise: #0f8a5f;
+      --director: #6f6a66;
+      --company-update: #2563eb;
+      --contract: #0d8f86;
+      --board-change: #7c33c8;
+      --regulatory: #d01b3c;
+      --dividend: #4d7c0f;
+      --shareholding: #be1873;
+      --buyback: #0e7490;
+      --admin: #5c6b78;
+      --nonreg: #0369a1;
+      --other: #6b7280;
+      --danger: #dc2626;
+      --new-cue: #1f8a4c;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); min-height:100vh; }
@@ -153,12 +203,16 @@
     .feed-counts { display:flex; gap:14px; font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
     .feed-counts span strong { color:var(--text-secondary); font-weight:500; }
 
-    /* Grid */
-    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; }
-    @media (max-width: 680px) { .grid { grid-template-columns:1fr; } }
+    /* Grid.
+       align-items:start is important: without it, grid items stretch to the tallest in their
+       row, so expanding one card inflated its neighbour into a tall empty box. */
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; align-items:start; }
+    .grid.cols-1 { grid-template-columns:1fr; }
+    .grid.cols-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 680px) { .grid, .grid.cols-1, .grid.cols-2 { grid-template-columns:1fr; } }
 
     /* Announcement row — dense */
-    .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:all 0.12s; padding:9px 12px; }
+    .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:background-color 0.12s, border-color 0.12s; padding:9px 12px; }
     .row:hover { background:var(--bg-card-hover); border-left-color:var(--accent-dim); }
     .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
     .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
@@ -166,9 +220,22 @@
     /* Read-across rows: orange highlight, distinct from the gold of core watchlist rows */
     .row.readacross { border-left-color:var(--readacross); background:var(--readacross-bg); }
     .row.readacross:hover { background:rgba(249,115,22,0.11); }
-    /* Read rows: dimmed but fully legible. Hovering restores full strength so re-reading is easy. */
-    .row.read { opacity:0.5; }
-    .row.read:hover { opacity:1; }
+    /* Read rows: the CONTENT dims, not the whole row, so the gold/orange tier bar on the left
+       keeps its full strength and a read watchlist item is still identifiable at a glance.
+       Hovering restores full opacity so re-reading is easy. */
+    .row.read .row-body { opacity:0.45; }
+    .row.read:hover .row-body { opacity:1; }
+    .row-body { transition:opacity 0.12s; }
+    /* New since the last refresh: a small accent flag plus a brief pulse on arrival. */
+    .row.is-new { box-shadow:inset 0 0 0 1px var(--accent-glow); }
+    .row.is-new .row-new-dot { display:inline-block; }
+    .row-new-dot { display:none; width:5px; height:5px; border-radius:50%; background:var(--new-cue); flex-shrink:0; animation:pulse-dot 2s ease-in-out 3; }
+    /* Keyboard focus ring for j/k navigation. */
+    .row.focused { outline:1px solid var(--accent); outline-offset:-1px; }
+    .row:focus-visible { outline:1px solid var(--accent); outline-offset:-1px; }
+    .row-read-btn { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:10px; padding:0 2px; line-height:1; flex-shrink:0; transition:color 0.12s; }
+    .row-read-btn:hover { color:var(--accent); }
+    .row-ra-map { font-family:var(--font-mono); font-size:9px; color:var(--readacross); background:var(--readacross-bg); padding:1px 5px; flex-shrink:0; }
     .row-meta { display:flex; align-items:center; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:nowrap; }
     .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
     .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
@@ -205,6 +272,72 @@
 
     /* Empty / error states */
     .empty { text-align:center; padding:60px 20px; background:var(--bg-card); border:1px solid var(--border); color:var(--text-muted); font-size:13px; }
+
+    /* ── Active filter chips ────────────────────────────────────────────────
+       Shows what is currently narrowing the feed, so an unexpectedly short list always has a
+       visible explanation. Matters most on mobile, where the sidebar is hidden in a drawer. */
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-family:var(--font-mono); letter-spacing:0.04em; text-transform:uppercase; color:var(--text-secondary); background:var(--bg-surface); border:1px solid var(--border); padding:3px 8px; }
+    .chip-x { cursor:pointer; color:var(--text-muted); font-size:11px; line-height:1; }
+    .chip-x:hover { color:var(--danger); }
+    .chip.clear-all { cursor:pointer; border-color:var(--border-strong); color:var(--text-muted); }
+    .chip.clear-all:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ── Options panel ──────────────────────────────────────────────────────
+       Centred dialog on desktop, bottom sheet on mobile. */
+    .sheet-wrap { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+    .sheet { background:var(--bg-card); border:1px solid var(--border-strong); width:100%; max-width:520px; max-height:84vh; overflow:auto; margin:20px; }
+    .sheet-head { position:sticky; top:0; background:var(--bg-card); display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); z-index:2; }
+    .sheet-title { font-size:15px; font-weight:600; }
+    .sheet-body { padding:6px 18px 18px; }
+    .opt-group { padding:14px 0; border-bottom:1px solid var(--border); }
+    .opt-group:last-child { border-bottom:none; }
+    .opt-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
+    .opt-hint { font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.45; }
+    .seg { display:flex; gap:6px; flex-wrap:wrap; }
+    .seg-btn { flex:1; min-width:78px; padding:9px 10px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:600; cursor:pointer; transition:border-color 0.12s, color 0.12s, background-color 0.12s; }
+    .seg-btn:hover { border-color:var(--border-strong); color:var(--text-primary); }
+    .seg-btn.on { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
+    .opt-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; }
+    .opt-row-text { font-size:13px; color:var(--text-primary); }
+    /* Accessible switch built from a button so it works with keyboard and touch. */
+    .switch { position:relative; width:38px; height:20px; flex-shrink:0; border-radius:20px; border:1px solid var(--border-strong); background:var(--bg-surface); cursor:pointer; transition:background-color 0.15s, border-color 0.15s; }
+    .switch.on { background:var(--accent); border-color:var(--accent); }
+    .switch-knob { position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--text-muted); transition:transform 0.15s, background-color 0.15s; }
+    .switch.on .switch-knob { transform:translateX(18px); background:var(--bg-primary); }
+    .opt-action { width:100%; text-align:left; padding:11px 12px; margin-bottom:6px; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; cursor:pointer; transition:border-color 0.12s, color 0.12s; }
+    .opt-action:hover { border-color:var(--accent); color:var(--accent); }
+    /* Per-category colour overrides */
+    .swatch-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; }
+    .swatch-row { display:flex; align-items:center; gap:8px; padding:5px 7px; background:var(--bg-surface); border:1px solid var(--border); }
+    .swatch-row input[type="color"] { width:22px; height:22px; padding:0; border:1px solid var(--border); background:transparent; cursor:pointer; flex-shrink:0; }
+    .swatch-name { font-size:11px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .swatch-reset { margin-left:auto; cursor:pointer; color:var(--text-dim); font-size:11px; flex-shrink:0; }
+    .swatch-reset:hover { color:var(--danger); }
+
+    /* ── Floating detail window ─────────────────────────────────────────────
+       Alternative to inline expansion. Full-screen sheet on mobile. */
+    .float-panel { background:var(--bg-card); border:1px solid var(--border-strong); width:100%; max-width:760px; max-height:88vh; display:flex; flex-direction:column; margin:20px; }
+    .float-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .float-body { overflow-y:auto; padding:14px 16px; }
+    .float-close { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:14px; line-height:1; padding:5px 9px; cursor:pointer; flex-shrink:0; }
+    .float-close:hover { border-color:var(--danger); color:var(--danger); }
+    .float-panel .expand { border-top:none; padding:0; background:transparent; }
+    @media (max-width: 680px) {
+      .sheet, .float-panel { margin:0; max-width:none; max-height:100vh; height:100vh; border:none; }
+      .sheet-wrap { align-items:stretch; }
+      .seg-btn { min-width:64px; font-size:12px; padding:11px 8px; }
+      .swatch-list { grid-template-columns:1fr 1fr; }
+    }
+
+    /* When the "dim once read" option is off, keep read rows at full strength. */
+    html.no-read-dim .row.read .row-body { opacity:1; }
+    /* Watchlist modal grouping */
+    .wl-group-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin:12px 0 6px; }
+    /* Light theme: the shimmer skeleton needs a lighter gradient to read correctly. */
+    html[data-theme="light"] .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-sidebar) 50%,var(--bg-card) 75%); background-size:200% 100%; }
+    html[data-theme="light"] .sheet-wrap { background:rgba(20,32,27,0.42); }
+    html[data-theme="light"] .scrim { background:rgba(20,32,27,0.42); }
   </style>
 </head>
 <body>
@@ -213,37 +346,53 @@
     const { useState, useEffect, useCallback, useRef, useMemo } = React;
     const API_BASE = "";
 
-    // ── Read-state store ──────────────────────────────────────────────────────
-    // Tracks which announcements have been opened. Persists in the browser, keyed
-    // per day so it resets each morning in step with the daily feed. Read rows are
-    // dimmed but stay visible. Self-contained so any card can use it without prop threading.
-    const readStore = (() => {
-      const KEY = "rns_read_v1";
-      // Local calendar day (en-CA gives YYYY-MM-DD). The previous toISOString()
-      // used UTC, so during BST the read-state reset an hour out of step with the feed.
-      const today = new Date().toLocaleDateString("en-CA");
+    // Stable identity for an announcement. Used for read state, new-item tracking and as the
+    // React key. Deliberately excludes the array index: keying by index meant every filter
+    // change or refresh remounted the cards, losing expansion state and replaying animations.
+    const annId = (ann) => ann.url || `${ann.ticker || ann.company}|${ann.headline}`;
+
+    // A per-day localStorage set. Used for both read state and seen state; both reset each
+    // morning in step with the daily feed.
+    function makeDaySet(storageKey) {
+      const today = new Date().toISOString().slice(0, 10);
       let ids = new Set();
       try {
-        const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
+        const raw = JSON.parse(localStorage.getItem(storageKey) || "{}");
         if (raw && raw.date === today && Array.isArray(raw.ids)) ids = new Set(raw.ids);
       } catch (e) {}
-      const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ date: today, ids: [...ids] })); } catch (e) {} };
+      const persist = () => { try { localStorage.setItem(storageKey, JSON.stringify({ date: today, ids: [...ids] })); } catch (e) {} };
       return {
-        keyFor: (ann) => ann.url || `${ann.ticker || ann.company}|${ann.headline}`,
         has: (k) => ids.has(k),
+        size: () => ids.size,
         mark: (k) => { if (!ids.has(k)) { ids.add(k); persist(); } },
+        unmark: (k) => { if (ids.delete(k)) persist(); },
+        markAll: (keys) => { let changed = false; keys.forEach(k => { if (!ids.has(k)) { ids.add(k); changed = true; } }); if (changed) persist(); },
+        clear: () => { ids = new Set(); persist(); },
       };
-    })();
+    }
 
-    // ── Filter-preference store ──────────────────────────────────────────────
-    // Persists the user's view settings (tier, source, sort, category filter and
-    // hidden categories) in the browser so the feed opens the way they left it.
+    // Which announcements have been opened. Read rows dim their content but stay visible.
+    const readStore = makeDaySet("rns_read_v1");
+    // Which announcements the user has already had sight of. Anything absent from this set on a
+    // later refresh is genuinely new and gets flagged in the feed.
+    const seenStore = makeDaySet("rns_seen_v1");
+
+    // ── Preference store ─────────────────────────────────────────────────────
+    // Persists view settings (filters, sort, theme, tag colours, expand style, density) so the
+    // app opens the way it was left.
+    const PREFS_KEY = "rns_prefs_v1";
     const prefsStore = {
-      KEY: "rns_prefs_v1",
-      load: () => { try { return JSON.parse(localStorage.getItem("rns_prefs_v1") || "null"); } catch (e) { return null; } },
-      save: (p) => { try { localStorage.setItem("rns_prefs_v1", JSON.stringify(p)); } catch (e) {} },
+      load: () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY) || "null"); } catch (e) { return null; } },
+      save: (p) => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch (e) {} },
     };
 
+    // Theme is applied to <html> so every CSS variable swaps at once.
+    const applyTheme = (theme) => {
+      try { document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark"); } catch (e) {}
+    };
+
+    // ── Category colours ─────────────────────────────────────────────────────
+    // All colours reference CSS variables so they follow the active theme automatically.
     const CATEGORY_COLORS = {
       "Results":          { color:"var(--results)",        bg:"rgba(91,168,247,0.10)" },
       "Trading Update":   { color:"var(--trading)",        bg:"rgba(167,139,250,0.10)" },
@@ -251,16 +400,59 @@
       "M&A":              { color:"var(--ma)",             bg:"rgba(249,112,102,0.10)" },
       "Contract":         { color:"var(--contract)",       bg:"rgba(45,212,191,0.10)" },
       "Fundraise":        { color:"var(--fundraise)",      bg:"rgba(52,211,153,0.10)" },
-      "Buyback":          { color:"#22d3ee",               bg:"rgba(34,211,238,0.10)" },
+      "Buyback":          { color:"var(--buyback)",        bg:"rgba(34,211,238,0.10)" },
       "Board Change":     { color:"var(--board-change)",   bg:"rgba(192,132,252,0.10)" },
-      "Director Dealing": { color:"var(--director)",       bg:"rgba(251,191,36,0.10)" },
-      "Shareholding":     { color:"#f472b6",               bg:"rgba(244,114,182,0.10)" },
-      "Regulatory":       { color:"var(--regulatory)",     bg:"rgba(251,146,60,0.10)" },
+      "Director Dealing": { color:"var(--director)",       bg:"rgba(168,162,158,0.12)" },
+      "Shareholding":     { color:"var(--shareholding)",   bg:"rgba(244,114,182,0.10)" },
+      "Regulatory":       { color:"var(--regulatory)",     bg:"rgba(244,63,94,0.10)" },
       "Dividend":         { color:"var(--dividend)",       bg:"rgba(163,230,53,0.10)" },
-      "Non-Reg":          { color:"#38bdf8",               bg:"rgba(56,189,248,0.10)" },
-      "Admin":            { color:"#94a3b8",               bg:"rgba(148,163,184,0.10)" },
+      "Non-Reg":          { color:"var(--nonreg)",         bg:"rgba(56,189,248,0.10)" },
+      "Admin":            { color:"var(--admin)",          bg:"rgba(148,163,184,0.10)" },
       "Other":            { color:"var(--other)",          bg:"rgba(138,158,143,0.08)" },
     };
+
+    // Categories that carry real IR signal. Used by the "Semantic" colour scheme, which greys
+    // out procedural announcements so the material ones are what catch the eye.
+    const MATERIAL_CATEGORIES = new Set([
+      "Results", "Trading Update", "Company Update", "M&A", "Contract", "Board Change", "Regulatory",
+    ]);
+    const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
+
+    const hexToRgba = (hex, alpha) => {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+      if (!m) return "transparent";
+      return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${alpha})`;
+    };
+
+    // Resolve the colour for a category tag under the active scheme, honouring any per-category
+    // override the user has picked in Options.
+    function makeCatColor(scheme, custom) {
+      return (cat) => {
+        const override = custom && custom[cat];
+        if (override) return { color: override, bg: hexToRgba(override, 0.13) };
+        if (scheme === "mono") return { color: "var(--text-secondary)", bg: "transparent" };
+        if (scheme === "semantic") {
+          return MATERIAL_CATEGORIES.has(cat)
+            ? (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"])
+            : { color: "var(--text-muted)", bg: "transparent" };
+        }
+        return CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"];
+      };
+    }
+
+    // "07:05" plus a relative age, for feeds being scanned through the morning.
+    function relativeAge(hhmm) {
+      if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+      const [h, m] = hhmm.split(":").map(Number);
+      const now = new Date();
+      const then = new Date(now); then.setHours(h, m, 0, 0);
+      let mins = Math.round((now - then) / 60000);
+      if (mins < 0) return null;
+      if (mins < 1) return "now";
+      if (mins < 60) return `${mins}m`;
+      const hrs = Math.floor(mins / 60);
+      return `${hrs}h${mins % 60 ? ` ${mins % 60}m` : ""}`;
+    }
 
     function StatusDot({status}) {
       const c = {connected:"var(--accent)",loading:"var(--watchlist)",error:"var(--danger)",idle:"var(--text-muted)"};
@@ -393,7 +585,8 @@
     }
 
     // ── Expandable Announcement Row — dense terminal style ──
-    function AnnouncementCard({ann, index, backendUrl, tier}) {
+    function AnnouncementCard({ann, backendUrl, tier, isNew, isFocused, expandStyle, catColorFor,
+                               showRelative, raTargets, readVersion, onFocusRow}) {
       const [expanded, setExpanded] = useState(false);
       const [detail, setDetail] = useState(null);
       const [loading, setLoading] = useState(false);
@@ -401,10 +594,14 @@
       const [shData, setShData] = useState(null);
       const [shLoading, setShLoading] = useState(false);
       const shFetched = useRef(false);
-      const readKey = readStore.keyFor(ann);
-      const [isRead, setIsRead] = useState(() => readStore.has(readKey));
+      const id = annId(ann);
+      const [isRead, setIsRead] = useState(() => readStore.has(id));
+      const asModal = expandStyle === "modal";
 
-      // Auto-fetch shareholding detail for Shareholding rows when expanded
+      // Re-sync from the store when a bulk action (mark all read / clear) changes it.
+      useEffect(() => { setIsRead(readStore.has(id)); }, [readVersion, id]);
+
+      // Auto-fetch shareholding detail for Shareholding rows when opened
       useEffect(() => {
         if (expanded && ann.category === "Shareholding" && ann.url && !shFetched.current) {
           shFetched.current = true;
@@ -416,6 +613,14 @@
             .finally(() => setShLoading(false));
         }
       }, [expanded, ann.category, ann.url, backendUrl]);
+
+      // Close the floating window on Escape.
+      useEffect(() => {
+        if (!(expanded && asModal)) return;
+        const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); setExpanded(false); } };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+      }, [expanded, asModal]);
 
       const fetchDetail = async () => {
         if (!ann.url) return;
@@ -435,83 +640,139 @@
         const next = !expanded;
         setExpanded(next);
         if (next) {
-          readStore.mark(readKey);
+          readStore.mark(id);
           setIsRead(true);
           if (!detail) fetchDetail();
         }
       };
 
-      const catColor = (CATEGORY_COLORS[ann.category] || CATEGORY_COLORS["Other"]);
+      // Mark read/unread without opening the announcement.
+      const toggleRead = (e) => {
+        e.stopPropagation();
+        if (isRead) { readStore.unmark(id); setIsRead(false); }
+        else { readStore.mark(id); setIsRead(true); }
+      };
+
+      const catColor = catColorFor(ann.category);
       const isWL = ann.is_watchlist;
+      const isRA = tier === "read_across";
       const rowClasses = ["row"];
-      if (isWL) rowClasses.push(tier === "read_across" ? "readacross" : "watchlist");
-      if (expanded) rowClasses.push("expanded");
+      if (isWL) rowClasses.push(isRA ? "readacross" : "watchlist");
+      if (expanded && !asModal) rowClasses.push("expanded");
       if (isRead && !expanded) rowClasses.push("read");
+      if (isNew) rowClasses.push("is-new");
+      if (isFocused) rowClasses.push("focused");
+      const age = showRelative ? relativeAge(ann.time) : null;
+
+      // Shared detail content, used inline and in the floating window.
+      const detailContent = (
+        <>
+          {loading && (
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+              <span className="spinner"></span>
+              <span style={{fontSize:11,color:"var(--text-muted)"}}>Fetching announcement...</span>
+            </div>
+          )}
+          {error && (
+            <div style={{padding:"8px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",marginBottom:10}}>
+              Failed to load: {error}
+            </div>
+          )}
+          {ann.category === "Shareholding" && shLoading && (
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+              <span className="spinner" style={{width:11,height:11,borderWidth:1.5}}></span>
+              <span style={{fontSize:10,color:"var(--text-muted)"}}>Loading shareholding data...</span>
+            </div>
+          )}
+          {ann.category === "Shareholding" && shData && <ShareholdingStrip data={shData} />}
+          {detail && !loading && (
+            <>
+              {detail.ai_summary && (
+                <div className="expand-section">
+                  <div className="expand-label">Summary</div>
+                  <div className="expand-summary">{detail.ai_summary}</div>
+                </div>
+              )}
+              {detail.key_figures && detail.key_figures.length > 0 && (
+                <div className="expand-section">
+                  <div className="expand-label">Key figures</div>
+                  {detail.key_figures.map((fig,i) => <span key={i} className="key-figure">{fig}</span>)}
+                </div>
+              )}
+              <FullTextToggle text={detail.body_text} />
+              <div style={{display:"flex",gap:8,alignItems:"center",paddingTop:8,borderTop:"1px solid var(--border)",marginTop:8}}>
+                {ann.url && (
+                  <a href={ann.url} target="_blank" rel="noopener noreferrer" className="expand-link" onClick={e=>e.stopPropagation()}>
+                    View on Investegate &#8599;
+                  </a>
+                )}
+                <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginLeft:"auto"}}>
+                  {new Date(detail.fetched_at).toLocaleTimeString("en-GB")}
+                </span>
+              </div>
+            </>
+          )}
+        </>
+      );
 
       return (
-        <div className={rowClasses.join(" ") + " fade-in"}>
-          <div onClick={toggleExpand}>
+        <div
+          id={`row-${id}`}
+          className={rowClasses.join(" ")}
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          onFocus={onFocusRow}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(); }
+          }}
+        >
+          <div className="row-body" onClick={toggleExpand}>
             <div className="row-meta">
-              <span className="row-time">{ann.time}</span>
-              {ann.ticker && <span className={"row-ticker" + (isWL ? (tier === "read_across" ? " readacross" : " watchlist") : "")}>{ann.ticker}</span>}
+              <span className="row-new-dot" title="New since your last refresh"/>
+              <span className="row-time">{ann.time}{age ? ` · ${age}` : ""}</span>
+              {ann.ticker && <span className={"row-ticker" + (isWL ? (isRA ? " readacross" : " watchlist") : "")}>{ann.ticker}</span>}
               {tier === "core" && <span className="row-tag tier-core">CORE</span>}
-              {tier === "read_across" && <span className="row-tag tier-ra">R/A</span>}
+              {isRA && <span className="row-tag tier-ra">R/A</span>}
+              {/* Why this read-across name matters: the core holding(s) it maps to. */}
+              {isRA && raTargets && raTargets.length > 0 && (
+                <span className="row-ra-map" title={`Reads across to ${raTargets.join(", ")}`}>&#8594; {raTargets.join(" ")}</span>
+              )}
               <span className="row-category" style={{color: catColor.color, background: catColor.bg}}>{ann.category}</span>
               {ann.source_feed && ann.source_feed !== "RNS" && <span className="row-source">{ann.source_feed}</span>}
               <span className="row-spacer"/>
-              <span className="row-chevron">&#9660;</span>
+              <button className="row-read-btn" onClick={toggleRead} title={isRead ? "Mark as unread" : "Mark as read"}>
+                {isRead ? "\u25CB" : "\u25CF"}
+              </button>
+              <span className="row-chevron">{asModal ? "\u2197" : "\u25BC"}</span>
             </div>
             <div className="row-company">{ann.company}</div>
             <div className="row-headline">{ann.headline}</div>
           </div>
 
-          {expanded && (
-            <div className="expand">
-              {loading && (
-                <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
-                  <span className="spinner"></span>
-                  <span style={{fontSize:11,color:"var(--text-muted)"}}>Fetching announcement...</span>
-                </div>
-              )}
-              {error && (
-                <div style={{padding:"8px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",marginBottom:10}}>
-                  Failed to load: {error}
-                </div>
-              )}
-              {ann.category === "Shareholding" && shLoading && (
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                  <span className="spinner" style={{width:11,height:11,borderWidth:1.5}}></span>
-                  <span style={{fontSize:10,color:"var(--text-muted)"}}>Loading shareholding data...</span>
-                </div>
-              )}
-              {ann.category === "Shareholding" && shData && <ShareholdingStrip data={shData} />}
-              {detail && !loading && (
-                <>
-                  {detail.ai_summary && (
-                    <div className="expand-section">
-                      <div className="expand-label">Summary</div>
-                      <div className="expand-summary">{detail.ai_summary}</div>
+          {/* Inline expansion */}
+          {expanded && !asModal && <div className="expand">{detailContent}</div>}
+
+          {/* Floating window expansion */}
+          {expanded && asModal && (
+            <div className="sheet-wrap" onClick={(e)=>{e.stopPropagation();setExpanded(false);}}>
+              <div className="float-panel" onClick={e=>e.stopPropagation()}>
+                <div className="float-head">
+                  <div style={{minWidth:0}}>
+                    <div className="row-meta" style={{marginBottom:4}}>
+                      <span className="row-time">{ann.time}</span>
+                      {ann.ticker && <span className={"row-ticker" + (isWL ? (isRA ? " readacross" : " watchlist") : "")}>{ann.ticker}</span>}
+                      <span className="row-category" style={{color: catColor.color, background: catColor.bg}}>{ann.category}</span>
                     </div>
-                  )}
-                  {detail.key_figures && detail.key_figures.length > 0 && (
-                    <div className="expand-section">
-                      <div className="expand-label">Key figures</div>
-                      {detail.key_figures.map((fig,i) => <span key={i} className="key-figure">{fig}</span>)}
-                    </div>
-                  )}
-                  <FullTextToggle text={detail.body_text} />
-                  <div style={{display:"flex",gap:8,alignItems:"center",paddingTop:8,borderTop:"1px solid var(--border)",marginTop:8}}>
-                    {ann.url && (
-                      <a href={ann.url} target="_blank" rel="noopener noreferrer" className="expand-link" onClick={e=>e.stopPropagation()}>
-                        View on Investegate &#8599;
-                      </a>
-                    )}
-                    <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginLeft:"auto"}}>
-                      {new Date(detail.fetched_at).toLocaleTimeString("en-GB")}
-                    </span>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{ann.company}</div>
+                    <div style={{fontSize:14,fontWeight:600,marginTop:2}}>{ann.headline}</div>
                   </div>
-                </>
-              )}
+                  <button className="float-close" onClick={()=>setExpanded(false)} title="Close (Esc)">&#10005;</button>
+                </div>
+                <div className="float-body">
+                  <div className="expand">{detailContent}</div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -530,48 +791,209 @@
       </div>;
     }
 
+    // Small reusable pieces for the options panel
+    function Switch({on, onClick}) {
+      return <button className={"switch" + (on ? " on" : "")} onClick={onClick} role="switch" aria-checked={on}>
+        <span className="switch-knob"/>
+      </button>;
+    }
+    function Seg({value, options, onChange}) {
+      return <div className="seg">
+        {options.map(o => (
+          <button key={o.v} className={"seg-btn" + (value === o.v ? " on" : "")} onClick={()=>onChange(o.v)}>{o.l}</button>
+        ))}
+      </div>;
+    }
+    function OptRow({label, on, onToggle}) {
+      return <div className="opt-row">
+        <span className="opt-row-text">{label}</span>
+        <Switch on={on} onClick={onToggle}/>
+      </div>;
+    }
+
+    // ── Options panel ────────────────────────────────────────────────────────
+    // Centred dialog on desktop, full-height sheet on mobile.
+    function OptionsModal({opts, setOpt, onClose, onMarkAllRead, onClearRead, onMarkAllSeen,
+                           onResetCategories, onResetOptions, hiddenCount, readCount}) {
+      const [showSwatches, setShowSwatches] = useState(false);
+      const custom = opts.customColors || {};
+      const setCustom = (cat, hex) => setOpt("customColors", {...custom, [cat]: hex});
+      const clearCustom = (cat) => { const n = {...custom}; delete n[cat]; setOpt("customColors", n); };
+      return (
+        <div className="sheet-wrap" onClick={onClose}>
+          <div className="sheet" onClick={e=>e.stopPropagation()}>
+            <div className="sheet-head">
+              <span className="sheet-title">Options</span>
+              <button className="float-close" onClick={onClose} title="Close (Esc)">&#10005;</button>
+            </div>
+            <div className="sheet-body">
+
+              <div className="opt-group">
+                <div className="opt-label">Appearance</div>
+                <Seg value={opts.theme} onChange={v=>setOpt("theme", v)}
+                     options={[{v:"dark",l:"Dark"},{v:"light",l:"Light"}]}/>
+              </div>
+
+              <div className="opt-group">
+                <div className="opt-label">Tag colours</div>
+                <Seg value={opts.tagScheme} onChange={v=>setOpt("tagScheme", v)}
+                     options={[{v:"vivid",l:"Vivid"},{v:"semantic",l:"Semantic"},{v:"mono",l:"Mono"}]}/>
+                <div className="opt-hint">
+                  Vivid gives every category its own colour. Semantic greys out procedural types
+                  (Admin, Shareholding, Director Dealing, Buyback, Fundraise, Dividend) so material
+                  news stands out. Mono drops tag colour entirely.
+                </div>
+                <button className="opt-action" style={{marginTop:10}} onClick={()=>setShowSwatches(s=>!s)}>
+                  {showSwatches ? "Hide" : "Customise"} individual tag colours
+                  {Object.keys(custom).length > 0 ? ` (${Object.keys(custom).length} set)` : ""}
+                </button>
+                {showSwatches && (
+                  <div className="swatch-list">
+                    {ALL_CATEGORIES.map(cat => (
+                      <div className="swatch-row" key={cat}>
+                        <input type="color" value={custom[cat] || "#888888"}
+                               onChange={e=>setCustom(cat, e.target.value)} title={`Colour for ${cat}`}/>
+                        <span className="swatch-name">{cat}</span>
+                        {custom[cat] && <span className="swatch-reset" title="Reset this tag" onClick={()=>clearCustom(cat)}>&#8635;</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="opt-group">
+                <div className="opt-label">Opening an announcement</div>
+                <Seg value={opts.expandStyle} onChange={v=>setOpt("expandStyle", v)}
+                     options={[{v:"inline",l:"Read in line"},{v:"modal",l:"Floating window"}]}/>
+                <div className="opt-hint">In line keeps you in the feed. A floating window gives the
+                  full text more room, which suits longer announcements and small screens.</div>
+              </div>
+
+              <div className="opt-group">
+                <div className="opt-label">Feed density</div>
+                <Seg value={opts.columns} onChange={v=>setOpt("columns", v)}
+                     options={[{v:"auto",l:"Auto"},{v:"1",l:"1 column"},{v:"2",l:"2 columns"}]}/>
+                <div className="opt-hint">A single column keeps the relevance ranking in a clean
+                  top-to-bottom order. Auto fits as many columns as the window allows.</div>
+              </div>
+
+              <div className="opt-group">
+                <div className="opt-label">Behaviour</div>
+                <OptRow label="Show relative time (07:05 · 22m)" on={opts.showRelative} onToggle={()=>setOpt("showRelative", !opts.showRelative)}/>
+                <OptRow label="Flag new items since last refresh" on={opts.flagNew} onToggle={()=>setOpt("flagNew", !opts.flagNew)}/>
+                <OptRow label="Show read-across target on rows" on={opts.showRaMap} onToggle={()=>setOpt("showRaMap", !opts.showRaMap)}/>
+                <OptRow label="Dim announcements once read" on={opts.dimRead} onToggle={()=>setOpt("dimRead", !opts.dimRead)}/>
+                <OptRow label="Keyboard shortcuts (j/k, Enter, /)" on={opts.keyboardNav} onToggle={()=>setOpt("keyboardNav", !opts.keyboardNav)}/>
+                <div className="opt-hint">j and k move, Enter opens, Esc closes, / jumps to search,
+                  r refreshes. Shift+R runs a hard refresh.</div>
+              </div>
+
+              <div className="opt-group">
+                <div className="opt-label">Auto-refresh interval</div>
+                <Seg value={String(opts.refreshSecs)} onChange={v=>setOpt("refreshSecs", Number(v))}
+                     options={[{v:"60",l:"60s"},{v:"120",l:"2 min"},{v:"300",l:"5 min"}]}/>
+              </div>
+
+              <div className="opt-group">
+                <div className="opt-label">Actions</div>
+                <button className="opt-action" onClick={onMarkAllRead}>Mark everything showing as read</button>
+                <button className="opt-action" onClick={onClearRead}>Clear read state{readCount ? ` (${readCount} marked)` : ""}</button>
+                <button className="opt-action" onClick={onMarkAllSeen}>Clear the new-item flags</button>
+                <button className="opt-action" onClick={onResetCategories}>
+                  Reset hidden categories to defaults{hiddenCount === 0 ? " (nothing hidden now)" : ` (${hiddenCount} hidden)`}
+                </button>
+                <button className="opt-action" onClick={onResetOptions}>Reset all options to defaults</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Active filter chips ──────────────────────────────────────────────────
+    function FilterChips({items, onClearAll}) {
+      if (items.length === 0) return null;
+      return <div className="chips">
+        {items.map(it => (
+          <span className="chip" key={it.key}>
+            {it.label}
+            <span className="chip-x" onClick={it.onClear} title="Clear">&#10005;</span>
+          </span>
+        ))}
+        {items.length > 1 && <span className="chip clear-all" onClick={onClearAll}>Clear all</span>}
+      </div>;
+    }
+
     function WatchlistModal({watchlist,onClose,onAdd,onRemove}) {
       const [ticker,setTicker]=useState("");const [name,setName]=useState("");const [sector,setSector]=useState("");const [tier,setTier]=useState("core");
-      const is={background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:6,padding:"8px 12px",color:"var(--text-primary)",fontFamily:"var(--font-sans)",fontSize:13,outline:"none",width:"100%"};
-      const tierBtn=(val,label)=>(<button onClick={()=>setTier(val)} style={{flex:1,padding:"8px 10px",borderRadius:6,border:`1px solid ${tier===val?"var(--accent)":"var(--border)"}`,background:tier===val?"var(--accent-glow)":"transparent",color:tier===val?"var(--accent)":"var(--text-secondary)",fontFamily:"var(--font-sans)",fontSize:12,fontWeight:600,cursor:"pointer"}}>{label}</button>);
-      return <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={onClose}>
-        <div onClick={e=>e.stopPropagation()} className="fade-up" style={{background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:14,padding:28,width:"100%",maxWidth:560,maxHeight:"80vh",overflow:"auto",margin:20}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-            <h2 style={{fontSize:18,fontWeight:600}}>Watchlist ({Object.keys(watchlist).length})</h2>
-            <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text-muted)",fontSize:20,cursor:"pointer"}}>&#10005;</button>
+      const [q,setQ]=useState("");
+      const is={background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:0,padding:"8px 12px",color:"var(--text-primary)",fontFamily:"var(--font-sans)",fontSize:13,outline:"none",width:"100%"};
+      const tierBtn=(val,label)=>(<button className={"seg-btn"+(tier===val?" on":"")} onClick={()=>setTier(val)}>{label}</button>);
+
+      // Grouped and searchable: a flat list of 40+ names was hard to scan.
+      const entries = Object.entries(watchlist);
+      const ql = q.trim().toLowerCase();
+      const match = ([t,info]) => !ql || t.toLowerCase().includes(ql) || (info.name||"").toLowerCase().includes(ql) || (info.sector||"").toLowerCase().includes(ql);
+      const sortFn = (a,b) => (a[1].name||a[0]).localeCompare(b[1].name||b[0]);
+      const core = entries.filter(e => (e[1].tier||"core") !== "read_across").filter(match).sort(sortFn);
+      const ra   = entries.filter(e => (e[1].tier||"core") === "read_across").filter(match).sort(sortFn);
+
+      const renderRow = ([t,info]) => (
+        <div key={t} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"var(--bg-surface)",border:"1px solid var(--border)",marginBottom:4}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",minWidth:0}}>
+            <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600,color:"var(--accent)",background:"var(--accent-glow)",padding:"2px 8px"}}>{t}</span>
+            {(info.tier||"core")==="read_across"
+              ? <span className="row-tag tier-ra">R/A</span>
+              : <span className="row-tag tier-core">CORE</span>}
+            <span style={{fontSize:13,color:"var(--text-primary)"}}>{info.name}</span>
+            <span style={{fontSize:11,color:"var(--text-muted)"}}>{info.sector}</span>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
-            {Object.entries(watchlist).map(([t,info])=><div key={t} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"var(--bg-surface)",border:"1px solid var(--border)",borderRadius:8}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600,color:"var(--accent)",background:"var(--accent-glow)",padding:"2px 8px",borderRadius:4}}>{t}</span>
-                {info.tier==="read_across"
-                  ? <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",padding:"1px 6px",borderRadius:4,background:"rgba(249,115,22,0.12)",color:"var(--readacross)"}}>R/A</span>
-                  : <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",padding:"1px 6px",borderRadius:4,background:"rgba(240,192,64,0.12)",color:"var(--core)"}}>CORE</span>}
-                <span style={{fontSize:13,color:"var(--text-primary)"}}>{info.name}</span>
-                <span style={{fontSize:11,color:"var(--text-muted)"}}>{info.sector}</span>
+          <button onClick={()=>onRemove(t)} style={{background:"none",border:"none",color:"var(--text-muted)",cursor:"pointer",fontSize:14,padding:"2px 6px"}}
+            onMouseOver={e=>e.target.style.color="var(--danger)"} onMouseOut={e=>e.target.style.color="var(--text-muted)"}>&#10005;</button>
+        </div>
+      );
+
+      return <div className="sheet-wrap" onClick={onClose}>
+        <div className="sheet" onClick={e=>e.stopPropagation()}>
+          <div className="sheet-head">
+            <span className="sheet-title">Watchlist ({entries.length})</span>
+            <button className="float-close" onClick={onClose} title="Close (Esc)">&#10005;</button>
+          </div>
+          <div className="sheet-body">
+            <input className="sidebar-search" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search watchlist..." style={{marginBottom:4}}/>
+            {core.length > 0 && <>
+              <div className="wl-group-label">Core ({core.length})</div>
+              {core.map(renderRow)}
+            </>}
+            {ra.length > 0 && <>
+              <div className="wl-group-label">Read-across ({ra.length})</div>
+              {ra.map(renderRow)}
+            </>}
+            {core.length === 0 && ra.length === 0 && (
+              <div style={{fontSize:12,color:"var(--text-muted)",padding:"14px 0"}}>No companies match that search.</div>
+            )}
+            <div style={{borderTop:"1px solid var(--border)",paddingTop:16,marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+              <div className="opt-label">Add to watchlist</div>
+              <div style={{display:"flex",gap:8}}>
+                <input value={ticker} onChange={e=>setTicker(e.target.value)} placeholder="Ticker" style={{...is,maxWidth:100,fontFamily:"var(--font-mono)"}}/>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="Company name" style={is}/>
               </div>
-              <button onClick={()=>onRemove(t)} style={{background:"none",border:"none",color:"var(--text-muted)",cursor:"pointer",fontSize:14,padding:"2px 6px"}}
-                onMouseOver={e=>e.target.style.color="var(--danger)"} onMouseOut={e=>e.target.style.color="var(--text-muted)"}>&#10005;</button>
-            </div>)}
-          </div>
-          <div style={{borderTop:"1px solid var(--border)",paddingTop:16,display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontSize:13,fontWeight:500,color:"var(--text-secondary)",marginBottom:4}}>Add to watchlist</div>
-            <div style={{display:"flex",gap:8}}>
-              <input value={ticker} onChange={e=>setTicker(e.target.value)} placeholder="Ticker" style={{...is,maxWidth:90,fontFamily:"var(--font-mono)"}}/>
-              <input value={name} onChange={e=>setName(e.target.value)} placeholder="Company name" style={is}/>
+              <input value={sector} onChange={e=>setSector(e.target.value)} placeholder="Sector (optional)" style={is}/>
+              <div>
+                <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:6}}>Tier</div>
+                <div className="seg">{tierBtn("core","Core")}{tierBtn("read_across","Read-across")}</div>
+              </div>
+              <button onClick={()=>{if(ticker&&name){onAdd(ticker.toUpperCase(),name,sector,tier);setTicker("");setName("");setSector("");setTier("core");}}} disabled={!ticker||!name}
+                style={{background:ticker&&name?"var(--accent)":"var(--border)",color:ticker&&name?"var(--bg-primary)":"var(--text-muted)",border:"none",padding:"10px 16px",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:600,cursor:ticker&&name?"pointer":"not-allowed"}}>
+                Add company
+              </button>
             </div>
-            <input value={sector} onChange={e=>setSector(e.target.value)} placeholder="Sector (optional)" style={is}/>
-            <div>
-              <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:6}}>Tier</div>
-              <div style={{display:"flex",gap:8}}>{tierBtn("core","Core")}{tierBtn("read_across","Read-across")}</div>
-            </div>
-            <button onClick={()=>{if(ticker&&name){onAdd(ticker.toUpperCase(),name,sector,tier);setTicker("");setName("");setSector("");setTier("core");}}} disabled={!ticker||!name} style={{background:ticker&&name?"var(--accent)":"var(--border)",color:ticker&&name?"var(--bg-primary)":"var(--text-muted)",border:"none",borderRadius:8,padding:"10px 16px",fontFamily:"var(--font-sans)",fontSize:13,fontWeight:600,cursor:ticker&&name?"pointer":"not-allowed"}}>Add company</button>
           </div>
         </div>
       </div>;
     }
 
-    // ── Read-Across View ──
     function ReadAcrossView({backendUrl, refreshTick}) {
       const [raData, setRaData] = useState(null);
       const [raLoading, setRaLoading] = useState(true);
@@ -959,8 +1381,23 @@
       );
     }
 
+    // Defaults for everything in the Options panel.
+    const OPTION_DEFAULTS = {
+      theme: "dark",
+      tagScheme: "vivid",
+      customColors: {},
+      expandStyle: "inline",
+      columns: "auto",
+      showRelative: true,
+      flagNew: true,
+      showRaMap: true,
+      dimRead: true,
+      keyboardNav: true,
+      refreshSecs: 120,
+    };
+
     function App() {
-      // Restore saved view preferences (null on first ever visit)
+      // Restore saved preferences (null on first ever visit)
       const savedPrefs = useMemo(() => prefsStore.load(), []);
       const [data,setData]=useState(null);const [status,setStatus]=useState("idle");
       const [filter,setFilter]=useState(()=>savedPrefs?.filter ?? "all");const [categoryFilter,setCategoryFilter]=useState(()=>savedPrefs?.categoryFilter ?? "all");
@@ -971,28 +1408,40 @@
       const [tab,setTab]=useState("feed");
       const [excludedCats,setExcludedCats]=useState(()=>savedPrefs?.excludedCats ? new Set(savedPrefs.excludedCats) : new Set());
       const [sourceFilter,setSourceFilter]=useState(()=>savedPrefs?.sourceFilter ?? "all"); // all | rns | nonreg
-      // If we restored saved prefs, skip the server-default category seeding so the user's choices win.
       const defaultsAppliedRef=useRef(savedPrefs != null);
+      // Options, merged over defaults so a new option added later still has a sane value.
+      const [opts,setOpts]=useState(()=>({...OPTION_DEFAULTS, ...(savedPrefs?.options || {})}));
+      const [optionsOpen,setOptionsOpen]=useState(false);
+      const setOpt=(k,v)=>setOpts(prev=>({...prev,[k]:v}));
+      // New-item tracking, read-state bumping, keyboard focus
+      const [newIds,setNewIds]=useState(()=>new Set());
+      const [readVersion,setReadVersion]=useState(0);
+      const [focusedIdx,setFocusedIdx]=useState(-1);
+      const [raMap,setRaMap]=useState({});
+      const serverDefaultsRef=useRef([]);   // server's default_hidden_categories, for "reset"
+      const searchRef=useRef(null);
+      const isHardRef=useRef(false);
+
       // Responsive state
       const [isMobile,setIsMobile]=useState(typeof window!=="undefined" && window.innerWidth<880);
-      const [drawerOpen,setDrawerOpen]=useState(false); // mobile filter drawer
-      const [menuOpen,setMenuOpen]=useState(false);      // mobile overflow menu
+      const [drawerOpen,setDrawerOpen]=useState(false);
+      const [menuOpen,setMenuOpen]=useState(false);
       useEffect(()=>{
         const onResize=()=>{ const m=window.innerWidth<880; setIsMobile(m); if(!m){setDrawerOpen(false);setMenuOpen(false);} };
         window.addEventListener("resize",onResize);
         return ()=>window.removeEventListener("resize",onResize);
       },[]);
-      // Close mobile overlays on Escape
-      useEffect(()=>{
-        const onKey=(e)=>{ if(e.key==="Escape"){ if(menuOpen)setMenuOpen(false); else if(drawerOpen)setDrawerOpen(false); } };
-        window.addEventListener("keydown",onKey);
-        return ()=>window.removeEventListener("keydown",onKey);
-      },[menuOpen,drawerOpen]);
 
-      // Persist view preferences whenever they change (search is intentionally not saved)
+      // Theme and read-dimming are applied on <html> so all CSS variables swap together.
+      useEffect(()=>{ applyTheme(opts.theme); },[opts.theme]);
       useEffect(()=>{
-        prefsStore.save({ filter, categoryFilter, sortMode, sourceFilter, excludedCats:[...excludedCats] });
-      },[filter,categoryFilter,sortMode,sourceFilter,excludedCats]);
+        try { document.documentElement.classList.toggle("no-read-dim", !opts.dimRead); } catch(e){}
+      },[opts.dimRead]);
+
+      // Persist filters and options together.
+      useEffect(()=>{
+        prefsStore.save({ filter, categoryFilter, sortMode, sourceFilter, excludedCats:[...excludedCats], options:opts });
+      },[filter,categoryFilter,sortMode,sourceFilter,excludedCats,opts]);
 
       const NONREG_SOURCES = ["GNW","UKN","PRN","MFN","EQS"];
       const toggleExcludeCat=(cat)=>{
@@ -1003,48 +1452,63 @@
         });
       };
 
-      // Guards against out-of-order responses: with auto-refresh on, a manual
-      // Refresh mid-cycle puts two requests in flight, and the older one can
-      // resolve last, overwriting newer data. Only the latest request may setData.
-      const fetchSeqRef = useRef(0);
-      const [hardRefreshing,setHardRefreshing]=useState(false);
-      const fetchData=useCallback(async(opts)=>{
-        const hard = !!(opts && opts.hard);
-        const seq = ++fetchSeqRef.current;
-        setStatus("loading");
-        if(hard)setHardRefreshing(true);
-        try{const r=await fetch(`${backendUrl}/api/rns?include_all=true&limit=2000${hard?"&hard=true":""}`);if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      // hard=true asks the backend to clear its cache and rescrape synchronously. force=true is
+      // sent alongside so an older backend without the hard flag still does a fresh scrape.
+      const fetchData=useCallback(async(hard=false)=>{
+        setStatus(hard ? "loading" : "loading");
+        isHardRef.current = hard;
+        try{
+          const qs = `include_all=true&limit=2000${hard ? "&force=true&hard=true" : ""}`;
+          const r=await fetch(`${backendUrl}/api/rns?${qs}`);
+          if(!r.ok)throw new Error(`HTTP ${r.status}`);
           const j=await r.json();
-          if(seq!==fetchSeqRef.current)return; // a newer request superseded this one
           setData(j);setStatus("connected");setLastRefresh(new Date());
-          // First-load only: pre-populate excludedCats with the categories the server suggests
-          // hiding by default (Fundraise, Buyback, Director Dealing, Shareholding, Admin, Dividend).
-          // After this, the user is in full control — refreshes won't reset their choices.
+          if(Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current=j.default_hidden_categories;
+          // First load only: adopt the server's suggested hidden categories.
           if(!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)){
             setExcludedCats(new Set(j.default_hidden_categories));
             defaultsAppliedRef.current=true;
           }
-        }catch(e){if(seq!==fetchSeqRef.current)return;console.error(e);setStatus("error");}
-        finally{if(seq===fetchSeqRef.current)setHardRefreshing(false);}
+          // Work out what is new since the previous look. The first visit of the day establishes
+          // the baseline silently, otherwise every announcement would be flagged at 07:00.
+          const ids=(j.announcements||[]).map(annId);
+          if(seenStore.size()===0){ seenStore.markAll(ids); setNewIds(new Set()); }
+          else {
+            const fresh=ids.filter(id=>!seenStore.has(id));
+            seenStore.markAll(ids);
+            if(fresh.length>0) setNewIds(new Set(fresh));
+          }
+        }catch(e){console.error(e);setStatus("error");}
       },[backendUrl]);
-      // Hard refresh: wipes the server-side cache and rescrapes Investegate from
-      // scratch, so what comes back is exactly what the site shows for today right
-      // now. Takes noticeably longer than a normal refresh (full scrape, ~10-30s).
-      const hardRefresh=useCallback(()=>fetchData({hard:true}),[fetchData]);
 
       const fetchWatchlist=useCallback(async()=>{
         try{const r=await fetch(`${backendUrl}/api/watchlist`);if(r.ok){const j=await r.json();setWatchlist(j.watchlist||{});}}catch{}
       },[backendUrl]);
 
-      useEffect(()=>{fetchData();fetchWatchlist();},[fetchData,fetchWatchlist]);
-      useEffect(()=>{if(autoRefresh)intervalRef.current=setInterval(fetchData,120000);return()=>{if(intervalRef.current)clearInterval(intervalRef.current);};},[autoRefresh,fetchData]);
+      // The read-across matrix gives each read-across ticker the core name(s) it maps to, so a
+      // row can show "-> CML" without opening the read-across tab.
+      const fetchRaMap=useCallback(async()=>{
+        try{
+          const r=await fetch(`${backendUrl}/api/readacross`);
+          if(!r.ok)return;
+          const j=await r.json();
+          const m={};
+          Object.entries(j.matrix||{}).forEach(([ra,links])=>{ m[ra]=Object.keys(links||{}); });
+          setRaMap(m);
+        }catch{}
+      },[backendUrl]);
+
+      useEffect(()=>{fetchData();fetchWatchlist();fetchRaMap();},[fetchData,fetchWatchlist,fetchRaMap]);
+      useEffect(()=>{
+        if(autoRefresh)intervalRef.current=setInterval(()=>fetchData(false),(opts.refreshSecs||120)*1000);
+        return()=>{if(intervalRef.current)clearInterval(intervalRef.current);};
+      },[autoRefresh,fetchData,opts.refreshSecs]);
 
       const handleAdd=async(t,n,s,tier)=>{try{await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier||"core"}`,{method:"POST"});await fetchWatchlist();fetchData();}catch{}};
       const handleRemove=async(t)=>{try{await fetch(`${backendUrl}/api/watchlist/${t}`,{method:"DELETE"});await fetchWatchlist();fetchData();}catch{}};
 
       const allAnns=data?.announcements||[];
 
-      // Derived counts — recomputed only when the source data or watchlist changes
       const {wlCount,coreCount,raCount,secCount,rnsCount,nonregCount,catCounts,sortedCats} = useMemo(()=>{
         const cc={}; allAnns.forEach(a=>{cc[a.category]=(cc[a.category]||0)+1;});
         return {
@@ -1059,7 +1523,6 @@
         };
       },[allAnns,watchlist]);
 
-      // Filtered + sorted feed — recomputed only when data or any filter input changes
       const anns = useMemo(()=>{
         let out=allAnns;
         if(filter==="watchlist")out=out.filter(a=>a.is_watchlist);
@@ -1067,7 +1530,6 @@
         else if(filter==="read_across")out=out.filter(a=>a.is_watchlist&&watchlist[a.ticker]?.tier==="read_across");
         else if(filter==="sector")out=out.filter(a=>a.sector_relevant);
         if(categoryFilter!=="all")out=out.filter(a=>a.category===categoryFilter);
-        // No watchlist override on excluded categories — if a category is hidden, it stays hidden.
         if(excludedCats.size>0)out=out.filter(a=>!excludedCats.has(a.category));
         if(sourceFilter==="rns")out=out.filter(a=>!a.source_feed||a.source_feed==="RNS");
         else if(sourceFilter==="nonreg")out=out.filter(a=>NONREG_SOURCES.includes(a.source_feed));
@@ -1079,6 +1541,70 @@
       },[allAnns,watchlist,filter,categoryFilter,excludedCats,sourceFilter,searchText,sortMode]);
 
       const tierFor = (ticker) => watchlist[ticker]?.tier;
+      const catColorFor = useMemo(()=>makeCatColor(opts.tagScheme,opts.customColors),[opts.tagScheme,opts.customColors]);
+      const newCount = useMemo(()=>anns.filter(a=>newIds.has(annId(a))).length,[anns,newIds]);
+      const anyModalOpen = optionsOpen || showWatchlist;
+
+      // ── Bulk actions ───────────────────────────────────────────────────────
+      const markAllRead=()=>{ readStore.markAll(anns.map(annId)); setReadVersion(v=>v+1); };
+      const clearRead=()=>{ readStore.clear(); setReadVersion(v=>v+1); };
+      const markAllSeen=()=>{ seenStore.markAll(allAnns.map(annId)); setNewIds(new Set()); };
+      const resetCategories=()=>{ setExcludedCats(new Set(serverDefaultsRef.current||[])); setCategoryFilter("all"); };
+      const resetOptions=()=>setOpts({...OPTION_DEFAULTS});
+      const clearAllFilters=()=>{ setFilter("all"); setCategoryFilter("all"); setSourceFilter("all"); setSearchText(""); };
+
+      // ── Keyboard shortcuts ─────────────────────────────────────────────────
+      useEffect(()=>{
+        if(!opts.keyboardNav) return;
+        const onKey=(e)=>{
+          const t=e.target;
+          const typing = t && (t.tagName==="INPUT" || t.tagName==="TEXTAREA" || t.isContentEditable);
+          if(e.key==="Escape"){
+            if(menuOpen){setMenuOpen(false);return;}
+            if(drawerOpen){setDrawerOpen(false);return;}
+            if(optionsOpen){setOptionsOpen(false);return;}
+            if(showWatchlist){setShowWatchlist(false);return;}
+            if(typing){t.blur();return;}
+            setFocusedIdx(-1);
+            return;
+          }
+          if(typing || anyModalOpen || tab!=="feed") return;
+          if(e.key==="/"){ e.preventDefault(); searchRef.current && searchRef.current.focus(); return; }
+          if(e.key==="j"||e.key==="ArrowDown"){ e.preventDefault(); setFocusedIdx(i=>Math.min((i<0?-1:i)+1,anns.length-1)); return; }
+          if(e.key==="k"||e.key==="ArrowUp"){ e.preventDefault(); setFocusedIdx(i=>Math.max((i<0?0:i)-1,0)); return; }
+          if(e.key==="Enter"){
+            if(focusedIdx<0||focusedIdx>=anns.length) return;
+            e.preventDefault();
+            const el=document.getElementById(`row-${annId(anns[focusedIdx])}`);
+            const body=el && el.querySelector(".row-body");
+            if(body) body.click();
+            return;
+          }
+          if(e.key==="r"){ e.preventDefault(); fetchData(false); return; }
+          if(e.key==="R"){ e.preventDefault(); fetchData(true); return; }
+        };
+        window.addEventListener("keydown",onKey);
+        return ()=>window.removeEventListener("keydown",onKey);
+      },[opts.keyboardNav,anns,focusedIdx,menuOpen,drawerOpen,optionsOpen,showWatchlist,anyModalOpen,tab,fetchData]);
+
+      // Keep the keyboard-focused row in view.
+      useEffect(()=>{
+        if(focusedIdx<0||focusedIdx>=anns.length) return;
+        const el=document.getElementById(`row-${annId(anns[focusedIdx])}`);
+        if(el && el.scrollIntoView) el.scrollIntoView({block:"nearest"});
+      },[focusedIdx,anns]);
+
+      // ── Active filter chips ────────────────────────────────────────────────
+      const chipItems = useMemo(()=>{
+        const items=[];
+        const tierLabels={watchlist:"Watchlist",core:"Core",read_across:"Read-across",sector:"Sector relevant"};
+        if(filter!=="all") items.push({key:"tier",label:`Tier: ${tierLabels[filter]||filter}`,onClear:()=>setFilter("all")});
+        if(sourceFilter!=="all") items.push({key:"src",label:`Source: ${sourceFilter==="rns"?"RNS only":"Non-Reg only"}`,onClear:()=>setSourceFilter("all")});
+        if(categoryFilter!=="all") items.push({key:"cat",label:`Type: ${categoryFilter}`,onClear:()=>setCategoryFilter("all")});
+        if(searchText) items.push({key:"q",label:`Search: ${searchText}`,onClear:()=>setSearchText("")});
+        if(excludedCats.size>0) items.push({key:"hid",label:`${excludedCats.size} type${excludedCats.size===1?"":"s"} hidden`,onClear:resetCategories});
+        return items;
+      },[filter,sourceFilter,categoryFilter,searchText,excludedCats]);
 
       // Sidebar filter helpers
       const TierRow = ({label, value, count, dotColor}) => (
@@ -1094,11 +1620,10 @@
         </div>
       );
 
-      // Sidebar filter content — rendered inline (desktop) or inside the mobile drawer
       const sidebarContent = (
         <>
           <div className="sidebar-section">
-            <input className="sidebar-search" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search ticker, company, headline..."/>
+            <input ref={searchRef} className="sidebar-search" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search ticker, company, headline..."/>
           </div>
           <div className="sidebar-section">
             <div className="sidebar-label">Tier</div>
@@ -1126,7 +1651,10 @@
           <div className="sidebar-section">
             <div className="sidebar-label">
               <span>Categories</span>
-              {excludedCats.size>0 && <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={()=>setExcludedCats(new Set())}>show all</span>}
+              <span style={{display:"flex",gap:8}}>
+                {excludedCats.size>0 && <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={()=>setExcludedCats(new Set())}>show all</span>}
+                <span style={{cursor:"pointer",color:"var(--text-secondary)",textTransform:"none",letterSpacing:0,fontSize:9}} onClick={resetCategories} title="Restore the default hidden categories">defaults</span>
+              </span>
             </div>
             <div className={"filter-row" + (categoryFilter==="all"&&excludedCats.size===0?" active":"")} onClick={()=>{setCategoryFilter("all");setExcludedCats(new Set());}}>
               <span className="filter-label">All types</span>
@@ -1134,7 +1662,7 @@
             {sortedCats.map(cat=>{
               const isExcluded=excludedCats.has(cat);
               const isActive=categoryFilter===cat;
-              const catColor = (CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"]).color;
+              const catColor = catColorFor(cat).color;
               const cls = "filter-row" + (isActive?" active":"") + (isExcluded?" excluded":"");
               return <div key={cat} className={cls}>
                 <span className="filter-label" onClick={()=>{if(!isExcluded)setCategoryFilter(isActive?"all":cat); else toggleExcludeCat(cat);}} style={{flex:1}}>
@@ -1151,6 +1679,8 @@
         </>
       );
 
+      const gridClass = "grid" + (opts.columns==="1" ? " cols-1" : opts.columns==="2" ? " cols-2" : "");
+
       return (
         <>
           {/* Top status toolbar */}
@@ -1165,18 +1695,21 @@
                 <StatusDot status={status}/>
                 {status==="connected"&&lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status}
               </span>
-              <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>
+              <button className="toolbar-btn primary" onClick={()=>fetchData(false)} disabled={status==="loading"}>
                 {status==="loading"?"...":"Refresh"}
               </button>
-              <button className="toolbar-btn" onClick={hardRefresh} disabled={status==="loading"}
-                title="Clears the server cache and rescrapes Investegate from scratch — slower, but guarantees the feed matches today's announcements exactly">
-                {hardRefreshing?"Rescraping...":"Hard refresh"}
+              <button className="toolbar-btn" onClick={()=>fetchData(true)} disabled={status==="loading"}
+                      title="Clear the server cache and rescrape from scratch (Shift+R)">
+                Hard refresh
               </button>
               <button className={"toolbar-btn"} onClick={()=>setAutoRefresh(!autoRefresh)} style={autoRefresh?{borderColor:"var(--accent)",color:"var(--accent)"}:undefined}>
                 Auto {autoRefresh?"ON":"OFF"}
               </button>
               <button className="toolbar-btn" onClick={()=>setShowWatchlist(true)}>WL ({Object.keys(watchlist).length})</button>
-              <button className="toolbar-btn icon" onClick={()=>setConfigOpen(!configOpen)} title="Backend URL">&#9881;</button>
+              <button className="toolbar-btn icon" onClick={()=>setOpt("theme", opts.theme==="dark"?"light":"dark")} title="Toggle light / dark">
+                {opts.theme==="dark" ? "\u263C" : "\u263D"}
+              </button>
+              <button className="toolbar-btn icon" onClick={()=>setOptionsOpen(true)} title="Options">&#9881;</button>
             </div>
           ) : (
             <>
@@ -1184,7 +1717,7 @@
                 {tab==="feed" && <button className="toolbar-icon-btn" onClick={()=>setDrawerOpen(true)} title="Filters">&#9776;</button>}
                 <span className="brand"><span>h2</span>Radnor</span>
                 <span className="toolbar-spacer"/>
-                <button className="toolbar-btn primary" onClick={fetchData} disabled={status==="loading"}>{status==="loading"?"...":"Refresh"}</button>
+                <button className="toolbar-btn primary" onClick={()=>fetchData(false)} disabled={status==="loading"}>{status==="loading"?"...":"Refresh"}</button>
                 <button className="toolbar-icon-btn" onClick={()=>setMenuOpen(!menuOpen)} title="More">&#8942;</button>
               </div>
               <div className="mobile-tabbar">
@@ -1199,19 +1732,21 @@
             <>
               <div className="scrim clear" onClick={()=>setMenuOpen(false)}/>
               <div className="overflow-menu">
-                <div className="overflow-item" onClick={()=>{hardRefresh();setMenuOpen(false);}}>
-                  <span>Hard refresh</span>
-                  <span className="overflow-val">{hardRefreshing?"...":"\u27F3"}</span>
+                <div className="overflow-item" onClick={()=>{fetchData(true);setMenuOpen(false);}}>
+                  <span>Hard refresh</span><span className="overflow-val">&#8635;</span>
                 </div>
                 <div className="overflow-item" onClick={()=>{setAutoRefresh(!autoRefresh);}}>
                   <span>Auto-refresh</span>
                   <span className="overflow-val" style={autoRefresh?{color:"var(--accent)"}:undefined}>{autoRefresh?"ON":"OFF"}</span>
                 </div>
+                <div className="overflow-item" onClick={()=>{setOpt("theme", opts.theme==="dark"?"light":"dark");}}>
+                  <span>Theme</span><span className="overflow-val">{opts.theme==="dark"?"Dark":"Light"}</span>
+                </div>
                 <div className="overflow-item" onClick={()=>{setShowWatchlist(true);setMenuOpen(false);}}>
                   <span>Watchlist</span><span className="overflow-val">{Object.keys(watchlist).length}</span>
                 </div>
-                <div className="overflow-item" onClick={()=>{setConfigOpen(!configOpen);setMenuOpen(false);}}>
-                  <span>Backend URL</span><span className="overflow-val">&#9881;</span>
+                <div className="overflow-item" onClick={()=>{setOptionsOpen(true);setMenuOpen(false);}}>
+                  <span>Options</span><span className="overflow-val">&#9881;</span>
                 </div>
               </div>
             </>
@@ -1255,7 +1790,11 @@
                       <span><strong>{anns.length}</strong> showing</span>
                       <span>/ {allAnns.length} total</span>
                       {wlCount>0 && <span style={{color:"var(--watchlist)"}}>{wlCount} watchlist</span>}
-                      {excludedCats.size>0 && <span style={{color:"var(--danger)"}}>{excludedCats.size} categories hidden</span>}
+                      {opts.flagNew && newCount>0 && (
+                        <span style={{color:"var(--accent)",cursor:"pointer"}} onClick={markAllSeen} title="Clear the new flags">
+                          {newCount} new
+                        </span>
+                      )}
                       {isMobile && (
                         <span style={{marginLeft:"auto",display:"flex",alignItems:"center"}}>
                           <StatusDot status={status}/>
@@ -1264,6 +1803,8 @@
                       )}
                     </div>
                   </div>
+
+                  <FilterChips items={chipItems} onClearAll={clearAllFilters}/>
 
                   {data?.errors?.length>0 && (
                     <div style={{marginBottom:10,padding:"6px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",fontSize:11,color:"var(--danger)",fontFamily:"var(--font-mono)"}}>
@@ -1279,20 +1820,31 @@
                   )}
 
                   {status==="loading"&&!data && (
-                    <div className="grid">{[0,1,2,3,4,5,6,7].map(i=><SkeletonCard key={i}/>)}</div>
+                    <div className={gridClass}>{[0,1,2,3,4,5,6,7].map(i=><SkeletonCard key={i}/>)}</div>
                   )}
 
                   {anns.length>0 && (
-                    <div className="grid">
-                      {anns.map((a,i) => (
-                        <AnnouncementCard
-                          key={a.url || `${a.company}|${a.headline}`}
-                          ann={a}
-                          index={i}
-                          backendUrl={backendUrl}
-                          tier={tierFor(a.ticker)}
-                        />
-                      ))}
+                    <div className={gridClass}>
+                      {anns.map((a,i) => {
+                        const id=annId(a);
+                        const tier=tierFor(a.ticker);
+                        return (
+                          <AnnouncementCard
+                            key={id}
+                            ann={a}
+                            backendUrl={backendUrl}
+                            tier={tier}
+                            isNew={opts.flagNew && newIds.has(id)}
+                            isFocused={focusedIdx===i}
+                            expandStyle={opts.expandStyle}
+                            catColorFor={catColorFor}
+                            showRelative={opts.showRelative}
+                            raTargets={opts.showRaMap && tier==="read_across" ? raMap[a.ticker] : null}
+                            readVersion={readVersion}
+                            onFocusRow={()=>setFocusedIdx(i)}
+                          />
+                        );
+                      })}
                     </div>
                   )}
 
@@ -1308,6 +1860,20 @@
           </div>
 
           {showWatchlist && <WatchlistModal watchlist={watchlist} onClose={()=>setShowWatchlist(false)} onAdd={handleAdd} onRemove={handleRemove}/>}
+          {optionsOpen && (
+            <OptionsModal
+              opts={opts}
+              setOpt={setOpt}
+              onClose={()=>setOptionsOpen(false)}
+              onMarkAllRead={markAllRead}
+              onClearRead={clearRead}
+              onMarkAllSeen={markAllSeen}
+              onResetCategories={resetCategories}
+              onResetOptions={resetOptions}
+              hiddenCount={excludedCats.size}
+              readCount={readStore.size()}
+            />
+          )}
         </>
       );
     }
