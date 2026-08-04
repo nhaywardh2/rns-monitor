@@ -289,6 +289,9 @@
     .sheet-head { position:sticky; top:0; background:var(--bg-card); display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); z-index:2; }
     .sheet-title { font-size:15px; font-weight:600; }
     .sheet-body { padding:6px 18px 18px; }
+    /* Shared close button for sheet and panel headers */
+    .float-close { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:14px; line-height:1; padding:5px 9px; cursor:pointer; flex-shrink:0; }
+    .float-close:hover { border-color:var(--danger); color:var(--danger); }
     .opt-group { padding:14px 0; border-bottom:1px solid var(--border); }
     .opt-group:last-child { border-bottom:none; }
     .opt-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
@@ -314,16 +317,47 @@
     .swatch-reset { margin-left:auto; cursor:pointer; color:var(--text-dim); font-size:11px; flex-shrink:0; }
     .swatch-reset:hover { color:var(--danger); }
 
-    /* ── Floating detail window ─────────────────────────────────────────────
-       Alternative to inline expansion. Full-screen sheet on mobile. */
-    .float-panel { background:var(--bg-card); border:1px solid var(--border-strong); width:100%; max-width:760px; max-height:88vh; display:flex; flex-direction:column; margin:20px; }
-    .float-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
-    .float-body { overflow-y:auto; padding:14px 16px; }
-    .float-close { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:14px; line-height:1; padding:5px 9px; cursor:pointer; flex-shrink:0; }
-    .float-close:hover { border-color:var(--danger); color:var(--danger); }
-    .float-panel .expand { border-top:none; padding:0; background:transparent; }
+    /* ── Detached reading panels ────────────────────────────────────────────
+       Non-blocking: no scrim, so the feed stays scrollable and clickable while panels are open.
+       Several can be open at once. Draggable and resizable by their header and corner handle. */
+    .panel { position:fixed; z-index:80; background:var(--bg-card); border:1px solid var(--border-strong); box-shadow:0 10px 34px rgba(0,0,0,0.45); display:flex; flex-direction:column; overflow:hidden; }
+    html[data-theme="light"] .panel { box-shadow:0 10px 30px rgba(20,32,27,0.20); }
+    .panel.raised { border-color:var(--accent-dim); }
+    .panel-head { display:flex; align-items:flex-start; gap:8px; padding:9px 10px; border-bottom:1px solid var(--border); background:var(--bg-toolbar); cursor:grab; flex-shrink:0; touch-action:none; }
+    .panel-head:active { cursor:grabbing; }
+    .panel-title { min-width:0; flex:1; }
+    .panel-headline { font-size:12px; font-weight:600; color:var(--text-primary); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+    .panel-btn { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:11px; line-height:1; padding:4px 7px; cursor:pointer; flex-shrink:0; }
+    .panel-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .panel-btn.close:hover { border-color:var(--danger); color:var(--danger); }
+    .panel-body { flex:1; overflow-y:auto; padding:11px 13px; }
+    .panel.collapsed .panel-body, .panel.collapsed .panel-resize { display:none; }
+    .panel.collapsed { height:auto !important; }
+    .panel-resize { position:absolute; right:0; bottom:0; width:15px; height:15px; cursor:nwse-resize; touch-action:none;
+      background:linear-gradient(135deg, transparent 50%, var(--border-strong) 50%, var(--border-strong) 70%, transparent 70%); }
+    /* Small bar listing open panels, with a close-all */
+    .panel-tray { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); z-index:79; display:flex; align-items:center; gap:8px; padding:5px 9px; background:var(--bg-card); border:1px solid var(--border-strong); font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
+    .panel-tray span.act { cursor:pointer; color:var(--text-secondary); }
+    .panel-tray span.act:hover { color:var(--accent); }
+
+    /* Mobile: side-by-side reading is not realistic on a phone, so open announcements collect in
+       a dock at the bottom. The feed stays browsable, and tapping a docked item expands it. */
+    .dock { position:fixed; left:0; right:0; bottom:0; z-index:80; background:var(--bg-sidebar); border-top:1px solid var(--border-strong); max-height:72vh; display:flex; flex-direction:column; }
+    .dock-bar { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-size:10px; color:var(--text-muted); flex-shrink:0; }
+    .dock-list { overflow-y:auto; }
+    .dock-item { border-bottom:1px solid var(--border); background:var(--bg-card); }
+    .dock-item:last-child { border-bottom:none; }
+    .dock-head { display:flex; align-items:center; gap:8px; padding:11px 12px; cursor:pointer; }
+    .dock-headline { flex:1; min-width:0; font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dock-body { max-height:52vh; overflow-y:auto; padding:10px 12px; border-top:1px solid var(--border); }
+
+    /* Action bar at the TOP of an opened announcement, so the source link is reachable without
+       scrolling past a long release. */
+    .detail-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:9px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+    .detail-fetched { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-left:auto; }
+
     @media (max-width: 680px) {
-      .sheet, .float-panel { margin:0; max-width:none; max-height:100vh; height:100vh; border:none; }
+      .sheet { margin:0; max-width:none; max-height:100vh; height:100vh; border:none; }
       .sheet-wrap { align-items:stretch; }
       .seg-btn { min-width:64px; font-size:12px; padding:11px 8px; }
       .swatch-list { grid-template-columns:1fr 1fr; }
@@ -534,6 +568,8 @@ function makeCatColor(scheme, custom) {
 }
 
 // "07:05" plus a relative age, for feeds being scanned through the morning.
+// If the stamp looks more than a couple of minutes in the future, the browser clock and the
+// feed's timezone disagree, so no age is shown at all rather than a misleading one.
 function relativeAge(hhmm) {
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
   const [h, m] = hhmm.split(":").map(Number);
@@ -541,7 +577,7 @@ function relativeAge(hhmm) {
   const then = new Date(now);
   then.setHours(h, m, 0, 0);
   let mins = Math.round((now - then) / 60000);
-  if (mins < 0) return null;
+  if (mins < -2) return null;
   if (mins < 1) return "now";
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
@@ -783,109 +819,70 @@ function FullTextToggle({
 }
 
 // ── Expandable Announcement Row — dense terminal style ──
-function AnnouncementCard({
+// Detail responses are cached in memory for the session, so collapsing and re-opening an
+// announcement, or re-opening it in a panel, is instant rather than another round trip.
+const detailCache = new Map();
+const shCache = new Map();
+
+// The body of an opened announcement. Used both for inline expansion and inside detached
+// reading panels, so the two stay identical in content and behaviour.
+function AnnouncementDetail({
   ann,
-  backendUrl,
-  tier,
-  isNew,
-  isFocused,
-  expandStyle,
-  catColorFor,
-  showRelative,
-  raTargets,
-  readVersion,
-  onFocusRow
+  backendUrl
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useState(() => detailCache.get(ann.url) || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [shData, setShData] = useState(null);
+  const [shData, setShData] = useState(() => shCache.get(ann.url) || null);
   const [shLoading, setShLoading] = useState(false);
-  const shFetched = useRef(false);
-  const id = annId(ann);
-  const [isRead, setIsRead] = useState(() => readStore.has(id));
-  const asModal = expandStyle === "modal";
-
-  // Re-sync from the store when a bulk action (mark all read / clear) changes it.
   useEffect(() => {
-    setIsRead(readStore.has(id));
-  }, [readVersion, id]);
-
-  // Auto-fetch shareholding detail for Shareholding rows when opened
-  useEffect(() => {
-    if (expanded && ann.category === "Shareholding" && ann.url && !shFetched.current) {
-      shFetched.current = true;
-      setShLoading(true);
-      fetch(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`).then(r => r.ok ? r.json() : null).then(json => {
-        if (json && !json.error) setShData(json);
-      }).catch(() => {}).finally(() => setShLoading(false));
-    }
-  }, [expanded, ann.category, ann.url, backendUrl]);
-
-  // Close the floating window on Escape.
-  useEffect(() => {
-    if (!(expanded && asModal)) return;
-    const onKey = e => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setExpanded(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [expanded, asModal]);
-  const fetchDetail = async () => {
-    if (!ann.url) return;
-    if (detail) return;
+    if (!ann.url || detail) return;
+    let alive = true;
     setLoading(true);
     setError(null);
-    try {
-      const resp = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
+    fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }).then(json => {
       if (json.error) throw new Error(json.error);
-      setDetail(json);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const toggleExpand = () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next) {
-      readStore.mark(id);
-      setIsRead(true);
-      if (!detail) fetchDetail();
-    }
-  };
-
-  // Mark read/unread without opening the announcement.
-  const toggleRead = e => {
-    e.stopPropagation();
-    if (isRead) {
-      readStore.unmark(id);
-      setIsRead(false);
-    } else {
-      readStore.mark(id);
-      setIsRead(true);
-    }
-  };
-  const catColor = catColorFor(ann.category);
-  const isWL = ann.is_watchlist;
-  const isRA = tier === "read_across";
-  const rowClasses = ["row"];
-  if (isWL) rowClasses.push(isRA ? "readacross" : "watchlist");
-  if (expanded && !asModal) rowClasses.push("expanded");
-  if (isRead && !expanded) rowClasses.push("read");
-  if (isNew) rowClasses.push("is-new");
-  if (isFocused) rowClasses.push("focused");
-  const age = showRelative ? relativeAge(ann.time) : null;
-
-  // Shared detail content, used inline and in the floating window.
-  const detailContent = /*#__PURE__*/React.createElement(React.Fragment, null, loading && /*#__PURE__*/React.createElement("div", {
+      detailCache.set(ann.url, json);
+      if (alive) setDetail(json);
+    }).catch(err => {
+      if (alive) setError(err.message);
+    }).finally(() => {
+      if (alive) setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ann.url, backendUrl, detail]);
+  useEffect(() => {
+    if (ann.category !== "Shareholding" || !ann.url || shData) return;
+    let alive = true;
+    setShLoading(true);
+    fetch(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`).then(r => r.ok ? r.json() : null).then(json => {
+      if (json && !json.error) {
+        shCache.set(ann.url, json);
+        if (alive) setShData(json);
+      }
+    }).catch(() => {}).finally(() => {
+      if (alive) setShLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ann.category, ann.url, backendUrl, shData]);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "detail-actions"
+  }, ann.url && /*#__PURE__*/React.createElement("a", {
+    href: ann.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "expand-link",
+    onClick: e => e.stopPropagation()
+  }, "View on Investegate ↗"), detail && /*#__PURE__*/React.createElement("span", {
+    className: "detail-fetched"
+  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))), loading && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -929,7 +926,7 @@ function AnnouncementCard({
     }
   }, "Loading shareholding data...")), ann.category === "Shareholding" && shData && /*#__PURE__*/React.createElement(ShareholdingStrip, {
     data: shData
-  }), detail && !loading && /*#__PURE__*/React.createElement(React.Fragment, null, detail.ai_summary && /*#__PURE__*/React.createElement("div", {
+  }), detail && /*#__PURE__*/React.createElement(React.Fragment, null, detail.ai_summary && /*#__PURE__*/React.createElement("div", {
     className: "expand-section"
   }, /*#__PURE__*/React.createElement("div", {
     className: "expand-label"
@@ -944,45 +941,73 @@ function AnnouncementCard({
     className: "key-figure"
   }, fig))), /*#__PURE__*/React.createElement(FullTextToggle, {
     text: detail.body_text
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      alignItems: "center",
-      paddingTop: 8,
-      borderTop: "1px solid var(--border)",
-      marginTop: 8
+  })));
+}
+function AnnouncementCard({
+  ann,
+  backendUrl,
+  tier,
+  isNew,
+  isFocused,
+  expandStyle,
+  catColorFor,
+  showRelative,
+  raTargets,
+  readVersion,
+  onFocusRow,
+  onOpenPanel,
+  isPanelOpen
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const id = annId(ann);
+  const [isRead, setIsRead] = useState(() => readStore.has(id));
+  const detached = expandStyle === "panel";
+
+  // Re-sync from the store when a bulk action changes it.
+  useEffect(() => {
+    setIsRead(readStore.has(id));
+  }, [readVersion, id]);
+  const activate = () => {
+    readStore.mark(id);
+    setIsRead(true);
+    if (detached) onOpenPanel && onOpenPanel(ann, tier);else setExpanded(e => !e);
+  };
+  const toggleRead = e => {
+    e.stopPropagation();
+    if (isRead) {
+      readStore.unmark(id);
+      setIsRead(false);
+    } else {
+      readStore.mark(id);
+      setIsRead(true);
     }
-  }, ann.url && /*#__PURE__*/React.createElement("a", {
-    href: ann.url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    className: "expand-link",
-    onClick: e => e.stopPropagation()
-  }, "View on Investegate ↗"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      color: "var(--text-muted)",
-      fontFamily: "var(--font-mono)",
-      marginLeft: "auto"
-    }
-  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB")))));
+  };
+  const catColor = catColorFor(ann.category);
+  const isWL = ann.is_watchlist;
+  const isRA = tier === "read_across";
+  const rowClasses = ["row"];
+  if (isWL) rowClasses.push(isRA ? "readacross" : "watchlist");
+  if (expanded && !detached) rowClasses.push("expanded");
+  if (isRead && !expanded) rowClasses.push("read");
+  if (isNew) rowClasses.push("is-new");
+  if (isFocused) rowClasses.push("focused");
+  const age = showRelative ? relativeAge(ann.time) : null;
   return /*#__PURE__*/React.createElement("div", {
     id: `row-${id}`,
     className: rowClasses.join(" "),
     role: "button",
     tabIndex: 0,
-    "aria-expanded": expanded,
+    "aria-expanded": detached ? undefined : expanded,
     onFocus: onFocusRow,
     onKeyDown: e => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        toggleExpand();
+        activate();
       }
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "row-body",
-    onClick: toggleExpand
+    onClick: activate
   }, /*#__PURE__*/React.createElement("div", {
     className: "row-meta"
   }, /*#__PURE__*/React.createElement("span", {
@@ -1014,63 +1039,20 @@ function AnnouncementCard({
     onClick: toggleRead,
     title: isRead ? "Mark as unread" : "Mark as read"
   }, isRead ? "\u25CB" : "\u25CF"), /*#__PURE__*/React.createElement("span", {
-    className: "row-chevron"
-  }, asModal ? "\u2197" : "\u25BC")), /*#__PURE__*/React.createElement("div", {
+    className: "row-chevron",
+    style: detached && isPanelOpen ? {
+      color: "var(--accent)"
+    } : undefined
+  }, detached ? "\u2197" : "\u25BC")), /*#__PURE__*/React.createElement("div", {
     className: "row-company"
   }, ann.company), /*#__PURE__*/React.createElement("div", {
     className: "row-headline"
-  }, ann.headline)), expanded && !asModal && /*#__PURE__*/React.createElement("div", {
+  }, ann.headline)), expanded && !detached && /*#__PURE__*/React.createElement("div", {
     className: "expand"
-  }, detailContent), expanded && asModal && /*#__PURE__*/React.createElement("div", {
-    className: "sheet-wrap",
-    onClick: e => {
-      e.stopPropagation();
-      setExpanded(false);
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "float-panel",
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "float-head"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      minWidth: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "row-meta",
-    style: {
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "row-time"
-  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
-    className: "row-ticker" + (isWL ? isRA ? " readacross" : " watchlist" : "")
-  }, ann.ticker), /*#__PURE__*/React.createElement("span", {
-    className: "row-category",
-    style: {
-      color: catColor.color,
-      background: catColor.bg
-    }
-  }, ann.category)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--text-secondary)"
-    }
-  }, ann.company), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 600,
-      marginTop: 2
-    }
-  }, ann.headline)), /*#__PURE__*/React.createElement("button", {
-    className: "float-close",
-    onClick: () => setExpanded(false),
-    title: "Close (Esc)"
-  }, "✕")), /*#__PURE__*/React.createElement("div", {
-    className: "float-body"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "expand"
-  }, detailContent)))));
+  }, /*#__PURE__*/React.createElement(AnnouncementDetail, {
+    ann: ann,
+    backendUrl: backendUrl
+  })));
 }
 function SkeletonCard() {
   return /*#__PURE__*/React.createElement("div", {
@@ -1269,12 +1251,12 @@ function OptionsModal({
       v: "inline",
       l: "Read in line"
     }, {
-      v: "modal",
-      l: "Floating window"
+      v: "panel",
+      l: "Detached panels"
     }]
   }), /*#__PURE__*/React.createElement("div", {
     className: "opt-hint"
-  }, "In line keeps you in the feed. A floating window gives the full text more room, which suits longer announcements and small screens.")), /*#__PURE__*/React.createElement("div", {
+  }, "In line expands the announcement inside the feed. Detached panels open it in a floating window that does not block the page, so you can keep scrolling and open several announcements side by side. On a phone the open announcements collect in a dock at the bottom of the screen instead.")), /*#__PURE__*/React.createElement("div", {
     className: "opt-group"
   }, /*#__PURE__*/React.createElement("div", {
     className: "opt-label"
@@ -2385,6 +2367,192 @@ function ReadAcrossView({
   }, "No current read-across company maps to these directly.")));
 }
 
+// ── Detached reading panel (desktop) ─────────────────────────────────────
+// Deliberately not a modal: there is no scrim, so the feed behind stays scrollable and
+// clickable and several announcements can be read side by side. Dragged by the header,
+// resized from the bottom-right corner.
+function DetachedPanel({
+  p,
+  backendUrl,
+  catColorFor,
+  onClose,
+  onRaise,
+  onToggle,
+  onChange
+}) {
+  const ann = p.ann;
+  const catColor = catColorFor(ann.category);
+  const isRA = p.tier === "read_across";
+  const startDrag = (e, mode) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onRaise(p.key);
+    const startX = e.clientX,
+      startY = e.clientY;
+    const base = {
+      x: p.x,
+      y: p.y,
+      w: p.w,
+      h: p.h
+    };
+    const maxX = (window.innerWidth || 1200) - 80;
+    const maxY = (window.innerHeight || 800) - 60;
+    const move = ev => {
+      const dx = ev.clientX - startX,
+        dy = ev.clientY - startY;
+      if (mode === "move") {
+        onChange(p.key, {
+          x: Math.min(Math.max(0, base.x + dx), maxX),
+          y: Math.min(Math.max(0, base.y + dy), maxY)
+        });
+      } else {
+        onChange(p.key, {
+          w: Math.max(300, base.w + dx),
+          h: Math.max(150, base.h + dy)
+        });
+      }
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "panel" + (p.collapsed ? " collapsed" : "") + (p.raised ? " raised" : ""),
+    style: {
+      left: p.x,
+      top: p.y,
+      width: p.w,
+      height: p.collapsed ? "auto" : p.h,
+      zIndex: 80 + (p.z || 0)
+    },
+    onMouseDown: () => onRaise(p.key)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head",
+    onMouseDown: e => startDrag(e, "move"),
+    title: "Drag to move"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-title"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta",
+    style: {
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker" + (ann.is_watchlist ? isRA ? " readacross" : " watchlist" : "")
+  }, ann.ticker), /*#__PURE__*/React.createElement("span", {
+    className: "row-category",
+    style: {
+      color: catColor.color,
+      background: catColor.bg
+    }
+  }, ann.category)), /*#__PURE__*/React.createElement("div", {
+    className: "panel-headline"
+  }, ann.headline), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)",
+      marginTop: 2,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, ann.company)), /*#__PURE__*/React.createElement("button", {
+    className: "panel-btn",
+    onClick: e => {
+      e.stopPropagation();
+      onToggle(p.key);
+    },
+    onMouseDown: e => e.stopPropagation(),
+    title: p.collapsed ? "Expand" : "Collapse"
+  }, p.collapsed ? "\u25A1" : "\u2013"), /*#__PURE__*/React.createElement("button", {
+    className: "panel-btn close",
+    onClick: e => {
+      e.stopPropagation();
+      onClose(p.key);
+    },
+    onMouseDown: e => e.stopPropagation(),
+    title: "Close"
+  }, "✕")), !p.collapsed && /*#__PURE__*/React.createElement("div", {
+    className: "panel-body"
+  }, /*#__PURE__*/React.createElement(AnnouncementDetail, {
+    ann: ann,
+    backendUrl: backendUrl
+  })), !p.collapsed && /*#__PURE__*/React.createElement("div", {
+    className: "panel-resize",
+    onMouseDown: e => startDrag(e, "resize"),
+    title: "Drag to resize"
+  }));
+}
+
+// ── Panel dock (mobile) ──────────────────────────────────────────────────
+// Floating windows do not work on a phone, so open announcements collect in a dock at the
+// bottom. The feed above stays browsable and any docked item can be expanded in place.
+function PanelDock({
+  panels,
+  backendUrl,
+  catColorFor,
+  onClose,
+  onToggle,
+  onCloseAll
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "dock"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "dock-bar"
+  }, /*#__PURE__*/React.createElement("span", null, panels.length, " open"), /*#__PURE__*/React.createElement("span", {
+    className: "act",
+    onClick: onCloseAll,
+    style: {
+      cursor: "pointer",
+      color: "var(--text-secondary)"
+    }
+  }, "Close all")), /*#__PURE__*/React.createElement("div", {
+    className: "dock-list"
+  }, panels.map(p => {
+    const catColor = catColorFor(p.ann.category);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "dock-item",
+      key: p.key
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "dock-head",
+      onClick: () => onToggle(p.key)
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "row-chevron",
+      style: {
+        transform: p.collapsed ? "none" : "rotate(180deg)"
+      }
+    }, "▼"), p.ann.ticker && /*#__PURE__*/React.createElement("span", {
+      className: "row-ticker"
+    }, p.ann.ticker), /*#__PURE__*/React.createElement("span", {
+      className: "dock-headline"
+    }, p.ann.headline), /*#__PURE__*/React.createElement("span", {
+      className: "row-category",
+      style: {
+        color: catColor.color,
+        background: catColor.bg
+      }
+    }, p.ann.category), /*#__PURE__*/React.createElement("button", {
+      className: "panel-btn close",
+      onClick: e => {
+        e.stopPropagation();
+        onClose(p.key);
+      },
+      title: "Close"
+    }, "✕")), !p.collapsed && /*#__PURE__*/React.createElement("div", {
+      className: "dock-body"
+    }, /*#__PURE__*/React.createElement(AnnouncementDetail, {
+      ann: p.ann,
+      backendUrl: backendUrl
+    })));
+  })));
+}
+
 // Defaults for everything in the Options panel.
 const OPTION_DEFAULTS = {
   theme: "dark",
@@ -2420,10 +2588,15 @@ function App() {
   const [sourceFilter, setSourceFilter] = useState(() => savedPrefs?.sourceFilter ?? "all"); // all | rns | nonreg
   const defaultsAppliedRef = useRef(savedPrefs != null);
   // Options, merged over defaults so a new option added later still has a sane value.
-  const [opts, setOpts] = useState(() => ({
-    ...OPTION_DEFAULTS,
-    ...(savedPrefs?.options || {})
-  }));
+  const [opts, setOpts] = useState(() => {
+    const merged = {
+      ...OPTION_DEFAULTS,
+      ...(savedPrefs?.options || {})
+    };
+    // The old blocking "modal" mode was replaced by non-blocking detached panels.
+    if (merged.expandStyle === "modal") merged.expandStyle = "panel";
+    return merged;
+  });
   const [optionsOpen, setOptionsOpen] = useState(false);
   const setOpt = (k, v) => setOpts(prev => ({
     ...prev,
@@ -2434,6 +2607,9 @@ function App() {
   const [readVersion, setReadVersion] = useState(0);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [raMap, setRaMap] = useState({});
+  // Open reading panels. Non-modal, so several can be open while the feed stays usable.
+  const [panels, setPanels] = useState([]);
+  const zRef = useRef(1);
   const serverDefaultsRef = useRef([]); // server's default_hidden_categories, for "reset"
   const searchRef = useRef(null);
   const isHardRef = useRef(false);
@@ -2619,6 +2795,85 @@ function App() {
   const newCount = useMemo(() => anns.filter(a => newIds.has(annId(a))).length, [anns, newIds]);
   const anyModalOpen = optionsOpen || showWatchlist;
 
+  // ── Reading panels ─────────────────────────────────────────────────────
+  const raisePanel = useCallback(key => {
+    zRef.current += 1;
+    const z = zRef.current;
+    setPanels(prev => prev.map(p => ({
+      ...p,
+      z: p.key === key ? z : p.z,
+      raised: p.key === key
+    })));
+  }, []);
+  const openPanel = useCallback((ann, tier) => {
+    const key = annId(ann);
+    setPanels(prev => {
+      const existing = prev.find(p => p.key === key);
+      zRef.current += 1;
+      const z = zRef.current;
+      if (existing) {
+        // Already open: bring it forward and make sure it is not collapsed.
+        return prev.map(p => p.key === key ? {
+          ...p,
+          collapsed: false,
+          z,
+          raised: true
+        } : {
+          ...p,
+          raised: false
+        });
+      }
+      const mobile = typeof window !== "undefined" && window.innerWidth < 880;
+      if (mobile) {
+        // On a phone the newest opens expanded and the rest fold down into the dock.
+        return [{
+          key,
+          ann,
+          tier,
+          collapsed: false,
+          z,
+          raised: true
+        }, ...prev.map(p => ({
+          ...p,
+          collapsed: true,
+          raised: false
+        }))];
+      }
+      // Cascade so a second panel does not land exactly on top of the first.
+      const n = prev.length;
+      const w = Math.min(560, Math.max(340, (window.innerWidth || 1200) - 60));
+      const h = Math.min(460, Math.max(220, (window.innerHeight || 800) - 220));
+      const x = Math.min(120 + n * 30, Math.max(20, (window.innerWidth || 1200) - w - 20));
+      const y = Math.min(90 + n * 28, Math.max(60, (window.innerHeight || 800) - h - 40));
+      return [...prev.map(p => ({
+        ...p,
+        raised: false
+      })), {
+        key,
+        ann,
+        tier,
+        x,
+        y,
+        w,
+        h,
+        collapsed: false,
+        z,
+        raised: true
+      }];
+    });
+  }, []);
+  const closePanel = useCallback(key => setPanels(prev => prev.filter(p => p.key !== key)), []);
+  const closeAllPanels = useCallback(() => setPanels([]), []);
+  const togglePanel = useCallback(key => setPanels(prev => prev.map(p => p.key === key ? {
+    ...p,
+    collapsed: !p.collapsed
+  } : p)), []);
+  const updatePanel = useCallback((key, patch) => setPanels(prev => prev.map(p => p.key === key ? {
+    ...p,
+    ...patch
+  } : p)), []);
+  const openPanelKeys = useMemo(() => new Set(panels.map(p => p.key)), [panels]);
+
   // ── Bulk actions ───────────────────────────────────────────────────────
   const markAllRead = () => {
     readStore.markAll(anns.map(annId));
@@ -2673,6 +2928,12 @@ function App() {
           t.blur();
           return;
         }
+        // Close the front-most reading panel before giving up keyboard focus.
+        if (panels.length > 0) {
+          const front = panels.reduce((a, b) => (b.z || 0) > (a.z || 0) ? b : a, panels[0]);
+          closePanel(front.key);
+          return;
+        }
         setFocusedIdx(-1);
         return;
       }
@@ -2713,7 +2974,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [opts.keyboardNav, anns, focusedIdx, menuOpen, drawerOpen, optionsOpen, showWatchlist, anyModalOpen, tab, fetchData]);
+  }, [opts.keyboardNav, anns, focusedIdx, menuOpen, drawerOpen, optionsOpen, showWatchlist, anyModalOpen, tab, fetchData, panels, closePanel]);
 
   // Keep the keyboard-focused row in view.
   useEffect(() => {
@@ -3109,9 +3370,14 @@ function App() {
     className: "sidebar"
   }, sidebarContent), /*#__PURE__*/React.createElement("main", {
     className: "main",
-    style: tab !== "feed" || isMobile ? {
-      gridColumn: "1 / -1"
-    } : undefined
+    style: {
+      ...(tab !== "feed" || isMobile ? {
+        gridColumn: "1 / -1"
+      } : {}),
+      ...(isMobile && panels.length > 0 ? {
+        paddingBottom: "78vh"
+      } : {})
+    }
   }, tab === "readacross" && /*#__PURE__*/React.createElement(ReadAcrossView, {
     backendUrl: backendUrl,
     refreshTick: lastRefresh ? lastRefresh.getTime() : 0
@@ -3190,7 +3456,9 @@ function App() {
       showRelative: opts.showRelative,
       raTargets: opts.showRaMap && tier === "read_across" ? raMap[a.ticker] : null,
       readVersion: readVersion,
-      onFocusRow: () => setFocusedIdx(i)
+      onFocusRow: () => setFocusedIdx(i),
+      onOpenPanel: openPanel,
+      isPanelOpen: openPanelKeys.has(id)
     });
   })), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
@@ -3210,6 +3478,33 @@ function App() {
     onClose: () => setShowWatchlist(false),
     onAdd: handleAdd,
     onRemove: handleRemove
+  }), !isMobile && panels.map(p => /*#__PURE__*/React.createElement(DetachedPanel, {
+    key: p.key,
+    p: p,
+    backendUrl: backendUrl,
+    catColorFor: catColorFor,
+    onClose: closePanel,
+    onRaise: raisePanel,
+    onToggle: togglePanel,
+    onChange: updatePanel
+  })), !isMobile && panels.length > 1 && /*#__PURE__*/React.createElement("div", {
+    className: "panel-tray"
+  }, /*#__PURE__*/React.createElement("span", null, panels.length, " panels open"), /*#__PURE__*/React.createElement("span", {
+    className: "act",
+    onClick: () => setPanels(prev => prev.map(p => ({
+      ...p,
+      collapsed: true
+    })))
+  }, "collapse all"), /*#__PURE__*/React.createElement("span", {
+    className: "act",
+    onClick: closeAllPanels
+  }, "close all")), isMobile && panels.length > 0 && /*#__PURE__*/React.createElement(PanelDock, {
+    panels: panels,
+    backendUrl: backendUrl,
+    catColorFor: catColorFor,
+    onClose: closePanel,
+    onToggle: togglePanel,
+    onCloseAll: closeAllPanels
   }), optionsOpen && /*#__PURE__*/React.createElement(OptionsModal, {
     opts: opts,
     setOpt: setOpt,
