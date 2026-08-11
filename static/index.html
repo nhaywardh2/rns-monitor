@@ -27,10 +27,6 @@
       --text-secondary: #7a8c80;
       --text-muted: #4a5a52;
       --text-dim: #34423b;
-      /* Long-form announcement body text. Deliberately brighter than --text-secondary:
-         secondary is sized for 9-11px labels, and reusing it for a full release made
-         paragraphs of running text too dark to read comfortably. */
-      --text-body: #c2cdc6;
       --accent: #3db86a;
       --accent-dim: #2a7d49;
       --accent-glow: rgba(61,184,106,0.10);
@@ -60,12 +56,6 @@
       --other: #8a9e8f;
       --danger: #ef4444;
       --new-cue: #3db86a;
-      --new-ring: rgba(61,184,106,0.28);
-      /* Text/icon colour on top of an accent-filled surface. Dark theme wants near-black
-         on the bright green; light theme wants white on the darker green. */
-      --on-accent: #07090a;
-      --watchlist-hover: rgba(240,192,64,0.10);
-      --readacross-hover: rgba(249,115,22,0.11);
       --font-sans: 'DM Sans', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
       --sidebar-w: 224px;
@@ -76,31 +66,30 @@
        re-pointed, so components need no theme-specific code of their own. Category hues are
        darkened for legible contrast on white. */
     html[data-theme="light"] {
-      --bg-primary: #eaeeec;
-      --bg-sidebar: #e3e8e6;
+      --bg-primary: #f1f4f3;
+      --bg-sidebar: #e8eceb;
       --bg-toolbar: #ffffff;
       --bg-card: #ffffff;
       --bg-card-hover: #f4f8f6;
       --bg-card-active: #ecf5f0;
       --bg-surface: #f7f9f8;
       --bg-detail: #fafbfa;
-      --border: #d0d9d5;
-      --border-strong: #a7b3ad;
+      --border: #d7dedb;
+      --border-strong: #b9c4bf;
       --border-active: #8cbf9f;
       --text-primary: #14201b;
-      --text-secondary: #42534b;
-      --text-muted: #5f6e67;
-      --text-dim: #7d8b84;
-      --text-body: #26332c;
-      --accent: #1a7d44;
+      --text-secondary: #4a5c53;
+      --text-muted: #74847c;
+      --text-dim: #9aa6a0;
+      --accent: #1f8a4c;
       --accent-dim: #166638;
-      --accent-glow: rgba(26,125,68,0.12);
-      --watchlist: #8a6104;
-      --watchlist-bg: rgba(166,118,8,0.13);
+      --accent-glow: rgba(31,138,76,0.10);
+      --watchlist: #a67608;
+      --watchlist-bg: rgba(166,118,8,0.09);
       --watchlist-border: rgba(166,118,8,0.30);
-      --core: #8a6104;
+      --core: #a67608;
       --readacross: #c2410c;
-      --readacross-bg: rgba(194,65,12,0.11);
+      --readacross-bg: rgba(194,65,12,0.08);
       --results: #1d6fd0;
       --trading: #6d3fd4;
       --ma: #cf3527;
@@ -117,11 +106,7 @@
       --nonreg: #0369a1;
       --other: #6b7280;
       --danger: #dc2626;
-      --new-cue: #1a7d44;
-      --new-ring: rgba(26,125,68,0.42);
-      --on-accent: #ffffff;
-      --watchlist-hover: rgba(166,118,8,0.18);
-      --readacross-hover: rgba(194,65,12,0.16);
+      --new-cue: #1f8a4c;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); min-height:100vh; }
@@ -142,20 +127,17 @@
     .spinner { width:14px; height:14px; border:1.5px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
 
     /* Top toolbar */
-    .toolbar { position:sticky; top:0; z-index:50; height:var(--toolbar-h); background:var(--bg-toolbar); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 12px; gap:10px; }
+    .toolbar { position:sticky; top:0; z-index:50; height:var(--toolbar-h); background:var(--bg-toolbar); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 14px; gap:14px; }
     .brand { font-size:14px; font-weight:700; letter-spacing:-0.02em; }
     .brand span { color:var(--accent); }
     .toolbar-tag { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); padding:2px 8px; border:1px solid var(--border); border-radius:0; }
-    .toolbar-meta { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; }
+    .toolbar-meta { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
     .toolbar-spacer { flex:1; }
     .toolbar-btn { background:transparent; border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:11px; font-weight:500; padding:6px 12px; cursor:pointer; transition:all 0.15s; }
     .toolbar-btn:hover { border-color:var(--accent); color:var(--accent); }
-    .toolbar-btn.primary { background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:600; }
-    .toolbar-btn.primary:hover { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--on-accent); }
-    .toolbar-btn.icon { padding:5px 8px; display:inline-flex; align-items:center; justify-content:center; }
-    .toolbar-btn.icon svg { display:block; }
-    /* Separates the theme toggle and the Options cog from the text buttons to their left. */
-    .toolbar-sep { width:1px; height:20px; background:var(--border); flex-shrink:0; margin:0 -2px; }
+    .toolbar-btn.primary { background:var(--accent); color:var(--bg-primary); border-color:var(--accent); font-weight:600; }
+    .toolbar-btn.primary:hover { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--bg-primary); }
+    .toolbar-btn.icon { padding:6px 10px; }
     .toolbar-tab { background:transparent; border:none; color:var(--text-muted); font-family:var(--font-sans); font-size:12px; font-weight:600; padding:14px 14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; height:100%; display:flex; align-items:center; }
     .toolbar-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
     .toolbar-tab:hover { color:var(--text-secondary); }
@@ -233,10 +215,10 @@
     .row:hover { background:var(--bg-card-hover); border-left-color:var(--accent-dim); }
     .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
     .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
-    .row.watchlist:hover { background:var(--watchlist-hover); }
+    .row.watchlist:hover { background:rgba(240,192,64,0.10); }
     /* Read-across rows: orange highlight, distinct from the gold of core watchlist rows */
     .row.readacross { border-left-color:var(--readacross); background:var(--readacross-bg); }
-    .row.readacross:hover { background:var(--readacross-hover); }
+    .row.readacross:hover { background:rgba(249,115,22,0.11); }
     /* Read rows: the CONTENT dims, not the whole row, so the gold/orange tier bar on the left
        keeps its full strength and a read watchlist item is still identifiable at a glance.
        Hovering restores full opacity so re-reading is easy. */
@@ -244,7 +226,7 @@
     .row.read:hover .row-body { opacity:1; }
     .row-body { transition:opacity 0.12s; }
     /* New since the last refresh: a small accent flag plus a brief pulse on arrival. */
-    .row.is-new { box-shadow:inset 0 0 0 1px var(--new-ring); }
+    .row.is-new { box-shadow:inset 0 0 0 1px var(--accent-glow); }
     .row.is-new .row-new-dot { display:inline-block; }
     .row-new-dot { display:none; width:5px; height:5px; border-radius:50%; background:var(--new-cue); flex-shrink:0; animation:pulse-dot 2s ease-in-out 3; }
     /* Keyboard focus ring for j/k navigation. */
@@ -259,8 +241,8 @@
     .row-ticker.watchlist { color:var(--watchlist); }
     .row-ticker.readacross { color:var(--readacross); }
     .row-tag { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 6px; border-radius:0; flex-shrink:0; }
-    .row-tag.tier-core { background:var(--watchlist-bg); color:var(--core); }
-    .row-tag.tier-ra { background:var(--readacross-bg); color:var(--readacross); }
+    .row-tag.tier-core { background:rgba(240,192,64,0.12); color:var(--core); }
+    .row-tag.tier-ra { background:rgba(249,115,22,0.12); color:var(--readacross); }
     .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:0; }
     .row-source { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); border:1px solid var(--border); padding:0 4px; flex-shrink:0; }
     .row-spacer { flex:1; }
@@ -274,9 +256,8 @@
     .expand-section { margin-bottom:14px; }
     .expand-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
     .expand-summary { font-size:12px; color:var(--text-primary); line-height:1.65; }
-    /* Still used by the Read-across tab. Themed rather than hardcoded green. */
-    .key-figure { display:block; padding:6px 10px; margin:0 0 4px 0; background:var(--accent-glow); border-left:2px solid var(--accent-dim); font-size:11px; color:var(--accent); line-height:1.5; word-wrap:break-word; font-family:var(--font-mono); }
-    .detail-body { font-size:12px; line-height:1.7; color:var(--text-body); white-space:normal; word-wrap:break-word; max-height:400px; overflow-y:auto; padding:6px 0; font-family:var(--font-sans); }
+    .key-figure { display:block; padding:6px 10px; margin:0 0 4px 0; background:rgba(61,184,106,0.05); border-left:2px solid rgba(61,184,106,0.25); font-size:11px; color:var(--accent); line-height:1.5; word-wrap:break-word; font-family:var(--font-mono); }
+    .detail-body { font-size:11px; line-height:1.6; color:var(--text-secondary); white-space:normal; word-wrap:break-word; max-height:400px; overflow-y:auto; padding:6px 0; font-family:var(--font-sans); }
     .detail-body p { margin:0 0 8px 0; }
     .expand-link { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary); text-decoration:none; padding:5px 10px; border:1px solid var(--border); transition:all 0.15s; }
     .expand-link:hover { color:var(--accent); border-color:var(--accent); }
@@ -325,7 +306,7 @@
     .switch { position:relative; width:38px; height:20px; flex-shrink:0; border-radius:20px; border:1px solid var(--border-strong); background:var(--bg-surface); cursor:pointer; transition:background-color 0.15s, border-color 0.15s; }
     .switch.on { background:var(--accent); border-color:var(--accent); }
     .switch-knob { position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--text-muted); transition:transform 0.15s, background-color 0.15s; }
-    .switch.on .switch-knob { transform:translateX(18px); background:var(--on-accent); }
+    .switch.on .switch-knob { transform:translateX(18px); background:var(--bg-primary); }
     .opt-action { width:100%; text-align:left; padding:11px 12px; margin-bottom:6px; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; cursor:pointer; transition:border-color 0.12s, color 0.12s; }
     .opt-action:hover { border-color:var(--accent); color:var(--accent); }
     /* Per-category colour overrides */
@@ -384,6 +365,8 @@
 
     /* When the "dim once read" option is off, keep read rows at full strength. */
     html.no-read-dim .row.read .row-body { opacity:1; }
+    /* Connection trouble banner */
+    .reconnect { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:8px 11px; background:var(--watchlist-bg); border:1px solid var(--watchlist-border); font-size:11px; color:var(--text-secondary); }
     /* Watchlist modal grouping */
     .wl-group-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin:12px 0 6px; }
     /* Light theme: the shimmer skeleton needs a lighter gradient to read correctly. */
@@ -608,6 +591,7 @@ function StatusDot({
   const c = {
     connected: "var(--accent)",
     loading: "var(--watchlist)",
+    reconnecting: "var(--watchlist)",
     error: "var(--danger)",
     idle: "var(--text-muted)"
   };
@@ -618,7 +602,7 @@ function StatusDot({
       height: 8,
       borderRadius: "50%",
       background: c[status] || c.idle,
-      animation: status === "loading" ? "pulse-dot 1.2s infinite" : "none",
+      animation: status === "loading" || status === "reconnecting" ? "pulse-dot 1.2s infinite" : "none",
       marginRight: 8,
       flexShrink: 0
     }
@@ -951,7 +935,14 @@ function AnnouncementDetail({
     className: "expand-label"
   }, "Summary"), /*#__PURE__*/React.createElement("div", {
     className: "expand-summary"
-  }, detail.ai_summary)), /*#__PURE__*/React.createElement(FullTextToggle, {
+  }, detail.ai_summary)), detail.key_figures && detail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "expand-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand-label"
+  }, "Key figures"), detail.key_figures.map((fig, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "key-figure"
+  }, fig))), /*#__PURE__*/React.createElement(FullTextToggle, {
     text: detail.body_text
   })));
 }
@@ -1111,56 +1102,6 @@ function SkeletonCard() {
     }
   }));
 }
-
-// ── Toolbar icons ────────────────────────────────────────────────────────
-// The theme toggle and the Options cog previously used the text glyphs U+263C and
-// U+2699. At 11px both are small, round and radially symmetric, so they were hard to
-// tell apart. These are drawn instead: the cog is an outline, the sun and moon are
-// solid, and the silhouettes differ clearly at this size.
-const IconCog = () => /*#__PURE__*/React.createElement("svg", {
-  width: "15",
-  height: "15",
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: "1.9",
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-  "aria-hidden": "true"
-}, /*#__PURE__*/React.createElement("circle", {
-  cx: "12",
-  cy: "12",
-  r: "3.1"
-}), /*#__PURE__*/React.createElement("path", {
-  d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-}));
-const IconSun = () => /*#__PURE__*/React.createElement("svg", {
-  width: "15",
-  height: "15",
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: "2",
-  strokeLinecap: "round",
-  "aria-hidden": "true"
-}, /*#__PURE__*/React.createElement("circle", {
-  cx: "12",
-  cy: "12",
-  r: "4.6",
-  fill: "currentColor",
-  stroke: "none"
-}), /*#__PURE__*/React.createElement("path", {
-  d: "M12 1.4v2.6M12 20v2.6M3.9 3.9l1.9 1.9M18.2 18.2l1.9 1.9M1.4 12H4M20 12h2.6M3.9 20.1l1.9-1.9M18.2 5.8l1.9-1.9"
-}));
-const IconMoon = () => /*#__PURE__*/React.createElement("svg", {
-  width: "15",
-  height: "15",
-  viewBox: "0 0 24 24",
-  "aria-hidden": "true"
-}, /*#__PURE__*/React.createElement("path", {
-  d: "M21 13.2A8.6 8.6 0 1 1 10.8 3 6.9 6.9 0 0 0 21 13.2z",
-  fill: "currentColor"
-}));
 
 // Small reusable pieces for the options panel
 function Switch({
@@ -1367,17 +1308,10 @@ function OptionsModal({
     className: "opt-group"
   }, /*#__PURE__*/React.createElement("div", {
     className: "opt-label"
-  }, "Auto-refresh"), /*#__PURE__*/React.createElement(OptRow, {
-    label: "Refresh automatically",
-    on: opts.autoRefresh !== false,
-    onToggle: () => setOpt("autoRefresh", opts.autoRefresh === false)
-  }), /*#__PURE__*/React.createElement(Seg, {
+  }, "Auto-refresh interval"), /*#__PURE__*/React.createElement(Seg, {
     value: String(opts.refreshSecs),
     onChange: v => setOpt("refreshSecs", Number(v)),
     options: [{
-      v: "30",
-      l: "30s"
-    }, {
       v: "60",
       l: "60s"
     }, {
@@ -1387,9 +1321,13 @@ function OptionsModal({
       v: "300",
       l: "5 min"
     }]
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Keep refreshing in background tabs",
+    on: opts.keepWarm,
+    onToggle: () => setOpt("keepWarm", !opts.keepWarm)
   }), /*#__PURE__*/React.createElement("div", {
     className: "opt-hint"
-  }, "Polling pauses while this tab is in the background and fires once when you switch back to it.")), /*#__PURE__*/React.createElement("div", {
+  }, "Off is recommended. The feed refreshes the moment you come back to the tab either way. Leaving this on holds the Render service awake, which avoids the wake-up wait but consumes free instance hours around the clock.")), /*#__PURE__*/React.createElement("div", {
     className: "opt-group"
   }, /*#__PURE__*/React.createElement("div", {
     className: "opt-label"
@@ -2358,7 +2296,7 @@ function ReadAcrossView({
     }, "Summary"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
-        color: "var(--text-body)",
+        color: "var(--text-secondary)",
         lineHeight: 1.6
       }
     }, liveDetail.ai_summary)), i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -2636,11 +2574,8 @@ const OPTION_DEFAULTS = {
   showRaMap: true,
   dimRead: true,
   keyboardNav: true,
-  autoRefresh: true,
-  refreshSecs: 30,
-  // Bumped whenever a default changes in a way that should override an existing saved
-  // value. See the migration in the opts initialiser below.
-  optsVersion: 2
+  refreshSecs: 120,
+  keepWarm: false
 };
 function App() {
   // Restore saved preferences (null on first ever visit)
@@ -2649,6 +2584,9 @@ function App() {
   const [status, setStatus] = useState("idle");
   const [filter, setFilter] = useState(() => savedPrefs?.filter ?? "all");
   const [categoryFilter, setCategoryFilter] = useState(() => savedPrefs?.categoryFilter ?? "all");
+  // Auto-refresh is on by default. If it is switched off deliberately, that choice is
+  // remembered rather than reset on the next visit.
+  const [autoRefresh, setAutoRefresh] = useState(() => savedPrefs?.autoRefresh ?? true);
   const [showWatchlist, setShowWatchlist] = useState(false);
   const [watchlist, setWatchlist] = useState({});
   const [lastRefresh, setLastRefresh] = useState(null);
@@ -2669,14 +2607,6 @@ function App() {
     };
     // The old blocking "modal" mode was replaced by non-blocking detached panels.
     if (merged.expandStyle === "modal") merged.expandStyle = "panel";
-    // v2: auto-refresh is now on by default and the interval dropped to 30s. Existing
-    // saved prefs are migrated once, otherwise a stale localStorage value would mask the
-    // new defaults and the change would appear not to have shipped.
-    if ((merged.optsVersion || 1) < 2) {
-      merged.autoRefresh = true;
-      merged.refreshSecs = 30;
-      merged.optsVersion = 2;
-    }
     return merged;
   });
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -2684,9 +2614,6 @@ function App() {
     ...prev,
     [k]: v
   }));
-  // Auto-refresh lives in opts so it persists across reloads, and defaults to on.
-  const autoRefresh = opts.autoRefresh !== false;
-  const setAutoRefresh = v => setOpt("autoRefresh", !!v);
   // New-item tracking, read-state bumping, keyboard focus
   const [newIds, setNewIds] = useState(() => new Set());
   const [readVersion, setReadVersion] = useState(0);
@@ -2698,6 +2625,13 @@ function App() {
   const serverDefaultsRef = useRef([]); // server's default_hidden_categories, for "reset"
   const searchRef = useRef(null);
   const isHardRef = useRef(false);
+  // Connection resilience
+  const inFlightRef = useRef(false); // stops background ticks stacking up
+  const retryRef = useRef(null); // pending backoff retry
+  const failRef = useRef(0); // consecutive failures
+  const lastSuccessRef = useRef(0); // wall-clock time of the last good fetch
+  const fetchRef = useRef(null); // always points at the current fetchData
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   // Responsive state
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 880);
@@ -2734,9 +2668,10 @@ function App() {
       sortMode,
       sourceFilter,
       excludedCats: [...excludedCats],
+      autoRefresh,
       options: opts
     });
-  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, opts]);
+  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, autoRefresh, opts]);
   const NONREG_SOURCES = ["GNW", "UKN", "PRN", "MFN", "EQS"];
   const toggleExcludeCat = cat => {
     setExcludedCats(prev => {
@@ -2748,17 +2683,40 @@ function App() {
 
   // hard=true asks the backend to clear its cache and rescrape synchronously. force=true is
   // sent alongside so an older backend without the hard flag still does a fresh scrape.
-  const fetchData = useCallback(async (hard = false) => {
-    setStatus(hard ? "loading" : "loading");
+  // Fetching is guarded three ways, because a sleeping Render service is slow rather than
+  // fast-failing: an abort timeout so a hung request cannot wedge the app, an in-flight lock
+  // so background ticks cannot stack up behind it, and a backoff retry so recovery is
+  // automatic instead of needing a page reload.
+  const fetchData = useCallback(async (hard = false, silent = false) => {
+    if (inFlightRef.current) return; // a request is already running
+    inFlightRef.current = true;
+    if (retryRef.current) {
+      clearTimeout(retryRef.current);
+      retryRef.current = null;
+    }
+    if (!silent) setStatus("loading");
     isHardRef.current = hard;
+    // A cold start can legitimately take about a minute, so allow generous but finite time.
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutMs = hard ? 180000 : 45000;
+    const killer = setTimeout(() => {
+      try {
+        ctrl && ctrl.abort();
+      } catch (e) {}
+    }, timeoutMs);
     try {
       const qs = `include_all=true&limit=2000${hard ? "&force=true&hard=true" : ""}`;
-      const r = await fetch(`${backendUrl}/api/rns?${qs}`);
+      const r = await fetch(`${backendUrl}/api/rns?${qs}`, ctrl ? {
+        signal: ctrl.signal
+      } : undefined);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       setData(j);
       setStatus("connected");
       setLastRefresh(new Date());
+      failRef.current = 0;
+      setReconnectAttempt(0);
+      lastSuccessRef.current = Date.now();
       if (Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current = j.default_hidden_categories;
       // First load only: adopt the server's suggested hidden categories.
       if (!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)) {
@@ -2778,9 +2736,21 @@ function App() {
       }
     } catch (e) {
       console.error(e);
-      setStatus("error");
+      failRef.current += 1;
+      setStatus("reconnecting");
+      setReconnectAttempt(failRef.current);
+      // 5s, 10s, 20s, 40s, then every 60s. Keeps trying without hammering a waking service.
+      const delay = Math.min(60000, 5000 * Math.pow(2, Math.min(failRef.current - 1, 3)));
+      retryRef.current = setTimeout(() => {
+        fetchRef.current && fetchRef.current(false, true);
+      }, delay);
+    } finally {
+      clearTimeout(killer);
+      inFlightRef.current = false;
     }
   }, [backendUrl]);
+  // Kept in a ref so the retry timer and event listeners always call the current version.
+  fetchRef.current = fetchData;
   const fetchWatchlist = useCallback(async () => {
     try {
       const r = await fetch(`${backendUrl}/api/watchlist`);
@@ -2810,27 +2780,66 @@ function App() {
     fetchWatchlist();
     fetchRaMap();
   }, [fetchData, fetchWatchlist, fetchRaMap]);
-  // Auto-refresh. Polling is skipped while the tab is hidden, because a background tab
-  // hitting the free-tier backend every 30 seconds is wasted work, and one fetch fires on
-  // return so the feed is current the moment the tab is looked at again.
   useEffect(() => {
     if (!autoRefresh) return;
-    const secs = Math.max(15, Number(opts.refreshSecs) || 30);
+    // Background polls are silent so the toolbar does not flicker every couple of minutes.
+    // Ticks are skipped while the tab is hidden unless "keep refreshing in the background" is
+    // on, because browsers throttle hidden-tab timers heavily and the requests mostly waste
+    // Render instance hours.
     intervalRef.current = setInterval(() => {
-      if (!document.hidden) fetchData(false);
-    }, secs * 1000);
-    const onVisible = () => {
-      if (!document.hidden) fetchData(false);
-    };
-    document.addEventListener("visibilitychange", onVisible);
+      const hidden = typeof document !== "undefined" && document.hidden;
+      if (hidden && !opts.keepWarm) return;
+      fetchRef.current && fetchRef.current(false, true);
+    }, (opts.refreshSecs || 120) * 1000);
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      document.removeEventListener("visibilitychange", onVisible);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [autoRefresh, fetchData, opts.refreshSecs]);
+  }, [autoRefresh, opts.refreshSecs, opts.keepWarm]);
+
+  // Refresh as soon as the tab comes back, so returning to a backgrounded app never shows a
+  // stale feed while it waits for the next tick. Also covers the machine waking from sleep,
+  // where the interval will not have fired at all.
+  useEffect(() => {
+    const staleBy = ms => Date.now() - (lastSuccessRef.current || 0) > ms;
+    const onWake = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (staleBy(20000)) fetchRef.current && fetchRef.current(false, false);
+    };
+    const onOnline = () => {
+      failRef.current = 0;
+      fetchRef.current && fetchRef.current(false, true);
+    };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
+  // Watchdog. Browser timer throttling and sleep can silently kill an interval, which is what
+  // made the app look frozen and need a manual reload. This checks the wall clock rather than
+  // trusting the timer, and forces a refresh once the data is clearly overdue.
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      if (inFlightRef.current) return;
+      const hidden = typeof document !== "undefined" && document.hidden;
+      if (hidden && !opts.keepWarm) return;
+      const overdue = (opts.refreshSecs || 120) * 1000 * 2.2;
+      if (Date.now() - (lastSuccessRef.current || 0) > overdue) {
+        fetchRef.current && fetchRef.current(false, true);
+      }
+    }, 20000);
+    return () => clearInterval(id);
+  }, [autoRefresh, opts.refreshSecs, opts.keepWarm]);
+
+  // Clear any pending retry when the component goes away.
+  useEffect(() => () => {
+    if (retryRef.current) clearTimeout(retryRef.current);
+  }, []);
   const handleAdd = async (t, n, s, tier) => {
     try {
       await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier || "core"}`, {
@@ -3333,19 +3342,15 @@ function App() {
   }, "Auto ", autoRefresh ? "ON" : "OFF"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn",
     onClick: () => setShowWatchlist(true)
-  }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("span", {
-    className: "toolbar-sep"
-  }), /*#__PURE__*/React.createElement("button", {
+  }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn icon",
     onClick: () => setOpt("theme", opts.theme === "dark" ? "light" : "dark"),
-    title: opts.theme === "dark" ? "Switch to light theme" : "Switch to dark theme",
-    "aria-label": opts.theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
-  }, opts.theme === "dark" ? /*#__PURE__*/React.createElement(IconSun, null) : /*#__PURE__*/React.createElement(IconMoon, null)), /*#__PURE__*/React.createElement("button", {
+    title: "Toggle light / dark"
+  }, opts.theme === "dark" ? "\u263C" : "\u263D"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn icon",
     onClick: () => setOptionsOpen(true),
-    title: "Options",
-    "aria-label": "Options"
-  }, /*#__PURE__*/React.createElement(IconCog, null))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    title: "Options"
+  }, "⚙")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "toolbar"
   }, tab === "feed" && /*#__PURE__*/React.createElement("button", {
     className: "toolbar-icon-btn",
@@ -3417,7 +3422,7 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("span", null, "Options"), /*#__PURE__*/React.createElement("span", {
     className: "overflow-val"
-  }, "Open")))), configOpen && /*#__PURE__*/React.createElement("div", {
+  }, "⚙")))), configOpen && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "10px 16px",
       background: "var(--bg-sidebar)",
@@ -3508,7 +3513,24 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(StatusDot, {
     status: status
-  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), /*#__PURE__*/React.createElement(FilterChips, {
+  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), reconnectAttempt > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "reconnect"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "spinner",
+    style: {
+      width: 12,
+      height: 12,
+      borderWidth: 1.5
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 160
+    }
+  }, "Lost contact with the backend, retrying automatically (attempt ", reconnectAttempt, "). A sleeping Render service can take about a minute to wake up."), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => fetchData(false, false)
+  }, "Retry now")), /*#__PURE__*/React.createElement(FilterChips, {
     items: chipItems,
     onClearAll: clearAllFilters
   }), data?.errors?.length > 0 && /*#__PURE__*/React.createElement("div", {
