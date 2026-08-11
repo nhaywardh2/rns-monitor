@@ -138,7 +138,8 @@
     .toolbar-btn:hover { border-color:var(--accent); color:var(--accent); }
     .toolbar-btn.primary { background:var(--accent); color:var(--bg-primary); border-color:var(--accent); font-weight:600; }
     .toolbar-btn.primary:hover { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--bg-primary); }
-    .toolbar-btn.icon { padding:6px 10px; }
+    .toolbar-btn.icon { padding:5px 9px; display:inline-flex; align-items:center; justify-content:center; }
+    .toolbar-btn.icon svg { display:block; }
     .toolbar-tab { background:transparent; border:none; color:var(--text-muted); font-family:var(--font-sans); font-size:12px; font-weight:600; padding:14px 14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; height:100%; display:flex; align-items:center; }
     .toolbar-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
     .toolbar-tab:hover { color:var(--text-secondary); }
@@ -495,6 +496,41 @@
     function StatusDot({status}) {
       const c = {connected:"var(--accent)",loading:"var(--watchlist)",reconnecting:"var(--watchlist)",error:"var(--danger)",idle:"var(--text-muted)"};
       return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:c[status]||c.idle,animation:(status==="loading"||status==="reconnecting")?"pulse-dot 1.2s infinite":"none",marginRight:8,flexShrink:0}}/>;
+    }
+
+    // Inline SVG icons. Unicode glyphs were the wrong tool here: a sun-with-rays and a cog are
+    // both small radial shapes and were indistinguishable at toolbar size, and glyph rendering
+    // varies by platform font. These use different shape languages so they cannot be confused.
+    function Icon({name, size=15}) {
+      const box = {width:size, height:size};
+      const stroke = {fill:"none", stroke:"currentColor", strokeWidth:1.7, strokeLinecap:"round", strokeLinejoin:"round"};
+      if (name === "sun") return (
+        <svg viewBox="0 0 24 24" style={box} {...stroke} aria-hidden="true">
+          <circle cx="12" cy="12" r="4.1"/>
+          <line x1="12" y1="1.8" x2="12" y2="4.2"/><line x1="12" y1="19.8" x2="12" y2="22.2"/>
+          <line x1="1.8" y1="12" x2="4.2" y2="12"/><line x1="19.8" y1="12" x2="22.2" y2="12"/>
+          <line x1="4.9" y1="4.9" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.1" y2="19.1"/>
+          <line x1="4.9" y1="19.1" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.1" y2="4.9"/>
+        </svg>
+      );
+      if (name === "moon") return (
+        <svg viewBox="0 0 24 24" style={box} aria-hidden="true">
+          <path d="M20.6 14.3A9 9 0 1 1 10.2 3.1a7 7 0 0 0 10.4 11.2z" fill="currentColor"/>
+        </svg>
+      );
+      // Sliders for Options: three horizontal tracks with offset handles. No radial element at
+      // all, so it reads as clearly different from the theme control beside it.
+      if (name === "sliders") return (
+        <svg viewBox="0 0 24 24" style={box} {...stroke} aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+          <circle cx="9" cy="6" r="2.5" fill="var(--bg-toolbar)"/>
+          <circle cx="16" cy="12" r="2.5" fill="var(--bg-toolbar)"/>
+          <circle cx="7.5" cy="18" r="2.5" fill="var(--bg-toolbar)"/>
+        </svg>
+      );
+      return null;
     }
 
     function FilterPill({label,active,onClick,count}) {
@@ -1969,10 +2005,12 @@
                 Auto {autoRefresh?"ON":"OFF"}
               </button>
               <button className="toolbar-btn" onClick={()=>setShowWatchlist(true)}>WL ({Object.keys(watchlist).length})</button>
-              <button className="toolbar-btn icon" onClick={()=>setOpt("theme", opts.theme==="dark"?"light":"dark")} title="Toggle light / dark">
-                {opts.theme==="dark" ? "\u263C" : "\u263D"}
+              <button className="toolbar-btn icon" onClick={()=>setOpt("theme", opts.theme==="dark"?"light":"dark")}
+                      title={opts.theme==="dark" ? "Switch to light mode" : "Switch to dark mode"}
+                      aria-label={opts.theme==="dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                <Icon name={opts.theme==="dark" ? "sun" : "moon"}/>
               </button>
-              <button className="toolbar-btn icon" onClick={()=>setOptionsOpen(true)} title="Options">&#9881;</button>
+              <button className="toolbar-btn icon" onClick={()=>setOptionsOpen(true)} title="Options" aria-label="Options"><Icon name="sliders"/></button>
             </div>
           ) : (
             <>
@@ -2003,13 +2041,17 @@
                   <span className="overflow-val" style={autoRefresh?{color:"var(--accent)"}:undefined}>{autoRefresh?"ON":"OFF"}</span>
                 </div>
                 <div className="overflow-item" onClick={()=>{setOpt("theme", opts.theme==="dark"?"light":"dark");}}>
-                  <span>Theme</span><span className="overflow-val">{opts.theme==="dark"?"Dark":"Light"}</span>
+                  <span>{opts.theme==="dark" ? "Switch to light mode" : "Switch to dark mode"}</span>
+                  <span className="overflow-val" style={{display:"flex",alignItems:"center"}}>
+                    <Icon name={opts.theme==="dark" ? "sun" : "moon"} size={14}/>
+                  </span>
                 </div>
                 <div className="overflow-item" onClick={()=>{setShowWatchlist(true);setMenuOpen(false);}}>
                   <span>Watchlist</span><span className="overflow-val">{Object.keys(watchlist).length}</span>
                 </div>
                 <div className="overflow-item" onClick={()=>{setOptionsOpen(true);setMenuOpen(false);}}>
-                  <span>Options</span><span className="overflow-val">&#9881;</span>
+                  <span>Options</span>
+                  <span className="overflow-val" style={{display:"flex",alignItems:"center"}}><Icon name="sliders" size={14}/></span>
                 </div>
               </div>
             </>
