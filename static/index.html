@@ -137,7 +137,8 @@
     .toolbar-btn:hover { border-color:var(--accent); color:var(--accent); }
     .toolbar-btn.primary { background:var(--accent); color:var(--bg-primary); border-color:var(--accent); font-weight:600; }
     .toolbar-btn.primary:hover { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--bg-primary); }
-    .toolbar-btn.icon { padding:6px 10px; }
+    .toolbar-btn.icon { padding:5px 9px; display:inline-flex; align-items:center; justify-content:center; }
+    .toolbar-btn.icon svg { display:block; }
     .toolbar-tab { background:transparent; border:none; color:var(--text-muted); font-family:var(--font-sans); font-size:12px; font-weight:600; padding:14px 14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; height:100%; display:flex; align-items:center; }
     .toolbar-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
     .toolbar-tab:hover { color:var(--text-secondary); }
@@ -607,6 +608,123 @@ function StatusDot({
       flexShrink: 0
     }
   });
+}
+
+// Inline SVG icons. Unicode glyphs were the wrong tool here: a sun-with-rays and a cog are
+// both small radial shapes and were indistinguishable at toolbar size, and glyph rendering
+// varies by platform font. These use different shape languages so they cannot be confused.
+function Icon({
+  name,
+  size = 15
+}) {
+  const box = {
+    width: size,
+    height: size
+  };
+  const stroke = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  if (name === "sun") return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: box,
+    ...stroke,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "4.1"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "1.8",
+    x2: "12",
+    y2: "4.2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "19.8",
+    x2: "12",
+    y2: "22.2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "1.8",
+    y1: "12",
+    x2: "4.2",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "19.8",
+    y1: "12",
+    x2: "22.2",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4.9",
+    y1: "4.9",
+    x2: "6.6",
+    y2: "6.6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "17.4",
+    y1: "17.4",
+    x2: "19.1",
+    y2: "19.1"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4.9",
+    y1: "19.1",
+    x2: "6.6",
+    y2: "17.4"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "17.4",
+    y1: "6.6",
+    x2: "19.1",
+    y2: "4.9"
+  }));
+  if (name === "moon") return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: box,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M20.6 14.3A9 9 0 1 1 10.2 3.1a7 7 0 0 0 10.4 11.2z",
+    fill: "currentColor"
+  }));
+  // Sliders for Options: three horizontal tracks with offset handles. No radial element at
+  // all, so it reads as clearly different from the theme control beside it.
+  if (name === "sliders") return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: box,
+    ...stroke,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "6",
+    x2: "21",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "12",
+    x2: "21",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "18",
+    x2: "21",
+    y2: "18"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "9",
+    cy: "6",
+    r: "2.5",
+    fill: "var(--bg-toolbar)"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "16",
+    cy: "12",
+    r: "2.5",
+    fill: "var(--bg-toolbar)"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "7.5",
+    cy: "18",
+    r: "2.5",
+    fill: "var(--bg-toolbar)"
+  }));
+  return null;
 }
 function FilterPill({
   label,
@@ -3345,12 +3463,18 @@ function App() {
   }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn icon",
     onClick: () => setOpt("theme", opts.theme === "dark" ? "light" : "dark"),
-    title: "Toggle light / dark"
-  }, opts.theme === "dark" ? "\u263C" : "\u263D"), /*#__PURE__*/React.createElement("button", {
+    title: opts.theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+    "aria-label": opts.theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: opts.theme === "dark" ? "sun" : "moon"
+  })), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn icon",
     onClick: () => setOptionsOpen(true),
-    title: "Options"
-  }, "⚙")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    title: "Options",
+    "aria-label": "Options"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "sliders"
+  }))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "toolbar"
   }, tab === "feed" && /*#__PURE__*/React.createElement("button", {
     className: "toolbar-icon-btn",
@@ -3404,9 +3528,16 @@ function App() {
     onClick: () => {
       setOpt("theme", opts.theme === "dark" ? "light" : "dark");
     }
-  }, /*#__PURE__*/React.createElement("span", null, "Theme"), /*#__PURE__*/React.createElement("span", {
-    className: "overflow-val"
-  }, opts.theme === "dark" ? "Dark" : "Light")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, opts.theme === "dark" ? "Switch to light mode" : "Switch to dark mode"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val",
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: opts.theme === "dark" ? "sun" : "moon",
+    size: 14
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
     onClick: () => {
       setShowWatchlist(true);
@@ -3421,8 +3552,15 @@ function App() {
       setMenuOpen(false);
     }
   }, /*#__PURE__*/React.createElement("span", null, "Options"), /*#__PURE__*/React.createElement("span", {
-    className: "overflow-val"
-  }, "⚙")))), configOpen && /*#__PURE__*/React.createElement("div", {
+    className: "overflow-val",
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "sliders",
+    size: 14
+  }))))), configOpen && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "10px 16px",
       background: "var(--bg-sidebar)",
