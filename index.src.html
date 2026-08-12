@@ -1611,11 +1611,20 @@
       const isHardRef=useRef(false);
       // Connection resilience
       const inFlightRef=useRef(false);      // stops background ticks stacking up
-      const retryRef=useRef(null);          // pending backoff retry
+      const inFlightStartRef=useRef(0);     // when it started, so a dead lock can be broken
+      const abortRef=useRef(null);          // controller for the live request, so it can be killed
+      const inFlightCeilingRef=useRef(0);   // how long the live request is allowed to take
+      const probeDeadRef=useRef(0);         // consecutive UNREACHABLE health probes
+      const scrapeWaitRef=useRef(0);        // when the cache first reported as still warming
+      const retryRef=useRef(null);          // pending retry
       const failRef=useRef(0);              // consecutive failures
       const lastSuccessRef=useRef(0);       // wall-clock time of the last good fetch
       const fetchRef=useRef(null);          // always points at the current fetchData
+      const dataRef=useRef(null);           // lets fetchData see whether anything has loaded
       const [reconnectAttempt,setReconnectAttempt]=useState(0);
+      const [connPhase,setConnPhase]=useState(null);   // null | "waking" | "scraping"
+      const [connSince,setConnSince]=useState(0);      // when trouble started, for elapsed display
+      const [connElapsed,setConnElapsed]=useState(0);  // seconds, ticked while trouble persists
 
       // Responsive state
       const [isMobile,setIsMobile]=useState(typeof window!=="undefined" && window.innerWidth<880);
@@ -1649,56 +1658,179 @@
 
       // hard=true asks the backend to clear its cache and rescrape synchronously. force=true is
       // sent alongside so an older backend without the hard flag still does a fresh scrape.
-      // Fetching is guarded three ways, because a sleeping Render service is slow rather than
-      // fast-failing: an abort timeout so a hung request cannot wedge the app, an in-flight lock
-      // so background ticks cannot stack up behind it, and a backoff retry so recovery is
-      // automatic instead of needing a page reload.
-      const fetchData=useCallback(async(hard=false, silent=false)=>{
-        if(inFlightRef.current) return;              // a request is already running
-        inFlightRef.current=true;
-        if(retryRef.current){clearTimeout(retryRef.current);retryRef.current=null;}
-        if(!silent) setStatus("loading");
-        isHardRef.current = hard;
-        // A cold start can legitimately take about a minute, so allow generous but finite time.
+      // ── Connecting to the backend ────────────────────────────────────────────
+      // The awkward part is the cold start. When the Render service has spun down, the FIRST
+      // request to /api/rns wakes the instance and then runs a full synchronous scrape, because
+      // the cache is empty. That can take a couple of minutes. Any client timeout shorter than
+      // that aborts before the server can ever answer, and retrying just re-enters the same slow
+      // path, which is what left the app stuck until a manual reload.
+      //
+      // So we never lead with the expensive endpoint when reconnecting. /api/health returns
+      // immediately without waiting for a scrape and reports whether the cache is warm, so it is
+      // used to wake the service and to wait for readiness. The feed is only requested once the
+      // cache is populated, at which point it returns instantly.
+      // A request is treated as dead once it outlives its own timeout plus slack. This is derived
+      // per request rather than fixed, so a long hard refresh is not killed while a normal poll can
+      // be broken quickly instead of wedging the app for minutes.
+      const LOCK_SLACK_MS = 20000;
+      const LOCK_CEILING_FALLBACK_MS = 90000;
+      // Render sends a free service to sleep after about 15 idle minutes. If the last good fetch is
+      // older than this, assume the instance may be cold and probe before asking for the feed.
+      const MAYBE_COLD_MS = 9 * 60 * 1000;
+
+      const cancelInFlight = useCallback(()=>{
+        try { if(abortRef.current) abortRef.current.abort(); } catch(e) {}
+        abortRef.current=null;
+        inFlightRef.current=false;
+      },[]);
+
+      const clearRetry = useCallback(()=>{
+        if(retryRef.current){ clearTimeout(retryRef.current); retryRef.current=null; }
+      },[]);
+
+      // Cheap readiness probe. Returns {alive, warm}. Never triggers a scrape.
+      const probeHealth = useCallback(async(timeoutMs=12000)=>{
         const ctrl = (typeof AbortController!=="undefined") ? new AbortController() : null;
-        const timeoutMs = hard ? 180000 : 45000;
         const killer = setTimeout(()=>{ try{ ctrl && ctrl.abort(); }catch(e){} }, timeoutMs);
         try{
-          const qs = `include_all=true&limit=2000${hard ? "&force=true&hard=true" : ""}`;
-          const r=await fetch(`${backendUrl}/api/rns?${qs}`, ctrl ? {signal:ctrl.signal} : undefined);
-          if(!r.ok)throw new Error(`HTTP ${r.status}`);
-          const j=await r.json();
-          setData(j);setStatus("connected");setLastRefresh(new Date());
-          failRef.current=0; setReconnectAttempt(0); lastSuccessRef.current=Date.now();
-          if(Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current=j.default_hidden_categories;
-          // First load only: adopt the server's suggested hidden categories.
-          if(!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)){
-            setExcludedCats(new Set(j.default_hidden_categories));
-            defaultsAppliedRef.current=true;
-          }
-          // Work out what is new since the previous look. The first visit of the day establishes
-          // the baseline silently, otherwise every announcement would be flagged at 07:00.
-          const ids=(j.announcements||[]).map(annId);
-          if(seenStore.size()===0){ seenStore.markAll(ids); setNewIds(new Set()); }
-          else {
-            const fresh=ids.filter(id=>!seenStore.has(id));
-            seenStore.markAll(ids);
-            if(fresh.length>0) setNewIds(new Set(fresh));
-          }
+          const r = await fetch(`${backendUrl}/api/health`, {
+            signal: ctrl ? ctrl.signal : undefined, cache:"no-store",
+          });
+          if(!r.ok) return {alive:false, warm:false};
+          const j = await r.json().catch(()=>({}));
+          return {alive:true, warm: !!j.last_scrape};
         }catch(e){
-          console.error(e);
+          return {alive:false, warm:false};
+        }finally{ clearTimeout(killer); }
+      },[backendUrl]);
+
+      const fetchData=useCallback(async(hard=false, silent=false, opt={})=>{
+        const force = !!opt.force;   // user-initiated: allowed to pre-empt an in-flight request
+        // The lock stops background ticks stacking up, but it must never be able to wedge the app.
+        // If setTimeout was frozen while the tab was hidden the abort may never have fired, so the
+        // lock is also time-limited rather than trusted absolutely.
+        if(inFlightRef.current){
+          const age = Date.now() - (inFlightStartRef.current || 0);
+          const ceiling = inFlightCeilingRef.current || LOCK_CEILING_FALLBACK_MS;
+          if(force || age > ceiling){
+            cancelInFlight();
+          } else {
+            // Do not silently drop the attempt, or the retry chain dies here and nothing ever
+            // recovers. Come back to it shortly instead.
+            if(!retryRef.current){
+              retryRef.current=setTimeout(()=>{ retryRef.current=null; fetchRef.current && fetchRef.current(hard,true); }, 4000);
+            }
+            return;
+          }
+        }
+
+        inFlightRef.current=true;
+        inFlightStartRef.current=Date.now();
+        clearRetry();
+        if(!silent) setStatus("loading");
+        isHardRef.current=hard;
+
+        let failed=false;
+        let phaseLocal=null;   // "waking" | "scraping" when we know what we are waiting for
+        try{
+          // Reconnecting, or nothing loaded yet: wake and wait via the cheap endpoint first.
+          // After several failed probes, stop trusting /api/health and go straight for the feed
+          // with the long ceiling, so a missing or misbehaving health endpoint cannot block us.
+          // Probe first whenever the instance might be cold. The previous condition only probed
+          // after a failure or before the first load, so returning to a long-backgrounded tab
+          // (failures reset to zero, data already present) skipped the probe and led with the
+          // expensive feed endpoint against a sleeping service. That request then sat for minutes
+          // holding the lock, which is what still looked like a hang.
+          const maybeCold = !lastSuccessRef.current || (Date.now()-lastSuccessRef.current > MAYBE_COLD_MS);
+          // Give up on the probe only when health itself is unreachable, or when the cache has been
+          // reported as warming for so long that something is evidently wrong. A cold morning
+          // scrape reporting "not warm" is the probe working correctly, so it must not count
+          // towards abandoning it, otherwise we fall back to a multi-minute feed request that holds
+          // the lock for no reason.
+          const waitedOnScrape = scrapeWaitRef.current ? (Date.now()-scrapeWaitRef.current) : 0;
+          const probeAbandoned = probeDeadRef.current >= 5 || waitedOnScrape > 180000;
+          const needsProbe = !hard && !probeAbandoned &&
+            (failRef.current>0 || !dataRef.current || !!opt.reconnect || maybeCold);
+          if(needsProbe){
+            // Only surface a message if the wait is actually noticeable, to avoid a flash on the
+            // normal fast path.
+            const phaseTimer=setTimeout(()=>setConnPhase(prev=>prev||"waking"),3000);
+            let probe;
+            try{ probe = await probeHealth(12000); } finally { clearTimeout(phaseTimer); }
+            if(!probe.alive){
+              probeDeadRef.current+=1;
+              phaseLocal="waking"; setConnPhase("waking"); failed=true; throw new Error("backend asleep");
+            }
+            probeDeadRef.current=0;    // health answered, so the endpoint is fine
+            if(!probe.warm){
+              if(!scrapeWaitRef.current) scrapeWaitRef.current=Date.now();
+              phaseLocal="scraping"; setConnPhase("scraping"); failed=true; throw new Error("cache not warm yet");
+            }
+            scrapeWaitRef.current=0;
+            setConnPhase(null);
+          }
+
+          const qs = `include_all=true&limit=2000${hard ? "&force=true&hard=true" : ""}`;
+          const ctrl = (typeof AbortController!=="undefined") ? new AbortController() : null;
+          abortRef.current=ctrl;
+          // A hard refresh deliberately asks for a synchronous rescrape, so it keeps the long
+          // ceiling. A normal poll should answer in seconds once the probe says the cache is warm,
+          // so it gets a short one: a four-minute ceiling meant a single bad request could hold the
+          // lock, and every recovery path, for minutes on end. The long ceiling is only reused when
+          // the probe has been abandoned and we are knowingly waiting on a cold scrape.
+          const timeoutMs = hard ? 300000 : (failRef.current >= 5 ? 240000 : 45000);
+          inFlightCeilingRef.current = timeoutMs + LOCK_SLACK_MS;
+          const killer = setTimeout(()=>{ try{ ctrl && ctrl.abort(); }catch(e){} }, timeoutMs);
+          // A slow feed response means the server is scraping. Say so rather than looking frozen.
+          const slowTimer = setTimeout(()=>setConnPhase(prev=>prev||"scraping"), 5000);
+          try{
+            const r=await fetch(`${backendUrl}/api/rns?${qs}`, {
+              signal: ctrl ? ctrl.signal : undefined, cache:"no-store",
+            });
+            if(!r.ok)throw new Error(`HTTP ${r.status}`);
+            const j=await r.json();
+            setData(j); dataRef.current=j;
+            setStatus("connected"); setLastRefresh(new Date());
+            failRef.current=0; probeDeadRef.current=0; scrapeWaitRef.current=0;
+          setReconnectAttempt(0); setConnPhase(null); setConnSince(0); setConnElapsed(0);
+            lastSuccessRef.current=Date.now();
+            if(Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current=j.default_hidden_categories;
+            if(!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)){
+              setExcludedCats(new Set(j.default_hidden_categories));
+              defaultsAppliedRef.current=true;
+            }
+            const ids=(j.announcements||[]).map(annId);
+            if(seenStore.size()===0){ seenStore.markAll(ids); setNewIds(new Set()); }
+            else {
+              const fresh=ids.filter(id=>!seenStore.has(id));
+              seenStore.markAll(ids);
+              if(fresh.length>0) setNewIds(new Set(fresh));
+            }
+          }finally{ clearTimeout(killer); clearTimeout(slowTimer); }
+        }catch(e){
+          failed=true;
+          if(e && e.message && !/asleep|not warm/.test(e.message)) console.error(e);
+        }finally{
+          abortRef.current=null;
+          inFlightRef.current=false;
+        }
+
+        if(failed){
           failRef.current+=1;
           setStatus("reconnecting");
           setReconnectAttempt(failRef.current);
-          // 5s, 10s, 20s, 40s, then every 60s. Keeps trying without hammering a waking service.
-          const delay=Math.min(60000, 5000*Math.pow(2, Math.min(failRef.current-1,3)));
-          retryRef.current=setTimeout(()=>{ fetchRef.current && fetchRef.current(false,true); }, delay);
-        }finally{
-          clearTimeout(killer);
-          inFlightRef.current=false;
+          setConnSince(prev=>prev||Date.now());
+          // When we know the service is waking or still scraping, retry briskly: the health probe
+          // is tiny and the state genuinely changes within seconds. Only back off for unexplained
+          // failures, where hammering would not help.
+          const delay = phaseLocal
+            ? (phaseLocal==="scraping" ? 5000 : 6000)
+            : Math.min(20000, 6000 + 2000*Math.min(failRef.current,7));
+          clearRetry();
+          retryRef.current=setTimeout(()=>{ retryRef.current=null; fetchRef.current && fetchRef.current(false,true); }, delay);
         }
-      },[backendUrl]);
-      // Kept in a ref so the retry timer and event listeners always call the current version.
+      },[backendUrl,cancelInFlight,clearRetry,probeHealth]);
+      // Kept in a ref so retry timers and event listeners always call the current version.
       fetchRef.current=fetchData;
 
       const fetchWatchlist=useCallback(async()=>{
@@ -1740,9 +1872,15 @@
         const staleBy=(ms)=>Date.now()-(lastSuccessRef.current||0)>ms;
         const onWake=()=>{
           if(typeof document!=="undefined" && document.hidden) return;
-          if(staleBy(20000)) fetchRef.current && fetchRef.current(false,false);
+          // Anything still pending from before the tab was hidden is almost certainly a zombie:
+          // sockets do not survive sleep, and its abort timer may have been frozen. Kill it and
+          // start clean rather than waiting on a request that will never answer.
+          if(inFlightRef.current) cancelInFlight();
+          clearRetry();
+          failRef.current=0;
+          if(staleBy(20000)) fetchRef.current && fetchRef.current(false,false,{force:true,reconnect:true});
         };
-        const onOnline=()=>{ failRef.current=0; fetchRef.current && fetchRef.current(false,true); };
+        const onOnline=()=>{ failRef.current=0; cancelInFlight(); clearRetry(); fetchRef.current && fetchRef.current(false,true,{force:true,reconnect:true}); };
         document.addEventListener("visibilitychange",onWake);
         window.addEventListener("focus",onWake);
         window.addEventListener("online",onOnline);
@@ -1751,7 +1889,7 @@
           window.removeEventListener("focus",onWake);
           window.removeEventListener("online",onOnline);
         };
-      },[]);
+      },[cancelInFlight,clearRetry]);
 
       // Watchdog. Browser timer throttling and sleep can silently kill an interval, which is what
       // made the app look frozen and need a manual reload. This checks the wall clock rather than
@@ -1759,16 +1897,64 @@
       useEffect(()=>{
         if(!autoRefresh) return;
         const id=setInterval(()=>{
-          if(inFlightRef.current) return;
+          // Break a request that has been running impossibly long. Without this, a promise that
+          // never settles holds the lock and every other recovery path returns early, which is
+          // exactly what made the app need a manual reload.
+          if(inFlightRef.current){
+            const ceiling = inFlightCeilingRef.current || LOCK_CEILING_FALLBACK_MS;
+            if(Date.now()-(inFlightStartRef.current||0) > ceiling){
+              cancelInFlight();
+              fetchRef.current && fetchRef.current(false,true,{force:true});
+            }
+            return;
+          }
           const hidden = typeof document!=="undefined" && document.hidden;
           if(hidden && !opts.keepWarm) return;
+          // If a retry is already pending, leave it alone.
+          if(retryRef.current) return;
           const overdue=(opts.refreshSecs||120)*1000*2.2;
           if(Date.now()-(lastSuccessRef.current||0)>overdue){
             fetchRef.current && fetchRef.current(false,true);
           }
-        },20000);
+        },15000);
         return ()=>clearInterval(id);
-      },[autoRefresh,opts.refreshSecs,opts.keepWarm]);
+      },[autoRefresh,opts.refreshSecs,opts.keepWarm,cancelInFlight]);
+
+      // Elapsed counter for the reconnect banner, so a slow wake reads as progress rather than a
+      // freeze. Only runs while there is actually a problem.
+      useEffect(()=>{
+        if(!connSince){ setConnElapsed(0); return; }
+        const tick=()=>setConnElapsed(Math.max(0,Math.round((Date.now()-connSince)/1000)));
+        tick();
+        const id=setInterval(tick,1000);
+        return ()=>clearInterval(id);
+      },[connSince]);
+
+      // Timer-independent backstop. Browsers freeze background pages, and a frozen page has no
+      // working setInterval at all, so every timer-based recovery is dead until it thaws. Real user
+      // input always fires, so any interaction with a stale feed triggers a refresh.
+      useEffect(()=>{
+        let lastTry=0;
+        const kick=()=>{
+          if(typeof document!=="undefined" && document.hidden) return;
+          const now=Date.now();
+          if(now-lastTry < 5000) return;                       // do not spam on scroll
+          if(inFlightRef.current || retryRef.current) return;
+          const overdue=(opts.refreshSecs||120)*1000*1.5;
+          if(now-(lastSuccessRef.current||0) > overdue){
+            lastTry=now;
+            fetchRef.current && fetchRef.current(false,true,{reconnect:true});
+          }
+        };
+        const evs=["pointerdown","keydown","wheel","touchstart","scroll"];
+        evs.forEach(ev=>window.addEventListener(ev,kick,{passive:true}));
+        // pageshow fires when a page is restored from the back/forward cache.
+        window.addEventListener("pageshow",kick);
+        return ()=>{
+          evs.forEach(ev=>window.removeEventListener(ev,kick));
+          window.removeEventListener("pageshow",kick);
+        };
+      },[opts.refreshSecs]);
 
       // Clear any pending retry when the component goes away.
       useEffect(()=>()=>{ if(retryRef.current) clearTimeout(retryRef.current); },[]);
@@ -1890,8 +2076,8 @@
             if(body) body.click();
             return;
           }
-          if(e.key==="r"){ e.preventDefault(); fetchData(false); return; }
-          if(e.key==="R"){ e.preventDefault(); fetchData(true); return; }
+          if(e.key==="r"){ e.preventDefault(); fetchData(false,false,{force:true}); return; }
+          if(e.key==="R"){ e.preventDefault(); fetchData(true,false,{force:true}); return; }
         };
         window.addEventListener("keydown",onKey);
         return ()=>window.removeEventListener("keydown",onKey);
@@ -2005,10 +2191,10 @@
                 <StatusDot status={status}/>
                 {status==="connected"&&lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status}
               </span>
-              <button className="toolbar-btn primary" onClick={()=>fetchData(false)} disabled={status==="loading"}>
+              <button className="toolbar-btn primary" onClick={()=>fetchData(false,false,{force:true})} disabled={false}>
                 {status==="loading"?"...":"Refresh"}
               </button>
-              <button className="toolbar-btn" onClick={()=>fetchData(true)} disabled={status==="loading"}
+              <button className="toolbar-btn" onClick={()=>fetchData(true,false,{force:true})} disabled={false}
                       title="Clear the server cache and rescrape from scratch (Shift+R)">
                 Hard refresh
               </button>
@@ -2029,7 +2215,7 @@
                 {tab==="feed" && <button className="toolbar-icon-btn" onClick={()=>setDrawerOpen(true)} title="Filters">&#9776;</button>}
                 <span className="brand"><span>h2</span>Radnor</span>
                 <span className="toolbar-spacer"/>
-                <button className="toolbar-btn primary" onClick={()=>fetchData(false)} disabled={status==="loading"}>{status==="loading"?"...":"Refresh"}</button>
+                <button className="toolbar-btn primary" onClick={()=>fetchData(false,false,{force:true})} disabled={false}>{status==="loading"?"...":"Refresh"}</button>
                 <button className="toolbar-icon-btn" onClick={()=>setMenuOpen(!menuOpen)} title="More">&#8942;</button>
               </div>
               <div className="mobile-tabbar">
@@ -2044,7 +2230,7 @@
             <>
               <div className="scrim clear" onClick={()=>setMenuOpen(false)}/>
               <div className="overflow-menu">
-                <div className="overflow-item" onClick={()=>{fetchData(true);setMenuOpen(false);}}>
+                <div className="overflow-item" onClick={()=>{fetchData(true,false,{force:true});setMenuOpen(false);}}>
                   <span>Hard refresh</span><span className="overflow-val">&#8635;</span>
                 </div>
                 <div className="overflow-item" onClick={()=>{setAutoRefresh(!autoRefresh);}}>
@@ -2123,14 +2309,25 @@
                     </div>
                   </div>
 
-                  {reconnectAttempt>0 && (
+                  {(reconnectAttempt>0 || connPhase) && (
                     <div className="reconnect">
                       <span className="spinner" style={{width:12,height:12,borderWidth:1.5}}/>
                       <span style={{flex:1,minWidth:160}}>
-                        Lost contact with the backend, retrying automatically (attempt {reconnectAttempt}).
-                        A sleeping Render service can take about a minute to wake up.
+                        {connPhase==="scraping"
+                          ? <>The backend is awake and gathering today&#39;s announcements. This can take a minute or two on the first request of the day, and the feed will appear by itself.</>
+                          : connPhase==="waking"
+                            ? <>Waking the backend up. Render puts free services to sleep when idle, so this usually takes about 30 seconds.</>
+                            : <>Lost contact with the backend, retrying automatically.</>}
+                        {reconnectAttempt>1 ? ` (attempt ${reconnectAttempt})` : ""}
+                        {connElapsed>4 ? ` \u00B7 ${connElapsed}s` : ""}
                       </span>
-                      <button className="toolbar-btn" onClick={()=>fetchData(false,false)}>Retry now</button>
+                      <button className="toolbar-btn" onClick={()=>fetchData(false,false,{force:true,reconnect:true})}>Retry now</button>
+                      {connElapsed>150 && (
+                        <button className="toolbar-btn" onClick={()=>{ try{window.location.reload();}catch(e){} }}
+                                title="Reload the page. Worth trying if this has gone on unusually long.">
+                          Reload app
+                        </button>
+                      )}
                     </div>
                   )}
 
