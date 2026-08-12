@@ -209,7 +209,9 @@
     .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; align-items:start; }
     .grid.cols-1 { grid-template-columns:1fr; }
     .grid.cols-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-    @media (max-width: 680px) { .grid, .grid.cols-1, .grid.cols-2 { grid-template-columns:1fr; } }
+    /* Matches the 880px breakpoint the JS uses for mobile layout, and minmax(0,...) lets a
+       column shrink below its content width instead of forcing the page wider. */
+    @media (max-width: 880px) { .grid, .grid.cols-1, .grid.cols-2 { grid-template-columns:minmax(0, 1fr); } }
 
     /* Announcement row — dense */
     .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:background-color 0.12s, border-color 0.12s; padding:9px 12px; }
@@ -236,7 +238,13 @@
     .row-read-btn { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:10px; padding:0 2px; line-height:1; flex-shrink:0; transition:color 0.12s; }
     .row-read-btn:hover { color:var(--accent); }
     .row-ra-map { font-family:var(--font-mono); font-size:9px; color:var(--readacross); background:var(--readacross-bg); padding:1px 5px; flex-shrink:0; }
-    .row-meta { display:flex; align-items:center; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:nowrap; }
+    /* The meta line must be allowed to wrap. Every child is flex-shrink:0, so with nowrap the
+       contents overflowed the card on narrow screens and .main's overflow-x:hidden silently
+       clipped the right-hand end (category chip, read toggle, chevron). The tags now wrap onto a
+       second line while the controls stay pinned top-right. */
+    .row-meta { display:flex; align-items:flex-start; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:wrap; }
+    .row-meta-tags { display:flex; align-items:center; flex-wrap:wrap; gap:8px; row-gap:4px; flex:1 1 auto; min-width:0; }
+    .row-meta-ctrl { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
     .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
     .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
     .row-ticker.watchlist { color:var(--watchlist); }
@@ -244,16 +252,16 @@
     .row-tag { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 6px; border-radius:0; flex-shrink:0; }
     .row-tag.tier-core { background:rgba(240,192,64,0.12); color:var(--core); }
     .row-tag.tier-ra { background:rgba(249,115,22,0.12); color:var(--readacross); }
-    .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:0; }
+    .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:1; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .row-source { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); border:1px solid var(--border); padding:0 4px; flex-shrink:0; }
     .row-spacer { flex:1; }
     .row-chevron { color:var(--text-dim); font-size:9px; transition:transform 0.15s; flex-shrink:0; }
     .row.expanded .row-chevron { transform:rotate(180deg); color:var(--accent); }
     .row-company { font-size:11px; color:var(--text-secondary); font-weight:500; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .row-headline { font-size:13px; color:var(--text-primary); line-height:1.35; font-weight:500; word-wrap:break-word; }
+    .row-headline { font-size:13px; color:var(--text-primary); line-height:1.35; font-weight:500; word-wrap:break-word; overflow-wrap:anywhere; }
 
     /* Expanded panel */
-    .expand { border-top:1px solid var(--border); padding:12px 14px; background:var(--bg-detail); }
+    .expand { border-top:1px solid var(--border); padding:12px 14px; background:var(--bg-detail); overflow-wrap:anywhere; }
     .expand-section { margin-bottom:14px; }
     .expand-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
     .expand-summary { font-size:12px; color:var(--text-primary); line-height:1.65; }
@@ -1131,6 +1139,8 @@ function AnnouncementCard({
     onClick: activate
   }, /*#__PURE__*/React.createElement("div", {
     className: "row-meta"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta-tags"
   }, /*#__PURE__*/React.createElement("span", {
     className: "row-new-dot",
     title: "New since your last refresh"
@@ -1153,9 +1163,9 @@ function AnnouncementCard({
     }
   }, ann.category), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
     className: "row-source"
-  }, ann.source_feed), /*#__PURE__*/React.createElement("span", {
-    className: "row-spacer"
-  }), /*#__PURE__*/React.createElement("button", {
+  }, ann.source_feed)), /*#__PURE__*/React.createElement("div", {
+    className: "row-meta-ctrl"
+  }, /*#__PURE__*/React.createElement("button", {
     className: "row-read-btn",
     onClick: toggleRead,
     title: isRead ? "Mark as unread" : "Mark as read"
@@ -1164,7 +1174,7 @@ function AnnouncementCard({
     style: detached && isPanelOpen ? {
       color: "var(--accent)"
     } : undefined
-  }, detached ? "\u2197" : "\u25BC")), /*#__PURE__*/React.createElement("div", {
+  }, detached ? "\u2197" : "\u25BC"))), /*#__PURE__*/React.createElement("div", {
     className: "row-company"
   }, ann.company), /*#__PURE__*/React.createElement("div", {
     className: "row-headline"
