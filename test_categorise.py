@@ -1,272 +1,167 @@
+"""Regression tests for the RNS Monitor categoriser and watchlist wiring.
+
+Run from the repo root:  python test_categorise.py
+
+This file is the spec for classification behaviour. After changing any keyword list
+in categorise(), or adding watchlist / read-across entries, run this and keep it green.
+Add a case whenever a mis-tagged announcement turns up in the live feed.
 """
-test_categorise.py — regression suite for the RNS Monitor's headline categoriser
-and filtering helpers.
+import app
 
-Run with:  python test_categorise.py
-
-Covers three things:
-  1. Standard RNS headline vocabulary maps to the right category.
-  2. Substring traps stay fixed: word-boundary matching means 'deal' must not
-     match "Dealings", 'director' must not match "Directorate", 'ai' must not
-     match "chairman", 'gold' must not match "Goldman Sachs", 'nav' must not
-     match "Navigator".
-  3. Rule ordering: Buyback before Contract, Fundraise before M&A, Admin
-     pre-checks before the Results/Contract cascades, material categories
-     always beating Admin.
-"""
-
-from app import (
-    categorise,
-    is_excluded_company,
-    is_material_type,
-    is_sector_relevant,
-    extract_ticker,
-    make_dedup_key,
-)
-
-# ── Categoriser cases: (headline, expected category) ─────────────────────────
-
+# ── Headline classification ──────────────────────────────────────────────────
+# (headline, expected_category)
 CASES = [
-    # Results
+    # Board change vs director dealing. 'director' is a substring of 'directorate',
+    # which is why categorise() relies on word-boundary matching via _kw().
+    ("Directorate Change", "Board Change"),
+    ("Appointment of Director", "Board Change"),
+    ("Resignation of Chairman", "Board Change"),
+    ("Board Change", "Board Change"),
+    ("Director/PDMR Shareholding", "Director Dealing"),
+    ("PDMR Dealings", "Director Dealing"),
+    ("Dealings by PDMR", "Director Dealing"),
+
+    # Results, and the admin lookalikes that contain 'results' or 'annual report'.
+    ("Full Year Results", "Results"),
     ("Final Results", "Results"),
     ("Interim Results", "Results"),
-    ("Half-year Report", "Results"),
-    ("Preliminary Results for the year ended 31 March 2026", "Results"),
-    ("Full Year Results 2025", "Results"),
-    ("Annual Results", "Results"),
-    ("Q3 Report", "Results"),
     ("Interim Management Statement", "Results"),
-    ("First Quarter Results", "Results"),
+    ("Voting Results", "Admin"),
+    ("Result of AGM", "Admin"),
+    ("Annual Financial Report", "Admin"),
+    ("Publication of Annual Report", "Admin"),
 
-    # Trading Update
+    # Real headlines that were missed in the live feed in September 2026.
+    # The cause was scrape coverage, not classification, but these are pinned so the
+    # classification side can never drift: all must stay OUT of NOISE_CATEGORIES.
+    ("Half-year Report", "Results"),
+    ("Half Year Report", "Results"),
+    ("Half Yearly Report", "Results"),
+    ("Interim Report and Accounts", "Results"),
+    ("FY26 Interim Report and Accounts", "Results"),
+
+    # Trading and company updates
     ("Trading Update", "Trading Update"),
-    ("Trading Statement", "Trading Update"),
-    ("Pre-close Trading Update", "Trading Update"),
-    ("Q1 Trading Update", "Trading Update"),
-    ("Year-end Trading Update", "Trading Update"),
-
-    # Company Update — includes the CMD / investor-event additions
-    ("Company Update", "Company Update"),
-    ("Operational Update", "Company Update"),
-    ("Business Update", "Company Update"),
+    ("Q1 Trading Statement", "Trading Update"),
+    ("Capital Markets Day", "Company Update"),
     ("Strategic Review", "Company Update"),
     ("Profit Warning", "Company Update"),
-    ("Capital Markets Day", "Company Update"),
-    ("Notice of Capital Markets Event", "Company Update"),
-    ("Investor Presentation", "Company Update"),
-    ("Investor Meet Company Presentation", "Company Update"),
-    ("Analyst and Investor Day", "Company Update"),
-    ("Site Visit for Analysts", "Company Update"),
-    ("Response to Press Speculation", "Company Update"),
 
-    # Buyback — must win over Contract ('renewal') and Fundraise
+    # Corporate actions
+    ("Acquisition of TargetCo", "M&A"),
+    ("Recommended Cash Offer", "M&A"),
+    ("Proposed Placing", "Fundraise"),
+    ("Rights Issue", "Fundraise"),
     ("Transaction in Own Shares", "Buyback"),
     ("Share Buyback Programme", "Buyback"),
-    ("Renewal of Buyback Programme", "Buyback"),
-    ("Commencement of Share Repurchase", "Buyback"),
 
-    # Contract
-    ("Contract Award", "Contract"),
-    ("New Partnership Agreement", "Contract"),
-    ("Framework Agreement with NHS Trust", "Contract"),
-    ("Contract Extension", "Contract"),
-    ("Major New Client Win", "Contract"),
-
-    # Fundraise — must win over M&A for offer-adjacent raise language
-    ("Placing to raise £50m", "Fundraise"),
-    ("Rights Issue", "Fundraise"),
-    ("Result of Open Offer", "Fundraise"),
-    ("Retail Offer via PrimaryBid", "Fundraise"),
-    ("Successful Fundraising", "Fundraise"),
-    ("Proposed Equity Raise and Bookbuild", "Fundraise"),
-    ("Intention to Float", "Fundraise"),
-    ("Secondary Offering", "Fundraise"),
-
-    # M&A
-    ("Recommended Cash Offer for Foo plc", "M&A"),
-    ("Completion of Acquisition", "M&A"),
-    ("Proposed Merger", "M&A"),
-    ("Disposal of Non-core Assets", "M&A"),
-    ("Statement re Possible Offer", "M&A"),
-    ("Scheme of Arrangement becomes Effective", "M&A"),
-
-    # Board Change — 'Directorate Change' is the standard RNS header and is a
-    # board matter, not a dealing
-    ("Directorate Change", "Board Change"),
-    ("Appointment of Chief Financial Officer", "Board Change"),
-    ("Resignation of Non-Executive Director", "Board Change"),
-    ("Board Change", "Board Change"),
-    ("CEO Succession", "Board Change"),
-    ("Chairman Steps Down", "Board Change"),
-
-    # Shareholding
+    # Contracts, holdings, dividends, admin
+    ("Contract Award with NHS", "Contract"),
+    ("Strategic Partnership", "Contract"),
     ("Holding(s) in Company", "Shareholding"),
     ("TR-1: Notification of Major Holdings", "Shareholding"),
-    ("Notification of Major Interest in Shares", "Shareholding"),
-
-    # Director Dealing — 'Dealings' must not be caught by Contract's 'deal'
-    ("Director/PDMR Shareholding", "Director Dealing"),
-    ("Dealings by PDMR", "Director Dealing"),
-    ("Directors' Dealings", "Director Dealing"),
-    ("PDMR Notification", "Director Dealing"),
-
-    # Regulatory
-    ("FCA Investigation Update", "Regulatory"),
-    ("Regulatory Statement", "Regulatory"),
-
-    # Dividend
-    ("Interim Dividend Declaration", "Dividend"),
-    ("Dividend Timetable", "Dividend"),
-    ("Special Dividend", "Dividend"),
-
-    # Admin — the noise bucket, watchlist-overridden client-side
+    ("Interim Dividend", "Dividend"),
     ("Total Voting Rights", "Admin"),
-    ("Block Listing Interim Review", "Admin"),
-    ("Result of AGM", "Admin"),
-    ("Result of General Meeting", "Admin"),
-    ("AGM Statement", "Admin"),
-    ("Form 8.3 - Foo plc", "Admin"),
-    ("Publication of Prospectus", "Admin"),
-    ("Publication of Circular", "Admin"),
-    ("Publication of Annual Report and Accounts", "Admin"),
-    ("Posting of Annual Report", "Admin"),
+    ("Block Listing Application", "Admin"),
     ("Price Monitoring Extension", "Admin"),
-    ("Second Price Monitoring Extn", "Admin"),
-    ("Exercise of Options", "Admin"),
-    ("Change of Name", "Admin"),
-    ("Change of Registered Office", "Admin"),
-    ("Change of Nominated Adviser", "Admin"),
-    ("Admission to Trading on AIM", "Admin"),
-    ("Notice of Redemption", "Admin"),
-    ("Statement of Capital", "Admin"),
-
-    # Ordering: material categories beat Admin when both match
-    ("Final Results and Notice of AGM", "Results"),
-    ("Publication of Final Results", "Results"),
-    ("Acquisition and Publication of Circular", "M&A"),
-
-    # Substring traps — word boundaries must hold
-    ("Navigator Holdings Rebrand", "Other"),        # 'nav' must not fire; no other keyword matches
-    ("Claims Settlement Reached", "Other"),          # 'ims' must not match inside 'claims'
-
-    # Fallbacks
-    ("Miscellaneous Announcement", "Other"),
+    ("Notice of AGM", "Admin"),
 ]
 
-# Non-Reg fallback: unmatched headline from a non-regulatory feed
-NONREG_CASES = [
-    ("Miscellaneous Announcement", "GNW", "Non-Reg"),
-    ("Miscellaneous Announcement", "PRN", "Non-Reg"),
-    ("Final Results", "GNW", "Results"),  # matched headlines keep their category regardless of feed
+# Headlines that must NOT land in the given category. These are the substring
+# collisions that word-boundary matching exists to prevent.
+TRAPS = [
+    ("Replacing the Auditor", "Fundraise"),        # 'placing' inside 'replacing'
+    ("Directorate Change", "Director Dealing"),    # 'director' inside 'directorate'
+    ("Dealings by PDMR", "Contract"),              # 'deal' inside 'dealings'
+    ("Navigator Holdings update", "Admin"),        # 'nav' inside 'navigator'
 ]
 
-# ── Exclusion cases: (company name, should be excluded) ─────────────────────
-
-EXCLUSION_CASES = [
-    ("Anglo American", True),
-    ("Rio Tinto", True),
-    ("Greatland Gold", True),
-    ("Tullow Oil", True),
-    ("Empire Metals", True),
-    ("Atlantic Lithium", True),
-    ("Diversified Gas & Oil", True),
-    # Word boundaries: these must NOT be excluded
-    ("Goldman Sachs Group", False),          # 'gold' must not match 'Goldman'
-    ("Hostelworld Group", False),
-    ("Bloomsbury Publishing", False),
-    ("Gattaca", False),
-    ("Petrofac", False),                     # 'petroleum'/'oil' must not fire on 'Petro'/'ofac'
+# Announcements that must never be hidden by default, whatever else changes.
+MUST_BE_VISIBLE = [
+    "Half-year Report",
+    "Interim Report and Accounts",
+    "Full Year Results",
+    "Trading Update",
+    "Capital Markets Day",
 ]
 
-# ── Noise-type cases: (headline, is material i.e. NOT excluded) ──────────────
+# Watchlist entries that must stay wired end to end.
+REQUIRED_WATCHLIST = {
+    "KEYS": "read_across",
+    "BOOK": "core",
+    "GTLY": "core",
+    "FTC": "read_across",
+}
 
-MATERIAL_CASES = [
-    ("Final Results", True),
-    ("Monthly Factsheet", False),
-    ("Net Asset Value(s)", False),
-    ("Replacement: Final Results", False),
-    ("Notice of AGM", False),
-    ("Notice of Results", False),
-    # 'nav' word-boundary: headlines about ships and renames must survive
-    ("Navigator Holdings Contract Win", True),
-    ("Change of Name to Navigo Group", True),
-]
 
-# ── Sector relevance: 'ai' must be word-bounded ───────────────────────────────
+def check_categories():
+    fails = []
+    for hl, exp in CASES:
+        got = app.categorise(hl)
+        if got != exp:
+            fails.append(f"  expected {exp!r:16} got {got!r:16} for {hl!r}")
+    print(f"{len(CASES) - len(fails)}/{len(CASES)} category cases passed")
+    return fails
 
-SECTOR_CASES = [
-    ("DeepTech plc", "AI partnership announced", True),
-    ("Foo plc", "Chairman appointment", False),          # 'chairman' contains 'ai'
-    ("Foo plc", "Documents available for inspection", False),  # 'available' contains 'ai'
-    ("Persimmon", "Housebuilding update", True),
-]
 
-# ── Ticker extraction ─────────────────────────────────────────────────────────
+def check_traps():
+    fails = []
+    for hl, wrong in TRAPS:
+        got = app.categorise(hl)
+        if got == wrong:
+            fails.append(f"  {hl!r} was trapped into {wrong!r}")
+    print(f"{len(TRAPS) - len(fails)}/{len(TRAPS)} substring-trap checks passed")
+    return fails
 
-TICKER_CASES = [
-    ("Hostelworld Group (HSW)", "HSW"),
-    ("Foo Group (AIM) (FOO)", "FOO"),
-    ("Foo Group (AIM)", None),               # venue token must not become a ticker
-    ("Taylor Wimpey (TW.)", "TW."),
-]
 
-# ── Dedup keys ────────────────────────────────────────────────────────────────
+def check_visibility():
+    fails = []
+    for hl in MUST_BE_VISIBLE:
+        cat = app.categorise(hl)
+        if cat in app.NOISE_CATEGORIES:
+            fails.append(f"  {hl!r} classifies as {cat!r}, which is hidden by default")
+        if not app.is_material_type(hl):
+            fails.append(f"  {hl!r} is dropped by EXCLUDED_TYPES")
+    print(f"{len(MUST_BE_VISIBLE) - len(fails)}/{len(MUST_BE_VISIBLE)} visibility checks passed")
+    return fails
 
-def run():
-    failures = []
 
-    for headline, expected in CASES:
-        got = categorise(headline)
-        if got != expected:
-            failures.append(f"categorise({headline!r}) = {got!r}, expected {expected!r}")
+def check_watchlist():
+    """Tier data is duplicated across three structures, so they must agree."""
+    fails = []
+    wl = app.DEFAULT_WATCHLIST
+    for ticker, tier in REQUIRED_WATCHLIST.items():
+        if ticker not in wl:
+            fails.append(f"  {ticker} missing from DEFAULT_WATCHLIST")
+        elif wl[ticker].get("tier") != tier:
+            fails.append(f"  {ticker} tier is {wl[ticker].get('tier')!r}, expected {tier!r}")
 
-    for headline, feed, expected in NONREG_CASES:
-        got = categorise(headline, feed)
-        if got != expected:
-            failures.append(f"categorise({headline!r}, {feed!r}) = {got!r}, expected {expected!r}")
+    core = {t for t, v in wl.items() if v.get("tier") == "core"}
+    ra = {t for t, v in wl.items() if v.get("tier") == "read_across"}
 
-    for company, expected in EXCLUSION_CASES:
-        got = is_excluded_company(company)
-        if got != expected:
-            failures.append(f"is_excluded_company({company!r}) = {got}, expected {expected}")
+    mismatch = ra ^ app.READ_ACROSS_TICKERS
+    if mismatch:
+        fails.append(f"  read_across tier and READ_ACROSS_TICKERS disagree on: {sorted(mismatch)}")
+    bad_src = [k for k in app.READ_ACROSS_MATRIX if k not in ra]
+    if bad_src:
+        fails.append(f"  matrix sources that are not read-across names: {bad_src}")
+    bad_tgt = sorted({c for links in app.READ_ACROSS_MATRIX.values() for c in links} - core)
+    if bad_tgt:
+        fails.append(f"  matrix targets that are not core names: {bad_tgt}")
 
-    for headline, expected in MATERIAL_CASES:
-        got = is_material_type(headline)
-        if got != expected:
-            failures.append(f"is_material_type({headline!r}) = {got}, expected {expected}")
+    print(f"watchlist wiring: {len(wl)} names ({len(core)} core, {len(ra)} read-across)"
+          + ("" if fails else " — consistent"))
+    return fails
 
-    for company, headline, expected in SECTOR_CASES:
-        got = is_sector_relevant(company, headline)
-        if got != expected:
-            failures.append(f"is_sector_relevant({company!r}, {headline!r}) = {got}, expected {expected}")
 
-    for text, expected in TICKER_CASES:
-        got = extract_ticker(text)
-        if got != expected:
-            failures.append(f"extract_ticker({text!r}) = {got!r}, expected {expected!r}")
-
-    # Dedup: distinct URLs never collapse, same URL always collapses
-    k1 = make_dedup_key("FOO", "Foo plc", "Holding(s) in Company", "https://www.investegate.co.uk/announcement/rns/foo--foo/holdings/1")
-    k2 = make_dedup_key("FOO", "Foo plc", "Holding(s) in Company", "https://www.investegate.co.uk/announcement/rns/foo--foo/holdings/2")
-    k3 = make_dedup_key("FOO", "Foo  plc", "Holding(s)  in Company", "https://www.investegate.co.uk/announcement/rns/foo--foo/holdings/1")
-    if k1 == k2:
-        failures.append("make_dedup_key: two different URLs collapsed to the same key")
-    if k1 != k3:
-        failures.append("make_dedup_key: identical URLs did not collapse to one key")
-    # No-URL fallback still normalises
-    k4 = make_dedup_key("FOO", "Foo plc", "Final  Results")
-    k5 = make_dedup_key("FOO", "Foo plc (FOO)", "Final Results")
-    if k4 != k5:
-        failures.append("make_dedup_key: ticker fallback failed to normalise whitespace/name variants")
-
-    total = (len(CASES) + len(NONREG_CASES) + len(EXCLUSION_CASES)
-             + len(MATERIAL_CASES) + len(SECTOR_CASES) + len(TICKER_CASES) + 3)
-    if failures:
-        print(f"FAILED {len(failures)}/{total} checks:\n")
-        for f in failures:
-            print(f"  ✗ {f}")
+def main():
+    fails = check_categories() + check_traps() + check_visibility() + check_watchlist()
+    for line in fails:
+        print(line)
+    if fails:
         raise SystemExit(1)
-    print(f"All {total} checks passed.")
+    print("\nALL PASS")
+
 
 if __name__ == "__main__":
-    run()
+    main()

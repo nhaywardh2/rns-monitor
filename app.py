@@ -209,7 +209,7 @@ WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
 READ_ACROSS_TICKERS = {
     "CRST", "BTRW", "TW.", "GRI", "KNOS", "BBOX", "SAVS", "LSL",
     "ALFA", "WTB", "JET2", "SUS", "SGRO", "SAFE", "FTC",
-    "IQE", "TTG", "DSCV", "ABDP",
+    "IQE", "TTG", "DSCV", "ABDP", "KEYS",
 }
 
 DEFAULT_WATCHLIST = {
@@ -258,6 +258,8 @@ DEFAULT_WATCHLIST = {
     "TTG":  {"name": "TT Electronics",                    "sector": "Electronic components / manufacturing", "tier": "read_across"},
     "DSCV": {"name": "discoverIE Group",                  "sector": "Specialist electronic components",      "tier": "read_across"},
     "ABDP": {"name": "AB Dynamics",                       "sector": "Automotive test / simulation",          "tier": "read_across"},
+    "KEYS": {"name": "Keystone Law Group",                "sector": "Legal / professional services",         "tier": "read_across"},
+    "BOOK": {"name": "Literacy Capital",                  "sector": "Closed-end investment company",         "tier": "core"},
 }
 
 def _ensure_tiers(wl: dict) -> dict:
@@ -397,6 +399,9 @@ READ_ACROSS_MATRIX = {
     },
     "ABDP": {
         "SEE":  {"type": "THEMATIC", "strength": 2, "note": "Automotive test and driving-simulation adjacency — AB Dynamics demand tracks ADAS and vehicle-autonomy development spend, the same end market driving Seeing Machines' driver-monitoring systems"},
+    },
+    "KEYS": {
+        "GTLY": {"type": "DIRECT",   "strength": 3, "note": "Direct listed legal-services peer to Gateley — fee income, fee-earner recruitment, realisation rates and chargeable-hours commentary read straight across"},
     },
 }
 
