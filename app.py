@@ -1,5 +1,5 @@
 """
-h2Radnor RNS Monitor — Web Deployment v2.0
+h2Radnor RNS Monitor, web deployment v2.2
 Combined API + Frontend, with optional password gate.
 """
 
@@ -12,15 +12,15 @@ import hmac
 import hashlib
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional
 from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, Query, Request, Response, Depends, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Query, Request, Response
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
 
 # ── Configuration via environment variables ──────────────────────────────────
@@ -36,9 +36,23 @@ SCRAPE_INTERVAL_SECONDS = int(os.environ.get("SCRAPE_INTERVAL_SECONDS", "120"))
 # How long fetched announcement bodies stay cached, in seconds. Bodies don't change once published.
 DETAIL_CACHE_TTL = int(os.environ.get("DETAIL_CACHE_TTL", "900"))  # 15 min
 DETAIL_CACHE_MAX = int(os.environ.get("DETAIL_CACHE_MAX", "600"))  # cap entries to bound memory
+# Maximum pages followed per paginated listing (50 rows each). 20 pages is 1,000 rows,
+# enough to rebuild a full RNS day after a restart. Steady-state scrapes stop far sooner.
+MAX_LISTING_PAGES = int(os.environ.get("MAX_LISTING_PAGES", "20"))
+# Postgres connection string. When set, the watchlist is stored in the database and
+# survives Render restarts, redeploys and spin-downs. When empty, watchlist.json is used,
+# which Render's free tier wipes on every restart. Use the database's Internal URL.
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+# Login lifetime. The cookie is an HMAC of SECRET_KEY, so rotating SECRET_KEY still
+# signs everyone out immediately regardless of this value.
+SESSION_DAYS = int(os.environ.get("SESSION_DAYS", "30"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("rns-monitor")
+# httpx and httpcore log every request at INFO, around 60 lines per scrape cycle, which
+# buries genuine warnings in the Render logs. Only their warnings and errors are kept.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # ── London-time "today" ──────────────────────────────────────────────────────
 # Render dynos run UTC. During BST, UTC's date lags London by an hour around
@@ -96,7 +110,10 @@ async def lifespan(_: FastAPI):
             except asyncio.CancelledError:
                 pass
 
-app = FastAPI(title="h2Radnor RNS Monitor", version="2.1.0", lifespan=lifespan)
+app = FastAPI(title="h2Radnor RNS Monitor", version="2.2.0", lifespan=lifespan)
+# Compress responses. A full day's feed is roughly 300 KB of JSON and shrinks by an order
+# of magnitude, which matters for Render's bandwidth allowance with tabs polling all day.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # No CORS middleware: the frontend is served same-origin from this app, so
 # cross-origin headers are unnecessary. The previous allow_origins=["*"] with
@@ -152,19 +169,11 @@ def _cookie_ok(token: Optional[str]) -> bool:
     """Constant-time comparison of the presented cookie against the expected token."""
     return bool(token) and hmac.compare_digest(token, _auth_token())
 
-def check_auth(request: Request):
-    """Check if user is authenticated. Skip if no password is set."""
-    if not APP_PASSWORD:
-        return True
-    if not _cookie_ok(request.cookies.get(AUTH_COOKIE)):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return True
-
 @app.get("/login", response_class=HTMLResponse)
 async def login_page():
     if not APP_PASSWORD:
         return RedirectResponse("/")
-    return HTMLResponse(content=LOGIN_HTML)
+    return HTMLResponse(content=LOGIN_HTML, headers=NO_CACHE)
 
 @app.post("/login")
 async def login(request: Request):
@@ -174,20 +183,23 @@ async def login(request: Request):
     if APP_PASSWORD and hmac.compare_digest(password, APP_PASSWORD):
         response = RedirectResponse("/", status_code=302)
         # Store a derived token, never the password itself.
-        response.set_cookie(AUTH_COOKIE, _auth_token(), httponly=True, secure=True, samesite="lax", max_age=86400)
+        response.set_cookie(AUTH_COOKIE, _auth_token(), httponly=True, secure=True, samesite="lax", max_age=SESSION_DAYS * 86400)
         return response
     return RedirectResponse("/login?error=1", status_code=302)
 
 # ── Serve Frontend ───────────────────────────────────────────────────────────
 
 STATIC_DIR = Path(__file__).parent / "static"
+NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend(request: Request):
     if APP_PASSWORD and not _cookie_ok(request.cookies.get(AUTH_COOKIE)):
         return RedirectResponse("/login")
     html_path = STATIC_DIR / "index.html"
-    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    # no-cache means the browser revalidates on every load, so a deploy shows up on the
+    # next refresh instead of an old copy of the frontend lingering in the cache.
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"), headers=NO_CACHE)
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -202,10 +214,32 @@ async def auth_middleware(request: Request, call_next):
 
 # ── Watchlist (persistent) ───────────────────────────────────────────────────
 
-WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
+WATCHLIST_FILE = Path(os.environ.get("WATCHLIST_FILE") or Path(__file__).parent / "watchlist.json")
 
 # Tickers tracked as read-across signals to the core watchlist.
 # All other watchlist tickers are treated as core by default.
+# Investegate sometimes files a company's announcements under a different company code
+# from its LSE ticker. I-RES is admitted on Euronext Dublin, and Investegate lists its
+# EQS announcements under company code 0QT8 at /company/0QT8, not /company/IRES. Without
+# this map, those announcements were never fetched from a company page, their index-page
+# rows extracted ticker 0QT8 (not on the watchlist) so they were never flagged, and the
+# company-page slug check would have discarded them anyway. Keys are Investegate codes,
+# values are the watchlist ticker they belong to. Add an entry whenever a watchlist
+# company's announcement URLs show a different "--code/" slug.
+TICKER_ALIASES = {
+    "0QT8": "IRES",   # Irish Residential Properties REIT (Euronext Dublin line)
+}
+
+def canonical_ticker(ticker):
+    """Map an Investegate company code onto its watchlist ticker, if aliased."""
+    if not ticker:
+        return ticker
+    return TICKER_ALIASES.get(ticker.upper(), ticker)
+
+def company_codes(ticker):
+    """Every Investegate company code whose page should be fetched for this ticker."""
+    return [ticker] + [code for code, t in TICKER_ALIASES.items() if t == ticker]
+
 READ_ACROSS_TICKERS = {
     "CRST", "BTRW", "TW.", "GRI", "KNOS", "BBOX", "SAVS", "LSL",
     "ALFA", "WTB", "JET2", "SUS", "SGRO", "SAFE", "FTC",
@@ -269,28 +303,171 @@ def _ensure_tiers(wl: dict) -> dict:
             info["tier"] = "read_across" if ticker in READ_ACROSS_TICKERS else "core"
     return wl
 
-def load_watchlist() -> dict:
-    """Load watchlist from JSON file, falling back to defaults if file doesn't exist."""
-    if WATCHLIST_FILE.exists():
+class WatchlistStore:
+    """Where the watchlist lives.
+
+    Postgres when DATABASE_URL is set, so additions and removals made in the app survive
+    Render restarts, redeploys and spin-downs. Otherwise watchlist.json, which Render's
+    free tier wipes on every restart (fine for local use).
+
+    Names removed in the app are remembered in a separate list. That lets new defaults
+    added to DEFAULT_WATCHLIST in code appear automatically on the next deploy, without
+    bringing back a company someone deliberately removed.
+
+    Every method is safe to call if the database is unreachable: the in-memory watchlist
+    keeps working, and the failure is reported through status() and /api/health.
+    """
+
+    def __init__(self):
+        self.backend = "json"
+        self.last_error: Optional[str] = None
+        self._pg = None
+        if DATABASE_URL:
+            try:
+                import psycopg
+                self._pg = psycopg
+                with self._conn() as c:
+                    c.execute("""CREATE TABLE IF NOT EXISTS watchlist (
+                        ticker TEXT PRIMARY KEY,
+                        name   TEXT NOT NULL,
+                        sector TEXT NOT NULL DEFAULT '',
+                        tier   TEXT NOT NULL DEFAULT 'core')""")
+                    c.execute("CREATE TABLE IF NOT EXISTS watchlist_removed (ticker TEXT PRIMARY KEY)")
+                self.backend = "postgres"
+            except Exception as e:
+                self.last_error = f"{type(e).__name__}: {str(e)[:200]}"
+                log.error(f"DATABASE_URL is set but Postgres is unavailable; using watchlist.json. {self.last_error}")
+
+    def _conn(self):
+        return self._pg.connect(DATABASE_URL, autocommit=True, connect_timeout=10)
+
+    # ── JSON helpers ────────────────────────────────────────────────────────
+    def _read_json(self):
+        """Returns (watchlist, removed). Accepts the old format (a plain dict of names)."""
+        if not WATCHLIST_FILE.exists():
+            return None, set()
         try:
             with open(WATCHLIST_FILE, "r") as f:
-                wl = json.load(f)
-                return _ensure_tiers(wl)
+                data = json.load(f)
         except (json.JSONDecodeError, IOError):
-            pass
-    # First run or corrupted file — save defaults and return them
-    save_watchlist(DEFAULT_WATCHLIST)
-    return dict(DEFAULT_WATCHLIST)
+            return None, set()
+        if isinstance(data, dict) and "watchlist" in data:
+            return data.get("watchlist") or {}, set(data.get("removed") or [])
+        return data, set()
 
-def save_watchlist(wl: dict):
-    """Save watchlist to JSON file."""
-    try:
-        with open(WATCHLIST_FILE, "w") as f:
-            json.dump(wl, f, indent=2)
-    except IOError as e:
-        print(f"Warning: could not save watchlist: {e}")
+    def _write_json(self, wl, removed):
+        try:
+            with open(WATCHLIST_FILE, "w") as f:
+                json.dump({"watchlist": wl, "removed": sorted(removed)}, f, indent=2)
+        except IOError as e:
+            self.last_error = f"could not write watchlist.json: {e}"
+            log.warning(self.last_error)
 
-WATCHLIST = load_watchlist()
+    def _removed_json(self):
+        return self._read_json()[1]
+
+    # ── Public API ──────────────────────────────────────────────────────────
+    def load(self) -> dict:
+        """Current watchlist, with any new code defaults merged in (unless removed)."""
+        if self.backend == "postgres":
+            try:
+                with self._conn() as c:
+                    rows = c.execute("SELECT ticker, name, sector, tier FROM watchlist").fetchall()
+                    removed = {r[0] for r in c.execute("SELECT ticker FROM watchlist_removed").fetchall()}
+                    wl = {t: {"name": n, "sector": sec, "tier": tier} for t, n, sec, tier in rows}
+                    for t, info in DEFAULT_WATCHLIST.items():
+                        if t not in wl and t not in removed:
+                            c.execute("INSERT INTO watchlist (ticker, name, sector, tier) VALUES (%s,%s,%s,%s) "
+                                      "ON CONFLICT (ticker) DO NOTHING",
+                                      (t, info["name"], info.get("sector", ""), info.get("tier", "core")))
+                            wl[t] = dict(info)
+                self.last_error = None
+                return _ensure_tiers(wl)
+            except Exception as e:
+                self.last_error = f"load failed: {type(e).__name__}: {str(e)[:200]}"
+                log.error(f"Watchlist load from Postgres failed; using defaults. {self.last_error}")
+                return _ensure_tiers({t: dict(i) for t, i in DEFAULT_WATCHLIST.items()})
+        wl, removed = self._read_json()
+        wl = dict(wl) if wl else {}
+        for t, info in DEFAULT_WATCHLIST.items():
+            if t not in wl and t not in removed:
+                wl[t] = dict(info)
+        wl = _ensure_tiers(wl)
+        self._write_json(wl, removed)
+        return wl
+
+    def upsert(self, ticker: str, info: dict) -> Optional[str]:
+        """Add or update one company. Returns an error string, or None on success."""
+        if self.backend == "postgres":
+            try:
+                with self._conn() as c:
+                    c.execute("INSERT INTO watchlist (ticker, name, sector, tier) VALUES (%s,%s,%s,%s) "
+                              "ON CONFLICT (ticker) DO UPDATE SET name=EXCLUDED.name, "
+                              "sector=EXCLUDED.sector, tier=EXCLUDED.tier",
+                              (ticker, info["name"], info.get("sector", ""), info.get("tier", "core")))
+                    c.execute("DELETE FROM watchlist_removed WHERE ticker=%s", (ticker,))
+                self.last_error = None
+                return None
+            except Exception as e:
+                self.last_error = f"save failed: {type(e).__name__}: {str(e)[:200]}"
+                log.error(self.last_error)
+                return self.last_error
+        removed = self._removed_json()
+        removed.discard(ticker)
+        self._write_json(WATCHLIST, removed)
+        return None
+
+    def remove(self, ticker: str) -> Optional[str]:
+        if self.backend == "postgres":
+            try:
+                with self._conn() as c:
+                    c.execute("DELETE FROM watchlist WHERE ticker=%s", (ticker,))
+                    c.execute("INSERT INTO watchlist_removed (ticker) VALUES (%s) ON CONFLICT DO NOTHING", (ticker,))
+                self.last_error = None
+                return None
+            except Exception as e:
+                self.last_error = f"remove failed: {type(e).__name__}: {str(e)[:200]}"
+                log.error(self.last_error)
+                return self.last_error
+        removed = self._removed_json()
+        removed.add(ticker)
+        self._write_json(WATCHLIST, removed)
+        return None
+
+    def reset(self) -> Optional[str]:
+        """Back to DEFAULT_WATCHLIST, forgetting every removal."""
+        if self.backend == "postgres":
+            try:
+                with self._conn() as c:
+                    c.execute("DELETE FROM watchlist")
+                    c.execute("DELETE FROM watchlist_removed")
+                    for t, info in DEFAULT_WATCHLIST.items():
+                        c.execute("INSERT INTO watchlist (ticker, name, sector, tier) VALUES (%s,%s,%s,%s)",
+                                  (t, info["name"], info.get("sector", ""), info.get("tier", "core")))
+                self.last_error = None
+                return None
+            except Exception as e:
+                self.last_error = f"reset failed: {type(e).__name__}: {str(e)[:200]}"
+                log.error(self.last_error)
+                return self.last_error
+        self._write_json({t: dict(i) for t, i in DEFAULT_WATCHLIST.items()}, set())
+        return None
+
+    def status(self) -> dict:
+        durable = self.backend == "postgres"
+        return {
+            "backend": self.backend,
+            "durable": durable,
+            "note": ("Watchlist changes are saved to Postgres and survive restarts."
+                     if durable else
+                     "Watchlist changes are saved to watchlist.json, which Render's free tier "
+                     "wipes on every restart. Set DATABASE_URL to keep them."),
+            "database_url_set": bool(DATABASE_URL),
+            "last_error": self.last_error,
+        }
+
+watchlist_store = WatchlistStore()
+WATCHLIST = watchlist_store.load()
 
 # ── Read-Across Matrix ───────────────────────────────────────────────────────
 # When a read-across company announces something, these are the core watchlist
@@ -416,6 +593,7 @@ class DailyCache:
         self.cache_date: Optional[str] = None
         self.last_scrape: Optional[datetime] = None
         self.last_errors: list[str] = []
+        self.last_stats: dict = {}
         self._load()
 
     def _load(self):
@@ -474,13 +652,6 @@ class DailyCache:
         self._save()
         return [Announcement(**v) for v in self.announcements.values()]
 
-    def clear(self):
-        """Wipe the cache entirely. Used by the hard-refresh path."""
-        self.announcements = {}
-        self.cache_date = today_london().isoformat()
-        self.last_scrape = None
-        self._save()
-
     def get_today(self) -> list:
         """Return cached announcements for TODAY only. This is the serve-time gate:
         endpoints must read through this, never through .announcements directly.
@@ -489,11 +660,13 @@ class DailyCache:
         Between them, yesterday's announcements cannot reach the frontend even if
         the background scraper stalls overnight and the midnight wipe never runs."""
         self._check_date()
-        today_str = today_london().strftime("%d/%m/%Y")
+        # Accept every day in the current session (today plus a preceding weekend),
+        # so a Sunday takeover statement is served on Monday rather than filtered out.
+        window = {d.strftime("%d/%m/%Y") for d in trading_window()}
         out = []
         for v in self.announcements.values():
             ann = Announcement(**v)
-            if ann.date_str and ann.date_str != today_str:
+            if ann.date_str and ann.date_str not in window:
                 continue
             out.append(ann)
         return out
@@ -503,7 +676,7 @@ class DailyCache:
         self._check_date()
         return len(self.announcements)
 
-CACHE_FILE = Path(__file__).parent / "cache_today.json"
+CACHE_FILE = Path(os.environ.get("CACHE_FILE") or Path(__file__).parent / "cache_today.json")
 daily_cache = DailyCache(CACHE_FILE)
 
 RELEVANT_SECTORS = [
@@ -522,19 +695,34 @@ RELEVANT_SECTORS = [
     "fastener", "building products", "construction",
     "emerging market", "investment trust",
     "fmcg", "consumer", "food", "beverage", "consumer goods",
+    # Energy, added September 2026: oil and gas, power and renewables names now appear
+    # in the feed and rank as sector relevant rather than being excluded.
+    "energy", "oil", "gas", "petroleum", "power", "renewable*", "utilities", "utility",
+    "hydrogen", "solar", "wind", "nuclear",
 ]
 
+# Mining and metals. These are no longer dropped by the server: they are flagged with
+# excluded_sector=True and the frontend hides them behind a switch you can turn off, so
+# nothing is ever invisible. M&A announcements are never flagged.
+# Oil, gas and energy names were removed from this list in September 2026.
 EXCLUDED_KEYWORDS = [
-    "mining", "resources", "metals", "petroleum", "oil", "gas",
+    "mining", "resources", "metals",
     "gold", "silver", "copper", "lithium", "coal", "diamond", "exploration",
 ]
 EXCLUDED_COMPANIES = {
     "anglo american", "glencore", "antofagasta", "fresnillo",
-    "rio tinto", "bhp", "shell", "bp", "endeavour mining",
+    "rio tinto", "bhp", "endeavour mining",
     "centamin", "hochschild", "ferrexpo", "kenmare", "central asia metals",
-    "greatland gold", "pan african", "thungela", "tullow oil",
-    "harbour energy", "energean", "parkmead",
+    "greatland gold", "pan african", "thungela",
 }
+# A company whose name contains one of these is an energy name and is never excluded,
+# even if it also contains a mining word (for example "Pantheon Resources", an oil
+# explorer, is excluded because nothing in its name says energy, but "Europa Oil & Gas
+# Resources" would not be).
+ENERGY_TERMS = [
+    "energy", "oil", "gas", "petroleum", "power", "renewable*", "utilities",
+    "hydrogen", "solar", "wind", "nuclear",
+]
 
 EXCLUDED_TYPES = [
     # Pure noise — drop entirely, even for watchlist companies. These are administrative
@@ -553,24 +741,6 @@ EXCLUDED_TYPES = [
     "cancellation of shares", "redemption",
 ]
 
-MATERIAL_TYPES = [
-    "results", "interim", "half-year", "preliminary", "trading update",
-    "trading statement", "acquisition", "merger", "disposal",
-    "placing", "rights issue", "fundrais", "share issue",
-    "director", "pdmr",
-    "company update", "strategic", "outlook", "guidance",
-    "revenue", "profit", "earnings",
-    "contract", "partnership", "agreement", "collaboration",
-    "offer", "bid", "takeover",
-    "buyback", "share purchase", "repurchase",
-    "appointment", "resignation", "board change",
-    "dividend", "special dividend",
-    "ipo", "admission", "regulatory", "fca", "compliance",
-    "restructur", "cost saving", "redundan",
-    "capital markets", "investor", "notice of results",
-    "holding(s) in company", "tr-1", "notification of major",
-    "major shareholding", "significant shareholding",
-]
 
 # ── Models ───────────────────────────────────────────────────────────────────
 
@@ -586,6 +756,9 @@ class Announcement(BaseModel):
     sector_relevant: bool = False
     source: str = "investegate"
     date_str: str = ""
+    # Mining and metals companies. Hidden in the feed by default behind a switch; never
+    # set on M&A or watchlist announcements.
+    excluded_sector: bool = False
 
 class ScrapeResponse(BaseModel):
     announcements: list[Announcement]
@@ -685,7 +858,7 @@ def extract_ticker(company_text):
     # so "Foo Group (AIM)" doesn't yield ticker "AIM".
     for m in reversed(matches):
         if m not in _NON_TICKER_TOKENS:
-            return m
+            return canonical_ticker(m)
     # Fallback: match a watchlist name only when the company cell starts with it
     # and the name isn't a prefix of a longer word — a bare substring check let
     # short names like "Record" attach to unrelated companies.
@@ -700,7 +873,11 @@ def clean_company_name(raw_text):
     return re.sub(r'\s+', ' ', raw_text.replace("Factsheet", "").strip())
 
 def is_excluded_company(company):
-    cl = company.lower()
+    """True for mining and metals companies (see EXCLUDED_KEYWORDS). Energy names are
+    never excluded."""
+    cl = (company or "").lower()
+    if _any_kw(cl, ENERGY_TERMS):
+        return False
     return _any_kw(cl, EXCLUDED_COMPANIES) or _any_kw(cl, EXCLUDED_KEYWORDS)
 
 def is_material_type(headline):
@@ -729,6 +906,54 @@ def categorise(headline, source_feed="RNS"):
         "publication of annual report", "posting of annual report",
     ]):
         return "Admin"
+    # Tender offers are capital returns (usually investment-trust buybacks), not takeovers.
+    # Checked early because "Results of Tender Offer" would otherwise tag as Results.
+    if _any_kw(h, ["tender offer", "tender offers"]):
+        return "Buyback"
+    # Takeover Code vocabulary. Checked this early deliberately: it sits above Results,
+    # Contract and Regulatory, each of which previously captured M&A headlines first
+    # ("Merger Agreement" -> Contract via 'agreement', "Extension of PUSU Deadline" ->
+    # Contract via 'extension', "Court Sanction of Scheme" -> Regulatory via 'sanction',
+    # "Results of Court Meeting" -> Results via 'results'). A large share of the offer
+    # lifecycle had no keyword at all (Rule 2.4 / 2.7 announcements, approaches, press
+    # speculation, irrevocables, acceptances, formal sale processes, scheme milestones)
+    # and fell through to Other. Bare 'offer' is intentionally absent so Open Offer,
+    # Retail Offer and Offer for Subscription stay Fundraise.
+    if _any_kw(h, [
+        # Code rule references
+        "rule 2.4", "rule 2.6", "rule 2.7", "rule 2.8", "rule 2.9", "rule 2.10",
+        "rule 2.11", "rule 2.12", "rule 9 waiver", "dispensation from rule 9", "whitewash",
+        # Approaches and speculation
+        "possible offer", "firm offer", "firm intention to make",
+        "statement re approach", "statement regarding approach", "response to approach",
+        "approach regarding", "bid approach", "unsolicited approach", "receipt of approach",
+        "press speculation", "media speculation", "market speculation",
+        "response to speculation", "statement re speculation", "statement regarding speculation",
+        # Offers
+        "recommended offer", "recommended cash", "recommended final offer", "cash offer",
+        "final offer", "revised offer", "increased offer", "improved offer", "competing offer",
+        "mandatory offer", "offer update", "update on offer", "offer period",
+        "offer unconditional", "offer declared unconditional", "offer lapsed",
+        "offer withdrawn", "withdrawal of offer", "termination of offer",
+        "no intention to make an offer", "no intention to bid",
+        "unconditional in all respects", "wholly unconditional", "unconditional",
+        "level of acceptances", "acceptance level", "acceptances",
+        "irrevocable undertaking", "irrevocable undertakings", "irrevocables",
+        "put up or shut up", "pusu", "formal sale process",
+        # Schemes of arrangement
+        "scheme of arrangement", "scheme document", "publication of scheme",
+        "posting of scheme", "scheme sanctioned", "scheme effective",
+        "scheme becomes effective", "sanction of scheme", "court sanction",
+        "court meeting", "court hearing",
+        # Deal structures
+        "merger agreement", "proposed merger", "recommended merger", "all-share merger",
+        "combination of", "all-share combination", "recommended combination",
+        "proposed combination", "recommended acquisition",
+        "sale of business", "sale of subsidiary", "sale of the group", "sale of the company",
+        "sale of division", "proposed sale", "conditional sale", "sale and purchase agreement",
+        "reverse takeover", "takeover offer", "takeover",
+    ]):
+        return "M&A"
     if _any_kw(h, [
         "interim dividend", "final dividend", "special dividend", "quarterly dividend",
         "dividend declaration", "dividend payment", "dividend timetable", "ex-dividend",
@@ -779,7 +1004,7 @@ def categorise(headline, source_feed="RNS"):
         "memorandum of understanding", "mou", "letter of intent", "loi",
     ]): return "Contract"
     # Fundraise — runs before M&A so 'open offer' / 'primary bid' phrasing doesn't mis-tag as M&A
-    if _any_kw(h, ["placing", "rights issue", "fundrais*", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise", "intention to float", "ipo", "offering"]): return "Fundraise"
+    if _any_kw(h, ["placing", "rights issue", "fundrais*", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise", "intention to float", "ipo", "offering", "offer for subscription"]): return "Fundraise"
     # M&A
     if _any_kw(h, [
         "acquisition", "merger", "disposal", "takeover", "offer", "bid",
@@ -829,6 +1054,8 @@ def categorise(headline, source_feed="RNS"):
         "agm", "egm", "annual general meeting", "extraordinary general meeting",
         "change of name", "change of registered office", "registered office",
         "change of adviser", "change of nominated adviser", "change of broker",
+        # Rule 8 position/dealing disclosures: high volume during offer periods, procedural
+        "opening position disclosure", "dealing disclosure", "form 8 (opd)", "form 8 (dd)",
     ]): return "Admin"
     # Non-regulatory sources get their own category if not matched above
     if source_feed in ("UKN", "GNW", "PRN", "MFN", "EQS"):
@@ -850,17 +1077,53 @@ def parse_investegate_time(time_text):
 _MONTH_NUM = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,"jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
 _DATE_RE = re.compile(r'\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b', re.IGNORECASE)
 
-def is_today(time_text):
-    """True if the text contains today's date (London). Parses the date out and
-    compares numerically — the old substring containment meant '1 Jul 2026'
-    matched '11 Jul 2026', and leading-zero day formats needed luck to work."""
-    m = _DATE_RE.search(time_text)
-    if not m:
-        return False
+
+# England and Wales bank holidays, from the GOV.UK list. 2026 and 2027 are published;
+# 2028 follows the standard rules (substitute days included). Extend this set each year:
+# /api/health reports bank_holidays_listed_until so you can see when it runs out.
+UK_BANK_HOLIDAYS = {
+    date(2026, 1, 1), date(2026, 4, 3), date(2026, 4, 6), date(2026, 5, 4),
+    date(2026, 5, 25), date(2026, 8, 31), date(2026, 12, 25), date(2026, 12, 28),
+    date(2027, 1, 1), date(2027, 3, 26), date(2027, 3, 29), date(2027, 5, 3),
+    date(2027, 5, 31), date(2027, 8, 30), date(2027, 12, 27), date(2027, 12, 28),
+    date(2028, 1, 3), date(2028, 4, 14), date(2028, 4, 17), date(2028, 5, 1),
+    date(2028, 5, 29), date(2028, 8, 28), date(2028, 12, 25), date(2028, 12, 26),
+}
+
+def is_non_trading_day(d: date) -> bool:
+    return d.weekday() >= 5 or d in UK_BANK_HOLIDAYS
+
+def trading_window() -> list:
+    """The calendar days that count as 'the current session': today, plus any weekend
+    days and bank holidays immediately before it. On a Monday that is Sat, Sun and Mon;
+    on the Tuesday after a bank holiday Monday it is Sat, Sun, Mon and Tue. Takeover
+    statements are often released on non-trading days, and would otherwise be dropped
+    for not being dated today. On an ordinary Tuesday to Friday it is just today."""
     today = today_london()
-    return (int(m.group(1)) == today.day
-            and _MONTH_NUM[m.group(2).lower()[:3]] == today.month
-            and int(m.group(3)) == today.year)
+    days = [today]
+    d = today
+    while True:
+        d = d - timedelta(days=1)
+        if is_non_trading_day(d):
+            days.append(d)
+        else:
+            break
+    return days
+
+def parse_announcement_date(text):
+    """Pull the calendar date out of an Investegate time/date cell, or None."""
+    m = _DATE_RE.search(text or "")
+    if not m:
+        return None
+    try:
+        return date(int(m.group(3)), _MONTH_NUM[m.group(2).lower()[:3]], int(m.group(1)))
+    except (ValueError, KeyError):
+        return None
+
+def in_window(text):
+    """The announcement's date if it falls inside trading_window(), otherwise None."""
+    d = parse_announcement_date(text)
+    return d if d is not None and d in trading_window() else None
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -1299,8 +1562,65 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
 # Serialises scrapes: the background loop, a cold-start warm-up, and a force=true
 # request could otherwise run full scrapes concurrently, doubling the request
 # volume to Investegate for no benefit.
+# Listing pages truncate long headlines ("INCREASED RECOMMENDED CASH ..."), so both
+# categorisation and search were working from partial text. Full titles are fetched from
+# the announcement page itself, a few per cycle, and remembered for the day so each is
+# fetched once. After a restart they are refetched gradually.
+TRUNCATION_MARKERS = ("...", "\u2026")
+TITLE_FETCHES_PER_CYCLE = int(os.environ.get("TITLE_FETCHES_PER_CYCLE", "15"))
+_full_titles: dict[str, str] = {}
+_full_titles_date: Optional[str] = None
+
+async def fetch_full_title(client, url) -> Optional[str]:
+    try:
+        resp = await client.get(url)
+        if resp.status_code != 200:
+            return None
+        h1 = BeautifulSoup(resp.text, "html.parser").find("h1")
+        title = h1.get_text(" ", strip=True) if h1 else ""
+        return title or None
+    except httpx.HTTPError:
+        return None
+
+async def resolve_truncated_headlines(anns, client) -> int:
+    """Replace truncated headlines with the full title, then recategorise. Returns how
+    many were newly fetched this cycle."""
+    global _full_titles, _full_titles_date
+    today = today_london().isoformat()
+    if _full_titles_date != today:
+        _full_titles, _full_titles_date = {}, today
+    todo = []
+    for a in anns:
+        if not a.url or not a.headline.rstrip().endswith(TRUNCATION_MARKERS):
+            continue
+        if a.url in _full_titles:
+            a.headline = _full_titles[a.url]
+            a.category = categorise(a.headline, a.source_feed)
+        elif a.url not in {t.url for t in todo}:
+            todo.append(a)
+    todo = todo[:TITLE_FETCHES_PER_CYCLE]
+    if not todo:
+        return 0
+    sem = asyncio.Semaphore(4)
+    async def one(a):
+        async with sem:
+            return a.url, await fetch_full_title(client, a.url)
+    fetched = dict(await asyncio.gather(*[one(a) for a in todo]))
+    for a in anns:
+        full = fetched.get(a.url)
+        if full:
+            _full_titles[a.url] = full
+            a.headline = full
+            a.category = categorise(full, a.source_feed)
+            a.sector_relevant = a.sector_relevant or is_sector_relevant(a.company, full)
+    return len({u for u, t in fetched.items() if t})
+
 _scrape_lock = asyncio.Lock()
 _SCRAPE_FRESHNESS_SECONDS = 60
+# Bounded, pooled connections for scraping. COMPANY_PAGE_CONCURRENCY caps how many
+# watchlist company pages are requested from Investegate at the same moment.
+HTTP_LIMITS = httpx.Limits(max_connections=10, max_keepalive_connections=10)
+COMPANY_PAGE_CONCURRENCY = int(os.environ.get("COMPANY_PAGE_CONCURRENCY", "6"))
 
 async def scrape_investegate(force: bool = False):
   async with _scrape_lock:
@@ -1317,13 +1637,26 @@ async def scrape_investegate(force: bool = False):
     errors = []
     raw = []
     seen_keys = set()  # For deduplication
-    today_str = today_london().strftime("%d/%m/%Y")
-    today_archive = today_london().strftime("https://www.investegate.co.uk/today-announcements/%Y-%m-%d")
+    started = time.monotonic()
+    # Per-source diagnostics, exposed at /api/health so a missed announcement can be
+    # traced to the page that should have caught it.
+    source_stats: dict[str, dict] = {}
 
     # Investegate caps each page at 50 rows (JS-driven "Show 100/200/300" doesn't work via HTTP).
     # Fix: scrape multiple index pages in parallel and deduplicate.
+    # Paginated sources. Each is followed page by page (see fetch_paginated) so the
+    # 50-row cap no longer loses announcements. One archive per day in the session,
+    # so on a Monday the weekend's releases are swept too.
+    paginated_sources = [
+        d.strftime("https://www.investegate.co.uk/today-announcements/%Y-%m-%d")
+        for d in trading_window()
+    ]
+    # Investegate's own Mergers, Acquisitions and Disposals category. Low volume and
+    # high signal, and it spans several days, so it catches takeover statements for
+    # companies that are on no index page we read.
+    paginated_sources.append("https://www.investegate.co.uk/category/mergers-acquisitions-and-disposals")
+
     pages_to_scrape = [
-        today_archive,
         "https://www.investegate.co.uk/",
         "https://www.investegate.co.uk/ftse100",
         "https://www.investegate.co.uk/ftse250",
@@ -1346,7 +1679,8 @@ async def scrape_investegate(force: bool = False):
             table_rows += 1
             try:
                 time_raw = cells[0].get_text(strip=True)
-                if not is_today(time_raw):
+                ann_date = in_window(time_raw)
+                if ann_date is None:
                     continue
                 time_display = parse_investegate_time(time_raw)
                 if not time_display:
@@ -1378,7 +1712,7 @@ async def scrape_investegate(force: bool = False):
                     headline=headline, category=categorise(headline, source_feed), url=url,
                     source_feed=source_feed, is_watchlist=ticker in WATCHLIST if ticker else False,
                     sector_relevant=is_sector_relevant(company_name, headline),
-                    source="investegate", date_str=today_str,
+                    source="investegate", date_str=ann_date.strftime("%d/%m/%Y"),
                 ))
             except (IndexError, AttributeError):
                 continue
@@ -1388,7 +1722,8 @@ async def scrape_investegate(force: bool = False):
     index_rows_parsed = 0
     index_table_rows = 0
     pages_ok = 0
-    async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True,
+                                 limits=HTTP_LIMITS) as client:
         async def fetch_page(url):
             # One retry after a short pause — a single transient blip on the
             # today-archive page (the richest source) otherwise loses most of a
@@ -1406,14 +1741,93 @@ async def scrape_investegate(force: bool = False):
                         await asyncio.sleep(1.0)
             return url, None, last_err
 
-        results = await asyncio.gather(*[fetch_page(u) for u in pages_to_scrape])
+        # URLs already in today's cache. A paginated sweep stops at the first page whose
+        # rows are all known, because pages run newest first and everything deeper is
+        # older and already held. In steady state that is usually page 1 only. After a
+        # restart the cache is empty, so the sweep runs deep and rebuilds the whole day,
+        # which is what stops announcements disappearing after a Render spin-down.
+        known_urls = {v.get("url") for v in daily_cache.announcements.values() if v.get("url")}
 
-        for url, html, err in results:
+        def row_urls(html_text):
+            """(in-session URLs, total announcement rows) for a page, with no side effects.
+            Builds URLs exactly as parse_rows does, so they compare against the cache."""
+            urls = set()
+            total = 0
+            soup = BeautifulSoup(html_text, "html.parser")
+            for row in soup.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) < 4:
+                    continue
+                total += 1
+                if in_window(cells[0].get_text(strip=True)) is None:
+                    continue
+                link = cells[3].find("a", href=True)
+                if link:
+                    href = link["href"]
+                    urls.add(href if href.startswith("http") else f"https://www.investegate.co.uk{href}")
+            return urls, total
+
+        def next_page_url(html_text, current):
+            """Follow only pagination links Investegate actually emits (?page=N)."""
+            soup = BeautifulSoup(html_text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                m = re.search(r'[?&]page=(\d+)', a["href"])
+                if m and int(m.group(1)) == current + 1:
+                    href = a["href"]
+                    if href.startswith("/"):
+                        href = "https://www.investegate.co.uk" + href
+                    return href.replace("http://", "https://", 1)
+            return None
+
+        async def fetch_paginated(base_url):
+            """Fetch a listing page by page. Returns a list of (url, html, err)."""
+            out = []
+            url, page = base_url, 1
+            while url and page <= MAX_LISTING_PAGES:
+                got = await fetch_page(url)
+                out.append(got)
+                _, html_text, err = got
+                if err or not html_text:
+                    break
+                # Must NOT call parse_rows here: it records rows in the shared seen_keys
+                # dedup set, so the results loop below would then treat every row on this
+                # page as a duplicate and drop it. row_urls is read-only.
+                page_urls, page_total = row_urls(html_text)
+                # Listings run newest first, so either condition means everything deeper
+                # is older than what we already have:
+                #  - every in-session row on this page is already cached, or
+                #  - the page has rows but none from the current session. Without this,
+                #    a multi-day listing such as the M&A category walked its entire
+                #    history (all MAX_LISTING_PAGES pages) whenever one new item appeared.
+                if page_urls and page_urls <= known_urls:
+                    break
+                if page_total and not page_urls:
+                    break
+                url = next_page_url(html_text, page)
+                page += 1
+                if url:
+                    await asyncio.sleep(0.3)   # be polite between pages
+            return out
+
+        single = asyncio.gather(*[fetch_page(u) for u in pages_to_scrape])
+        paged = asyncio.gather(*[fetch_paginated(u) for u in paginated_sources])
+        single_results, paged_results = await asyncio.gather(single, paged)
+        # (source, url, html, err). A paginated source contributes one entry per page.
+        results = [(r[0], *r) for r in single_results]
+        for base, group in zip(paginated_sources, paged_results):
+            results += [(base, *r) for r in group]
+
+        for source, url, html, err in results:
+            st = source_stats.setdefault(source, {"pages": 0, "rows_in_session": 0, "ok": True, "error": None})
+            st["pages"] += 1
             if err:
                 errors.append(f"Failed: {url} — {err}")
+                st["ok"] = False
+                st["error"] = err[:160]
                 continue
             pages_ok += 1
             page_rows, table_rows = parse_rows(html)
+            st["rows_in_session"] += len(page_rows)
             index_rows_parsed += len(page_rows)
             index_table_rows += table_rows
             raw.extend(page_rows)
@@ -1450,18 +1864,42 @@ async def scrape_investegate(force: bool = False):
     # Cell 1: Time (e.g. "07:00 AM")
     # Cell 2: Source (e.g. "RNS")
     # Cell 3: Announcement (with link)
-    async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
-        async def fetch_company_page(ticker, info):
+    # Company pages are fetched at most COMPANY_PAGE_CONCURRENCY at a time. Firing all 46
+    # at Investegate in the same instant every two minutes invites rate limiting.
+    company_sem = asyncio.Semaphore(COMPANY_PAGE_CONCURRENCY)
+    company_failed: list[str] = []
+    async with httpx.AsyncClient(headers=HEADERS, timeout=30.0, follow_redirects=True,
+                                 limits=HTTP_LIMITS) as client:
+        async def get_company_page(page_url):
+            """One retry, as for index pages: a single blip otherwise drops a watchlist
+            company from the whole cycle."""
+            for attempt in (1, 2):
+                try:
+                    async with company_sem:
+                        resp = await client.get(page_url)
+                    if resp.status_code >= 500 and attempt == 1:
+                        await asyncio.sleep(1.0)
+                        continue
+                    return resp
+                except httpx.HTTPError:
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(1.0)
+
+        async def fetch_company_page(ticker, info, code=None):
+            # `code` is the Investegate company code whose page is fetched. It differs
+            # from `ticker` only for aliased companies (see TICKER_ALIASES).
+            code = code or ticker
             found = []
-            today_str = today_london().strftime("%d/%m/%Y")
             try:
                 # Investegate company pages: e.g. https://www.investegate.co.uk/company/NRR
                 # Tickers with trailing dot (TW., JD., JET2 etc.) are kept as-is — the dot
                 # is part of the LSE symbol and Investegate URL slugs preserve it.
-                page_url = f"https://www.investegate.co.uk/company/{ticker}"
-                resp = await client.get(page_url)
+                page_url = f"https://www.investegate.co.uk/company/{code}"
+                resp = await get_company_page(page_url)
                 if resp.status_code != 200:
                     errors.append(f"Company page {ticker}: HTTP {resp.status_code}")
+                    company_failed.append(code)
                     return found
                 soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -1476,7 +1914,8 @@ async def scrape_investegate(force: bool = False):
                         headline_cell = cells[3]
 
                         # Filter to today's announcements only
-                        if not is_today(date_raw):
+                        row_date = in_window(date_raw)
+                        if row_date is None:
                             continue
 
                         # Parse time — combine date and time so existing helper recognises the format
@@ -1499,7 +1938,7 @@ async def scrape_investegate(force: bool = False):
                         # Stops cross-referenced "related announcements" sneaking in.
                         if url:
                             url_lower = url.lower()
-                            ticker_slug = ticker.lower()
+                            ticker_slug = code.lower()
                             if f"--{ticker_slug}/" not in url_lower:
                                 continue
 
@@ -1522,19 +1961,28 @@ async def scrape_investegate(force: bool = False):
                             time=time_display, company=info["name"], ticker=ticker,
                             headline=headline, category=categorise(headline, sf), url=url,
                             source_feed=sf, is_watchlist=True, sector_relevant=True,
-                            source="investegate-company", date_str=today_str,
+                            source="investegate-company", date_str=row_date.strftime("%d/%m/%Y"),
                         ))
                     except (IndexError, AttributeError):
                         continue
             except Exception as e:
                 errors.append(f"Company page {ticker}: {type(e).__name__}: {str(e)[:100]}")
+                company_failed.append(code)
             return found
 
         company_results = await asyncio.gather(
-            *[fetch_company_page(t, i) for t, i in WATCHLIST.items()]
+            *[fetch_company_page(t, i, code) for t, i in WATCHLIST.items() for code in company_codes(t)]
         )
         for company_anns in company_results:
             raw.extend(company_anns)
+
+        titles_resolved = await resolve_truncated_headlines(raw, client)
+
+    source_stats["company_pages"] = {
+        "requested": sum(len(company_codes(t)) for t in WATCHLIST),
+        "failed": sorted(set(company_failed)),
+        "rows_in_session": sum(len(x) for x in company_results),
+    }
 
     total_raw = len(raw)
 
@@ -1544,6 +1992,15 @@ async def scrape_investegate(force: bool = False):
 
     # Persist errors on the cache so /api/rns can surface them between background scrapes
     daily_cache.last_errors = errors
+    daily_cache.last_stats = {
+        "finished_at": datetime.now().isoformat(),
+        "duration_seconds": round(time.monotonic() - started, 1),
+        "session_days": [d.isoformat() for d in trading_window()],
+        "rows_scraped": total_raw,
+        "cached_total": total_cached,
+        "truncated_headlines_resolved": titles_resolved,
+        "sources": source_stats,
+    }
 
     return all_today, total_cached, errors
 
@@ -1561,25 +2018,21 @@ NOISE_CATEGORIES = {
     "Dividend",          # dividend declarations (usually announced with results anyway)
 }
 
-def is_noise_category(ann):
-    """True if this announcement is in a noisy category and the company is not on the watchlist."""
-    return ann.category in NOISE_CATEGORIES and not ann.is_watchlist
-
-def filter_announcements(anns):
-    # Watchlist membership overrides the mining/oil/gas exclusion: a watchlist
-    # company whose name happens to contain an excluded keyword must always show.
-    return [a for a in anns
-            if (a.is_watchlist or not is_excluded_company(a.company))
-            and is_material_type(a.headline)
-            and not is_noise_category(a)]
+def _date_key(date_str):
+    """dd/mm/yyyy -> yyyymmdd so dates sort chronologically."""
+    try:
+        d, m, y = date_str.split("/")
+        return f"{y}{m}{d}"
+    except (AttributeError, ValueError):
+        return ""
 
 def rank_announcements(anns):
     def sk(a):
         p = 3
         if a.is_watchlist: p = 0
         elif a.sector_relevant: p = 1
-        elif a.category in ("Results","Trading Update"): p = 2
-        return (p, a.time)
+        elif a.category in ("M&A", "Results", "Trading Update"): p = 2
+        return (p, _date_key(a.date_str), a.time)
     return sorted(anns, key=sk)
 
 def apply_live_watchlist(anns):
@@ -1589,6 +2042,9 @@ def apply_live_watchlist(anns):
     here means manually-added companies are highlighted, filtered, and ranked correctly
     on the next refresh without waiting for the announcement to be re-scraped."""
     for a in anns:
+        # Canonicalise first so entries cached under an Investegate alias code
+        # (e.g. 0QT8 for I-RES) are recognised as the watchlist company they are.
+        a.ticker = canonical_ticker(a.ticker)
         a.is_watchlist = bool(a.ticker) and a.ticker in WATCHLIST
     return anns
 
@@ -1610,6 +2066,12 @@ async def health():
         "background_scraper": bg_state,
         "scrape_interval_seconds": SCRAPE_INTERVAL_SECONDS,
         "last_errors_count": len(daily_cache.last_errors),
+        "watchlist_size": len(WATCHLIST),
+        "watchlist_storage": watchlist_store.status(),
+        "session_days": [d.isoformat() for d in trading_window()],
+        "bank_holidays_listed_until": max(UK_BANK_HOLIDAYS).isoformat(),
+        "bank_holiday_list_needs_update": today_london().year > max(UK_BANK_HOLIDAYS).year,
+        "last_scrape_stats": daily_cache.last_stats,
     }
 
 @app.get("/api/watchlist")
@@ -1626,49 +2088,58 @@ async def _ensure_cache_warm(force: bool = False):
 
 @app.get("/api/rns", response_model=ScrapeResponse)
 async def get_rns(
+    request: Request,
     watchlist_only: bool = Query(False),
     include_all: bool = Query(False),
     limit: int = Query(2000),
-    include_fundraise: bool = Query(False, description="Legacy alias — noise filtering is now client-side"),
+    include_fundraise: bool = Query(False, description="Legacy alias; noise filtering is client-side"),
     force: bool = Query(False, description="Bypass cache freshness and trigger a fresh scrape"),
-    hard: bool = Query(False, description="Clear the cache entirely before scraping — guarantees the response contains only what Investegate shows right now for today"),
+    hard: bool = Query(False, description="Deprecated alias for force. It used to wipe the day's cache; it no longer does."),
 ):
     """Read announcements from the daily cache (kept warm by the background scraper).
-    Returns instantly when the cache is populated. Cold-cache and force=true paths
-    fall back to a synchronous scrape.
 
-    Category-based noise filtering (Director Dealing, Shareholding, Admin, etc.) is now
-    handled client-side. The server returns everything except mining/oil/gas companies
-    and lets the UI manage category visibility, which means the user can unhide any
-    category with one click via the existing category pills.
+    Category filtering is client-side. Mining and metals companies are returned with
+    excluded_sector=True so the UI can hide them behind a switch; nothing is dropped
+    here, and M&A announcements are never flagged.
 
-    `include_all=true` additionally bypasses the headline-level material-type filter
-    (EXCLUDED_TYPES); without it, factsheets, NAVs, and reissue notices are dropped."""
-    if hard:
-        daily_cache.clear()
-        await scrape_investegate(force=True)
-    else:
-        await _ensure_cache_warm(force=force)
+    Conditional requests: the response carries an ETag derived from its content (not
+    from the scrape timestamp). A client that sends it back in If-None-Match gets a
+    bodiless 304 when nothing has changed, which is most polls.
+
+    `include_all=false` additionally drops headlines matching EXCLUDED_TYPES
+    (factsheets, NAVs, reissue notices)."""
+    # `hard` used to call daily_cache.clear(), destroying every announcement that had
+    # scrolled off Investegate's listing pages. It now simply forces a rescrape.
+    await _ensure_cache_warm(force=force or hard)
     raw = apply_live_watchlist(daily_cache.get_today())
     total_raw = len(raw)
+    for a in raw:
+        a.excluded_sector = (not a.is_watchlist and a.category != "M&A"
+                             and is_excluded_company(a.company))
     if include_all:
-        # Just exclude mining/oil/gas — let the client decide what to hide.
-        # Watchlist companies are exempt from the exclusion.
-        filtered = [a for a in raw if a.is_watchlist or not is_excluded_company(a.company)]
+        filtered = raw
     else:
-        # Apply EXCLUDED_TYPES headline-level filter; still no category-level filter
-        filtered = [a for a in raw
-                    if (a.is_watchlist or not is_excluded_company(a.company))
-                    and is_material_type(a.headline)]
-    if watchlist_only: filtered = [a for a in filtered if a.is_watchlist]
+        filtered = [a for a in raw if not a.excluded_sector and is_material_type(a.headline)]
+    if watchlist_only:
+        filtered = [a for a in filtered if a.is_watchlist]
     ranked = rank_announcements(filtered)
-    scraped_at = daily_cache.last_scrape.isoformat() if daily_cache.last_scrape else datetime.now().isoformat()
-    return ScrapeResponse(
+    body = ScrapeResponse(
         announcements=ranked[:limit], total_raw=total_raw, total_filtered=len(filtered),
-        scraped_at=scraped_at, date=today_london().strftime("%A %d %B %Y"),
+        scraped_at=(daily_cache.last_scrape.isoformat() if daily_cache.last_scrape
+                    else datetime.now().isoformat()),
+        date=today_london().strftime("%A %d %B %Y"),
         source="investegate", errors=list(daily_cache.last_errors),
         default_hidden_categories=sorted(NOISE_CATEGORIES),
-    )
+    ).model_dump()
+    # The scrape timestamp changes every cycle even when nothing new arrived, so it is
+    # left out of the ETag; otherwise every poll would miss.
+    fingerprint = json.dumps({k: v for k, v in body.items() if k != "scraped_at"},
+                             sort_keys=True, default=str)
+    etag = '"' + hashlib.sha1(fingerprint.encode()).hexdigest() + '"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return JSONResponse(content=body, headers=headers)
 
 @app.get("/api/rns/all", response_model=ScrapeResponse)
 async def get_rns_unfiltered(limit: int = Query(2000), force: bool = Query(False)):
@@ -1780,28 +2251,80 @@ async def get_rns_by_ticker(ticker: str):
     return {"ticker": ticker, "company": WATCHLIST.get(ticker, {}).get("name", "Unknown"),
             "announcements": [a for a in raw if a.ticker == ticker], "errors": list(daily_cache.last_errors)}
 
+_TICKER_RE = re.compile(r'^[A-Z0-9]{1,6}\.?$')
+
+async def check_investegate_company(ticker: str) -> tuple[Optional[str], Optional[str]]:
+    """(error, warning) for a proposed watchlist ticker.
+
+    An error blocks the addition: Investegate has no page for it, so it would be fetched
+    every two minutes forever and show a permanent scrape error. A warning allows it but
+    flags that the company's announcements appear to be filed under a different code,
+    the I-RES / 0QT8 situation, which needs an entry in TICKER_ALIASES.
+    If Investegate itself is unreachable, the addition is allowed with a warning rather
+    than blocked by an outage."""
+    url = f"https://www.investegate.co.uk/company/{ticker}"
+    try:
+        async with httpx.AsyncClient(headers=HEADERS, timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(url)
+    except httpx.HTTPError as e:
+        return None, f"Could not reach Investegate to check {ticker} ({type(e).__name__}). Added anyway."
+    if resp.status_code == 404:
+        return (f"Investegate has no company page for {ticker}. Check the ticker: it should be "
+                f"the code shown in brackets after the company name on Investegate."), None
+    if resp.status_code != 200:
+        return None, f"Investegate returned HTTP {resp.status_code} for {ticker}. Added anyway."
+    soup = BeautifulSoup(resp.text, "html.parser")
+    codes = set()
+    for a in soup.find_all("a", href=True):
+        m = re.search(r'/announcement/[^/]+/[^/]*--([a-z0-9.]+)/', a["href"].lower())
+        if m:
+            codes.add(m.group(1).upper())
+    if codes and ticker not in codes:
+        others = ", ".join(sorted(codes)[:3])
+        return None, (f"{ticker}'s announcements on Investegate appear under {others}. "
+                      f"Announcements may be missed until {others} is added to TICKER_ALIASES in app.py.")
+    return None, None
+
 @app.post("/api/watchlist/add")
 async def add_to_watchlist(ticker: str, name: str, sector: str = "", tier: str = "core"):
+    ticker = (ticker or "").strip().upper()
+    name = (name or "").strip()
+    if not _TICKER_RE.match(ticker):
+        return JSONResponse(status_code=400, content={
+            "status": "error", "error": f"'{ticker}' is not a valid ticker. Use 1 to 6 letters or digits, e.g. GTLY or TW."})
+    if not name:
+        return JSONResponse(status_code=400, content={"status": "error", "error": "Enter the company name."})
     if tier not in ("core", "read_across"):
         tier = "core"
-    WATCHLIST[ticker.upper()] = {"name": name, "sector": sector, "tier": tier}
-    save_watchlist(WATCHLIST)
-    return {"status": "added", "ticker": ticker.upper(), "watchlist": WATCHLIST}
+    error, warning = await check_investegate_company(ticker)
+    if error:
+        return JSONResponse(status_code=400, content={"status": "error", "error": error})
+    info = {"name": name, "sector": (sector or "").strip(), "tier": tier}
+    WATCHLIST[ticker] = info
+    save_error = await asyncio.to_thread(watchlist_store.upsert, ticker, info)
+    status = watchlist_store.status()
+    if save_error:
+        warning = (warning + " " if warning else "") + "The change could not be saved and will be lost on restart."
+    elif not status["durable"]:
+        warning = (warning + " " if warning else "") + "Saved for now, but it will be lost when the server restarts."
+    return {"status": "added", "ticker": ticker, "warning": warning, "storage": status, "watchlist": WATCHLIST}
 
 @app.delete("/api/watchlist/{ticker}")
 async def remove_from_watchlist(ticker: str):
-    removed = WATCHLIST.pop(ticker.upper(), None)
-    if removed:
-        save_watchlist(WATCHLIST)
-    return {"status": "removed" if removed else "not_found", "ticker": ticker.upper()}
+    ticker = ticker.upper()
+    removed = WATCHLIST.pop(ticker, None)
+    if not removed:
+        return {"status": "not_found", "ticker": ticker}
+    save_error = await asyncio.to_thread(watchlist_store.remove, ticker)
+    return {"status": "removed", "ticker": ticker, "warning": save_error, "storage": watchlist_store.status()}
 
 @app.post("/api/watchlist/reset")
 async def reset_watchlist():
     """Reset watchlist back to defaults."""
     WATCHLIST.clear()
-    WATCHLIST.update(DEFAULT_WATCHLIST)
-    save_watchlist(WATCHLIST)
-    return {"status": "reset", "watchlist": WATCHLIST}
+    WATCHLIST.update({t: dict(i) for t, i in DEFAULT_WATCHLIST.items()})
+    save_error = await asyncio.to_thread(watchlist_store.reset)
+    return {"status": "reset", "warning": save_error, "watchlist": WATCHLIST}
 
 @app.get("/api/debug/raw-html")
 async def debug_raw_html():
@@ -1828,8 +2351,8 @@ if __name__ == "__main__":
     print("  h2Radnor RNS Monitor v2.0")
     print(f"  Running on http://{HOST}:{PORT}")
     if APP_PASSWORD:
-        print(f"  Password protection: ON")
+        print("  Password protection: ON")
     else:
-        print(f"  Password protection: OFF (set APP_PASSWORD env var to enable)")
+        print("  Password protection: OFF (set APP_PASSWORD env var to enable)")
     print()
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning")

@@ -16,8 +16,12 @@
 const fs = require("fs");
 const babel = require("@babel/core");
 
-const SRC = "index.src.html";
-const OUT = "index.html";
+const path = require("path");
+// Paths are relative to this file, so the build works from any working directory.
+// OUT is the file Render actually serves (app.py reads static/index.html). It used to be
+// written to the repo root and moved into static/ by hand.
+const SRC = path.join(__dirname, "index.src.html");
+const OUT = path.join(__dirname, "static", "index.html");
 
 const src = fs.readFileSync(SRC, "utf8");
 
@@ -46,5 +50,6 @@ let out = src
   .replace(/<script type="text\/babel">[\s\S]*?<\/script>/,
     () => '<script>\n/* Precompiled from ' + SRC + ' via Babel. Edit ' + SRC + ' and re-run build.js, not this file. */\n' + compiled + '\n  </script>');
 
+fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, out);
 console.log("Built " + OUT + " (" + out.length + " bytes) from " + SRC);

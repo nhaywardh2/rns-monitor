@@ -1,0 +1,18 @@
+{
+  "name": "rns-monitor",
+  "private": true,
+  "description": "h2Radnor RNS Monitor: build and test tooling. The app itself is Python (app.py).",
+  "scripts": {
+    "build": "node build.js",
+    "test:frontend": "node tests/frontend_check.js",
+    "test:backend": "python3 tests/test_backend.py && python3 test_categorise.py",
+    "test": "npm run build && npm run test:frontend && npm run test:backend"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.0",
+    "@babel/preset-react": "^8.0.0",
+    "jsdom": "^27.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

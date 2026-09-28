@@ -251,6 +251,7 @@
     .row-ticker.readacross { color:var(--readacross); }
     .row-tag { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 6px; border-radius:0; flex-shrink:0; }
     .row-tag.tier-core { background:rgba(240,192,64,0.12); color:var(--core); }
+    .row-tag.row-day { background:rgba(148,163,184,0.16); color:var(--text-secondary); letter-spacing:0.06em; }
     .row-tag.tier-ra { background:rgba(249,115,22,0.12); color:var(--readacross); }
     .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:1; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .row-source { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); border:1px solid var(--border); padding:0 4px; flex-shrink:0; }
@@ -375,6 +376,21 @@
     /* When the "dim once read" option is off, keep read rows at full strength. */
     html.no-read-dim .row.read .row-body { opacity:1; }
     /* Connection trouble banner */
+    .more-bar { display:flex; align-items:center; gap:12px; justify-content:center; padding:16px 0 8px; font-size:11px; color:var(--text-muted); }
+    .wl-msg { font-size:12px; line-height:1.45; padding:8px 10px; border:1px solid var(--border); }
+    .wl-msg.error { color:var(--danger); border-color:rgba(239,68,68,0.35); background:rgba(239,68,68,0.06); }
+    .wl-msg.warning { color:var(--text-secondary); border-color:var(--watchlist-border); background:var(--watchlist-bg); }
+    .wl-msg.ok { color:var(--accent); border-color:var(--accent-dim); background:var(--accent-glow); }
+    .diag { margin-top:10px; font-size:11px; color:var(--text-secondary); }
+    .diag-store { padding:7px 9px; margin-bottom:8px; border:1px solid var(--border); line-height:1.45; }
+    .diag-store.ok { border-color:var(--accent-dim); }
+    .diag-store.warn { border-color:var(--watchlist-border); background:var(--watchlist-bg); }
+    .diag-meta { margin-bottom:8px; line-height:1.45; }
+    .diag-table { display:flex; flex-direction:column; gap:2px; }
+    .diag-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; padding:4px 6px; background:var(--bg-surface); align-items:center; }
+    .diag-row.bad { outline:1px solid rgba(239,68,68,0.35); }
+    .diag-src { font-family:var(--font-mono); font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .diag-err { grid-column:1 / -1; color:var(--danger); }
     .reconnect { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:8px 11px; background:var(--watchlist-bg); border:1px solid var(--watchlist-border); font-size:11px; color:var(--text-secondary); }
     /* Watchlist modal grouping */
     .wl-group-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin:12px 0 6px; }
@@ -387,7 +403,7 @@
 <body>
   <div id="root"></div>
   <script>
-/* Precompiled from index.src.html via Babel. Edit index.src.html and re-run build.js, not this file. */
+/* Precompiled from /home/claude/repo/index.src.html via Babel. Edit /home/claude/repo/index.src.html and re-run build.js, not this file. */
 const {
   useState,
   useEffect,
@@ -404,8 +420,43 @@ const annId = ann => ann.url || `${ann.ticker || ann.company}|${ann.headline}`;
 
 // A per-day localStorage set. Used for both read state and seen state; both reset each
 // morning in step with the daily feed.
+// London calendar day as yyyy-mm-dd. The backend's day runs on London time; UTC lags
+// by an hour during BST, so between midnight and 01:00 the stores used to think it was
+// still yesterday and anything marked read in that hour vanished at 01:00.
+function londonDayKey() {
+  try {
+    const p = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    const get = t => (p.find(x => x.type === t) || {}).value;
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+// fetch with a timeout, for every request other than the main feed (which has its own
+// abort logic). Without it, a request to a sleeping backend could leave a spinner up
+// indefinitely.
+function fetchWithTimeout(url, options = {}, ms = 30000) {
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => {
+    try {
+      ctrl.abort();
+    } catch (e) {}
+  }, ms) : null;
+  return fetch(url, ctrl ? {
+    ...options,
+    signal: ctrl.signal
+  } : options).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 function makeDaySet(storageKey) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = londonDayKey();
   let ids = new Set();
   try {
     const raw = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -577,6 +628,33 @@ function makeCatColor(scheme, custom) {
     return CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"];
   };
 }
+
+// Announcements can now come from earlier in the session (e.g. a Sunday takeover
+// statement shown on Monday). The backend stamps each with its real dd/mm/yyyy date.
+const londonTodayStr = () => {
+  try {
+    return new Date().toLocaleDateString("en-GB", {
+      timeZone: "Europe/London"
+    });
+  } catch (e) {
+    return new Date().toLocaleDateString("en-GB");
+  }
+};
+// "27/09/2026" -> "SUN 27", or null when it is today.
+function earlierDayLabel(dateStr) {
+  if (!dateStr || dateStr === londonTodayStr()) return null;
+  const [d, m, y] = dateStr.split("/").map(Number);
+  if (!d || !m || !y) return null;
+  const day = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    weekday: "short",
+    timeZone: "UTC"
+  });
+  return `${day.toUpperCase()} ${d}`;
+}
+const dateKey = ds => {
+  const p = (ds || "").split("/");
+  return p.length === 3 ? p[2] + p[1] + p[0] : "";
+};
 
 // "07:05" plus a relative age, for feeds being scanned through the morning.
 // If the stamp looks more than a couple of minutes in the future, the browser clock and the
@@ -969,7 +1047,7 @@ function AnnouncementDetail({
     let alive = true;
     setLoading(true);
     setError(null);
-    fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`).then(r => {
+    fetchWithTimeout(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`, {}, 45000).then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.json();
     }).then(json => {
@@ -977,7 +1055,7 @@ function AnnouncementDetail({
       detailCache.set(ann.url, json);
       if (alive) setDetail(json);
     }).catch(err => {
-      if (alive) setError(err.message);
+      if (alive) setError(err.name === "AbortError" ? "The server took too long to respond. Close and reopen to try again." : err.message);
     }).finally(() => {
       if (alive) setLoading(false);
     });
@@ -989,7 +1067,7 @@ function AnnouncementDetail({
     if (ann.category !== "Shareholding" || !ann.url || shData) return;
     let alive = true;
     setShLoading(true);
-    fetch(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`).then(r => r.ok ? r.json() : null).then(json => {
+    fetchWithTimeout(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`, {}, 45000).then(r => r.ok ? r.json() : null).then(json => {
       if (json && !json.error) {
         shCache.set(ann.url, json);
         if (alive) setShData(json);
@@ -1144,9 +1222,12 @@ function AnnouncementCard({
   }, /*#__PURE__*/React.createElement("span", {
     className: "row-new-dot",
     title: "New since your last refresh"
-  }), /*#__PURE__*/React.createElement("span", {
+  }), earlierDayLabel(ann.date_str) && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag row-day",
+    title: `Released ${ann.date_str}, before today`
+  }, earlierDayLabel(ann.date_str)), /*#__PURE__*/React.createElement("span", {
     className: "row-time"
-  }, ann.time, age ? ` · ${age}` : ""), ann.ticker && /*#__PURE__*/React.createElement("span", {
+  }, ann.time, age && !earlierDayLabel(ann.date_str) ? ` · ${age}` : ""), ann.ticker && /*#__PURE__*/React.createElement("span", {
     className: "row-ticker" + (isWL ? isRA ? " readacross" : " watchlist" : "")
   }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
     className: "row-tag tier-core"
@@ -1285,9 +1366,28 @@ function OptionsModal({
   onResetCategories,
   onResetOptions,
   hiddenCount,
-  readCount
+  readCount,
+  backendUrl
 }) {
   const [showSwatches, setShowSwatches] = useState(false);
+  const [health, setHealth] = useState(null);
+  const [showDiag, setShowDiag] = useState(false);
+  useEffect(() => {
+    if (!showDiag) return;
+    let alive = true;
+    fetchWithTimeout(`${backendUrl}/api/health`, {}, 20000).then(r => r.ok ? r.json() : null).then(j => {
+      if (alive) setHealth(j || {
+        error: true
+      });
+    }).catch(() => {
+      if (alive) setHealth({
+        error: true
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [showDiag, backendUrl]);
   const custom = opts.customColors || {};
   const setCustom = (cat, hex) => setOpt("customColors", {
     ...custom,
@@ -1470,7 +1570,49 @@ function OptionsModal({
   }, "Reset hidden categories to defaults", hiddenCount === 0 ? " (nothing hidden now)" : ` (${hiddenCount} hidden)`), /*#__PURE__*/React.createElement("button", {
     className: "opt-action",
     onClick: onResetOptions
-  }, "Reset all options to defaults")))));
+  }, "Reset all options to defaults")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Diagnostics"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: () => setShowDiag(v => !v)
+  }, showDiag ? "Hide" : "Show", " what the last scrape collected"), showDiag && !health && /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Loading..."), showDiag && health && health.error && /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Could not load diagnostics from the server."), showDiag && health && !health.error && (() => {
+    const st = health.last_scrape_stats || {};
+    const src = st.sources || {};
+    const store = health.watchlist_storage || {};
+    const short = u => u.replace("https://www.investegate.co.uk", "") || "/";
+    const rows = Object.entries(src).filter(([k]) => k !== "company_pages");
+    const cp = src.company_pages;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "diag"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "diag-store " + (store.durable ? "ok" : "warn")
+    }, store.note, store.last_error ? ` Last error: ${store.last_error}` : ""), /*#__PURE__*/React.createElement("div", {
+      className: "diag-meta"
+    }, "Last scrape ", st.finished_at ? new Date(st.finished_at).toLocaleTimeString("en-GB") : "not yet run", st.duration_seconds != null ? `, took ${st.duration_seconds}s` : "", st.truncated_headlines_resolved ? `, ${st.truncated_headlines_resolved} shortened headlines completed` : "", ".", health.bank_holiday_list_needs_update ? " The bank holiday list in app.py needs extending." : ""), /*#__PURE__*/React.createElement("div", {
+      className: "diag-table"
+    }, rows.map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+      key: k,
+      className: "diag-row" + (v.ok ? "" : " bad")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "diag-src",
+      title: k
+    }, short(k)), /*#__PURE__*/React.createElement("span", null, v.pages, " page", v.pages === 1 ? "" : "s"), /*#__PURE__*/React.createElement("span", null, v.rows_in_session, " rows"), !v.ok && /*#__PURE__*/React.createElement("span", {
+      className: "diag-err",
+      title: v.error || ""
+    }, "failed"))), cp && /*#__PURE__*/React.createElement("div", {
+      className: "diag-row" + (cp.failed && cp.failed.length ? " bad" : "")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "diag-src"
+    }, "Watchlist company pages"), /*#__PURE__*/React.createElement("span", null, cp.requested, " fetched"), /*#__PURE__*/React.createElement("span", null, cp.rows_in_session, " rows"), cp.failed && cp.failed.length > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "diag-err"
+    }, "failed: ", cp.failed.join(", ")))));
+  })()))));
 }
 
 // ── Active filter chips ──────────────────────────────────────────────────
@@ -1504,6 +1646,33 @@ function WatchlistModal({
   const [sector, setSector] = useState("");
   const [tier, setTier] = useState("core");
   const [q, setQ] = useState("");
+  const [msg, setMsg] = useState(null); // {kind:"error"|"warning"|"ok", text}
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!ticker || !name || busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await onAdd(ticker.trim().toUpperCase(), name.trim(), sector, tier);
+    setBusy(false);
+    if (!res || !res.ok) {
+      setMsg({
+        kind: "error",
+        text: res && res.error || "The company was not added."
+      });
+      return;
+    }
+    setMsg(res.warning ? {
+      kind: "warning",
+      text: `Added ${ticker.trim().toUpperCase()}. ${res.warning}`
+    } : {
+      kind: "ok",
+      text: `Added ${ticker.trim().toUpperCase()}.`
+    });
+    setTicker("");
+    setName("");
+    setSector("");
+    setTier("core");
+  };
   const is = {
     background: "var(--bg-surface)",
     border: "1px solid var(--border)",
@@ -1659,28 +1828,23 @@ function WatchlistModal({
     }
   }, "Tier"), /*#__PURE__*/React.createElement("div", {
     className: "seg"
-  }, tierBtn("core", "Core"), tierBtn("read_across", "Read-across"))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (ticker && name) {
-        onAdd(ticker.toUpperCase(), name, sector, tier);
-        setTicker("");
-        setName("");
-        setSector("");
-        setTier("core");
-      }
-    },
-    disabled: !ticker || !name,
+  }, tierBtn("core", "Core"), tierBtn("read_across", "Read-across"))), msg && /*#__PURE__*/React.createElement("div", {
+    className: "wl-msg " + msg.kind,
+    role: "status"
+  }, msg.text), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !ticker || !name || busy,
     style: {
-      background: ticker && name ? "var(--accent)" : "var(--border)",
-      color: ticker && name ? "var(--bg-primary)" : "var(--text-muted)",
+      background: ticker && name && !busy ? "var(--accent)" : "var(--border)",
+      color: ticker && name && !busy ? "var(--bg-primary)" : "var(--text-muted)",
       border: "none",
       padding: "10px 16px",
       fontFamily: "var(--font-sans)",
       fontSize: 13,
       fontWeight: 600,
-      cursor: ticker && name ? "pointer" : "not-allowed"
+      cursor: ticker && name && !busy ? "pointer" : "not-allowed"
     }
-  }, "Add company")))));
+  }, busy ? "Checking Investegate..." : "Add company")))));
 }
 function ReadAcrossView({
   backendUrl,
@@ -1697,7 +1861,7 @@ function ReadAcrossView({
   const fetchRA = useCallback(async () => {
     setRaLoading(true);
     try {
-      const r = await fetch(`${backendUrl}/api/readacross`);
+      const r = await fetchWithTimeout(`${backendUrl}/api/readacross`, {}, 45000);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       setRaData(j);
@@ -1764,7 +1928,7 @@ function ReadAcrossView({
     if (anns.length > 0 && anns[0].url && !liveDetails[anns[0].url]) {
       setLoadingDetail(true);
       try {
-        const r = await fetch(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(anns[0].url)}`);
+        const r = await fetchWithTimeout(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(anns[0].url)}`, {}, 45000);
         if (r.ok) {
           const j = await r.json();
           setLiveDetails(prev => ({
@@ -2720,6 +2884,9 @@ function App() {
   const intervalRef = useRef(null);
   const [tab, setTab] = useState("feed");
   const [excludedCats, setExcludedCats] = useState(() => savedPrefs?.excludedCats ? new Set(savedPrefs.excludedCats) : new Set());
+  // Mining and metals companies arrive flagged excluded_sector and are hidden unless this
+  // is on. M&A and watchlist announcements are never flagged by the server.
+  const [showMining, setShowMining] = useState(() => savedPrefs?.showMining ?? false);
   const [sourceFilter, setSourceFilter] = useState(() => savedPrefs?.sourceFilter ?? "all"); // all | rns | nonreg
   const defaultsAppliedRef = useRef(savedPrefs != null);
   // Options, merged over defaults so a new option added later still has a sane value.
@@ -2741,6 +2908,12 @@ function App() {
   const [newIds, setNewIds] = useState(() => new Set());
   const [readVersion, setReadVersion] = useState(0);
   const [focusedIdx, setFocusedIdx] = useState(-1);
+  // A full day is 600 to 1,000 announcements now that pagination captures everything.
+  // Rendering them all at once made filtering and typing sluggish, especially on a phone,
+  // so the feed renders a batch and adds more as you scroll towards the end.
+  const RENDER_BATCH = 150;
+  const [renderLimit, setRenderLimit] = useState(RENDER_BATCH);
+  const sentinelRef = useRef(null);
   const [raMap, setRaMap] = useState({});
   // Open reading panels. Non-modal, so several can be open while the feed stays usable.
   const [panels, setPanels] = useState([]);
@@ -2757,6 +2930,12 @@ function App() {
   const lastSuccessRef = useRef(0); // wall-clock time of the last good fetch
   const fetchRef = useRef(null); // always points at the current fetchData
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [signedOut, setSignedOut] = useState(false);
+  const signedOutRef = useRef(false);
+  useEffect(() => {
+    signedOutRef.current = signedOut;
+  }, [signedOut]);
+  const etagRef = useRef(null); // last feed ETag, for conditional requests
 
   // Responsive state
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 880);
@@ -2794,9 +2973,10 @@ function App() {
       sourceFilter,
       excludedCats: [...excludedCats],
       autoRefresh,
+      showMining,
       options: opts
     });
-  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, autoRefresh, opts]);
+  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, autoRefresh, showMining, opts]);
   const NONREG_SOURCES = ["GNW", "UKN", "PRN", "MFN", "EQS"];
   const toggleExcludeCat = cat => {
     setExcludedCats(prev => {
@@ -2806,8 +2986,10 @@ function App() {
     });
   };
 
-  // hard=true asks the backend to clear its cache and rescrape synchronously. force=true is
-  // sent alongside so an older backend without the hard flag still does a fresh scrape.
+  // `slow` means "expect a synchronous rescrape", so it only widens the timeout and sends
+  // force=true. It deliberately does NOT send hard=true: on the backend, hard wipes the day's
+  // accumulated cache, so announcements from earlier in the morning that have since scrolled
+  // off Investegate's 50-row index pages are destroyed and cannot be recovered.
   // ── Connecting to the backend ────────────────────────────────────────────
   // Kept deliberately simple. Auto-refresh polls on its interval whether or not the tab is in
   // front, which is what keeps the Render service awake and is how this worked originally.
@@ -2844,12 +3026,36 @@ function App() {
       } catch (e) {}
     }, hard ? HARD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
     try {
-      const qs = `include_all=true&limit=2000${hard ? "&force=true&hard=true" : ""}`;
+      const qs = `include_all=true&limit=2000${hard ? "&force=true" : ""}`;
+      // Send back the ETag from the last full response. When nothing has changed the
+      // server answers 304 with no body, so most polls transfer almost nothing.
+      const headers = etagRef.current ? {
+        "If-None-Match": etagRef.current
+      } : {};
       const r = await fetch(`${backendUrl}/api/rns?${qs}`, {
         signal: ctrl ? ctrl.signal : undefined,
-        cache: "no-store"
+        cache: "no-store",
+        headers
       });
+      // 401 means the sign-in cookie has expired. It used to be treated like a network
+      // failure, so the banner said the backend was unreachable and retried forever;
+      // only a full reload recovered. Stop polling and ask the user to sign in.
+      if (r.status === 401) {
+        setSignedOut(true);
+        setStatus("signed out");
+        setReconnectAttempt(0);
+        return;
+      }
+      if (r.status === 304) {
+        setStatus("connected");
+        setLastRefresh(new Date());
+        setReconnectAttempt(0);
+        failRef.current = 0;
+        lastSuccessRef.current = Date.now();
+        return;
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      etagRef.current = r.headers.get("ETag") || null;
       const j = await r.json();
       setData(j);
       setStatus("connected");
@@ -2873,6 +3079,7 @@ function App() {
       }
     } catch (e) {
       console.error(e);
+      if (signedOutRef.current) return;
       failRef.current += 1;
       setStatus("reconnecting");
       setReconnectAttempt(n => n + 1);
@@ -2894,7 +3101,7 @@ function App() {
   fetchRef.current = fetchData;
   const fetchWatchlist = useCallback(async () => {
     try {
-      const r = await fetch(`${backendUrl}/api/watchlist`);
+      const r = await fetchWithTimeout(`${backendUrl}/api/watchlist`, {}, 20000);
       if (r.ok) {
         const j = await r.json();
         setWatchlist(j.watchlist || {});
@@ -2906,7 +3113,7 @@ function App() {
   // row can show "-> CML" without opening the read-across tab.
   const fetchRaMap = useCallback(async () => {
     try {
-      const r = await fetch(`${backendUrl}/api/readacross`);
+      const r = await fetchWithTimeout(`${backendUrl}/api/readacross`, {}, 30000);
       if (!r.ok) return;
       const j = await r.json();
       const m = {};
@@ -2927,6 +3134,7 @@ function App() {
   useEffect(() => {
     if (!autoRefresh) return;
     const id = setInterval(() => {
+      if (signedOutRef.current) return;
       fetchRef.current && fetchRef.current(false, true);
     }, (opts.refreshSecs || 120) * 1000);
     intervalRef.current = id;
@@ -2966,23 +3174,55 @@ function App() {
   useEffect(() => () => {
     if (retryRef.current) clearTimeout(retryRef.current);
   }, []);
+
+  // Returns {ok, error, warning} so the watchlist dialog can say what happened. The server
+  // rejects tickers Investegate has no page for, and warns about alias codes and about
+  // changes that will not survive a restart.
   const handleAdd = async (t, n, s, tier) => {
     try {
-      await fetch(`${backendUrl}/api/watchlist/add?ticker=${t}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier || "core"}`, {
+      const r = await fetchWithTimeout(`${backendUrl}/api/watchlist/add?ticker=${encodeURIComponent(t)}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier || "core"}`, {
         method: "POST"
-      });
+      }, 30000);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return {
+        ok: false,
+        error: j.error || `The server rejected the change (HTTP ${r.status}).`
+      };
       await fetchWatchlist();
-      fetchData();
-    } catch {}
+      fetchData(false, true, {
+        force: true
+      });
+      return {
+        ok: true,
+        warning: j.warning || null
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "Could not reach the server. Check your connection and try again."
+      };
+    }
   };
   const handleRemove = async t => {
     try {
-      await fetch(`${backendUrl}/api/watchlist/${t}`, {
+      const r = await fetchWithTimeout(`${backendUrl}/api/watchlist/${encodeURIComponent(t)}`, {
         method: "DELETE"
-      });
+      }, 30000);
+      const j = await r.json().catch(() => ({}));
       await fetchWatchlist();
-      fetchData();
-    } catch {}
+      fetchData(false, true, {
+        force: true
+      });
+      return {
+        ok: r.ok,
+        warning: j.warning || null
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "Could not reach the server."
+      };
+    }
   };
   const allAnns = data?.announcements || [];
   const {
@@ -2992,6 +3232,7 @@ function App() {
     secCount,
     rnsCount,
     nonregCount,
+    miningCount,
     catCounts,
     sortedCats
   } = useMemo(() => {
@@ -3006,12 +3247,14 @@ function App() {
       secCount: allAnns.filter(a => a.sector_relevant).length,
       rnsCount: allAnns.filter(a => !a.source_feed || a.source_feed === "RNS").length,
       nonregCount: allAnns.filter(a => NONREG_SOURCES.includes(a.source_feed)).length,
+      miningCount: allAnns.filter(a => a.excluded_sector).length,
       catCounts: cc,
       sortedCats: Object.entries(cc).sort((a, b) => b[1] - a[1]).map(([c]) => c)
     };
   }, [allAnns, watchlist]);
   const anns = useMemo(() => {
     let out = allAnns;
+    if (!showMining) out = out.filter(a => !a.excluded_sector);
     if (filter === "watchlist") out = out.filter(a => a.is_watchlist);else if (filter === "core") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core");else if (filter === "read_across") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across");else if (filter === "sector") out = out.filter(a => a.sector_relevant);
     if (categoryFilter !== "all") out = out.filter(a => a.category === categoryFilter);
     if (excludedCats.size > 0) out = out.filter(a => !excludedCats.has(a.category));
@@ -3021,10 +3264,15 @@ function App() {
       out = out.filter(a => a.company.toLowerCase().includes(q) || a.headline.toLowerCase().includes(q) || (a.ticker || "").toLowerCase().includes(q));
     }
     if (sortMode === "latest") {
-      out = [...out].sort((a, b) => a.time > b.time ? -1 : a.time < b.time ? 1 : 0);
+      // Date first, then time, so a Sunday 18:00 release sorts below Monday 07:00.
+      out = [...out].sort((a, b) => {
+        const ka = dateKey(a.date_str) + a.time,
+          kb = dateKey(b.date_str) + b.time;
+        return ka > kb ? -1 : ka < kb ? 1 : 0;
+      });
     }
     return out;
-  }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode]);
+  }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode, showMining]);
   const tierFor = ticker => watchlist[ticker]?.tier;
   const catColorFor = useMemo(() => makeCatColor(opts.tagScheme, opts.customColors), [opts.tagScheme, opts.customColors]);
   const newCount = useMemo(() => anns.filter(a => newIds.has(annId(a))).length, [anns, newIds]);
@@ -3129,6 +3377,20 @@ function App() {
   const resetOptions = () => setOpts({
     ...OPTION_DEFAULTS
   });
+  useEffect(() => {
+    setRenderLimit(RENDER_BATCH);
+  }, [filter, categoryFilter, sourceFilter, searchText, sortMode, excludedCats, showMining]);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(en => en.isIntersecting)) setRenderLimit(l => l + RENDER_BATCH);
+    }, {
+      rootMargin: "600px"
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [renderLimit, anns.length]);
   const clearAllFilters = () => {
     setFilter("all");
     setCategoryFilter("all");
@@ -3180,7 +3442,11 @@ function App() {
       }
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusedIdx(i => Math.min((i < 0 ? -1 : i) + 1, anns.length - 1));
+        setFocusedIdx(i => {
+          const next = Math.min((i < 0 ? -1 : i) + 1, anns.length - 1);
+          if (next >= renderLimit - 5) setRenderLimit(l => l + RENDER_BATCH); // keep the focused row rendered
+          return next;
+        });
         return;
       }
       if (e.key === "k" || e.key === "ArrowUp") {
@@ -3209,11 +3475,11 @@ function App() {
           force: true
         });
         return;
-      }
+      } // forced rescrape, non-destructive
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [opts.keyboardNav, anns, focusedIdx, menuOpen, drawerOpen, optionsOpen, showWatchlist, anyModalOpen, tab, fetchData, panels, closePanel]);
+  }, [opts.keyboardNav, anns, focusedIdx, menuOpen, drawerOpen, optionsOpen, showWatchlist, anyModalOpen, tab, fetchData, panels, closePanel, renderLimit]);
 
   // Keep the keyboard-focused row in view.
   useEffect(() => {
@@ -3258,8 +3524,13 @@ function App() {
       label: `${excludedCats.size} type${excludedCats.size === 1 ? "" : "s"} hidden`,
       onClear: resetCategories
     });
+    if (!showMining && miningCount > 0) items.push({
+      key: "mining",
+      label: `${miningCount} mining and metals hidden`,
+      onClear: () => setShowMining(true)
+    });
     return items;
-  }, [filter, sourceFilter, categoryFilter, searchText, excludedCats]);
+  }, [filter, sourceFilter, categoryFilter, searchText, excludedCats, showMining, miningCount]);
 
   // Sidebar filter helpers
   const TierRow = ({
@@ -3345,6 +3616,25 @@ function App() {
     value: "nonreg",
     count: nonregCount
   })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Sectors"), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row",
+    onClick: () => setShowMining(v => !v),
+    role: "switch",
+    "aria-checked": showMining,
+    title: "Mining and metals companies. Their M&A announcements always show."
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-dot",
+    style: {
+      background: showMining ? "var(--accent)" : "var(--text-dim)"
+    }
+  }), "Mining and metals ", showMining ? "shown" : "hidden"), /*#__PURE__*/React.createElement("span", {
+    className: "filter-count"
+  }, miningCount))), /*#__PURE__*/React.createElement("div", {
     className: "sidebar-section"
   }, /*#__PURE__*/React.createElement("div", {
     className: "sidebar-label"
@@ -3435,6 +3725,8 @@ function App() {
     }, isExcluded ? "\u21BA" : "\u2715"));
   })));
   const gridClass = "grid" + (opts.columns === "1" ? " cols-1" : opts.columns === "2" ? " cols-2" : "");
+  const visibleAnns = anns.slice(0, renderLimit);
+  const remaining = anns.length - visibleAnns.length;
   return /*#__PURE__*/React.createElement(React.Fragment, null, !isMobile ? /*#__PURE__*/React.createElement("div", {
     className: "toolbar"
   }, /*#__PURE__*/React.createElement("span", {
@@ -3465,8 +3757,8 @@ function App() {
       force: true
     }),
     disabled: false,
-    title: "Clear the server cache and rescrape from scratch (Shift+R)"
-  }, "Hard refresh"), /*#__PURE__*/React.createElement("button", {
+    title: "Rescrape Investegate now, bypassing the cache freshness check. Earlier announcements from today are kept. (Shift+R)"
+  }, "Force refresh"), /*#__PURE__*/React.createElement("button", {
     className: "toolbar-btn",
     onClick: () => setAutoRefresh(!autoRefresh),
     style: autoRefresh ? {
@@ -3531,7 +3823,7 @@ function App() {
       });
       setMenuOpen(false);
     }
-  }, /*#__PURE__*/React.createElement("span", null, "Hard refresh"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, "Force refresh"), /*#__PURE__*/React.createElement("span", {
     className: "overflow-val"
   }, "↻")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-item",
@@ -3671,7 +3963,21 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(StatusDot, {
     status: status
-  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), reconnectAttempt > 0 && /*#__PURE__*/React.createElement("div", {
+  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), signedOut && /*#__PURE__*/React.createElement("div", {
+    className: "reconnect"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 160
+    }
+  }, "Your sign-in has expired, so the feed has stopped updating. Sign in again to continue."), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => {
+      try {
+        window.location.href = "/login";
+      } catch (e) {}
+    }
+  }, "Sign in again")), !signedOut && reconnectAttempt > 0 && /*#__PURE__*/React.createElement("div", {
     className: "reconnect"
   }, /*#__PURE__*/React.createElement("span", {
     className: "spinner",
@@ -3727,7 +4033,7 @@ function App() {
     key: i
   }))), anns.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: gridClass
-  }, anns.map((a, i) => {
+  }, visibleAnns.map((a, i) => {
     const id = annId(a);
     const tier = tierFor(a.ticker);
     return /*#__PURE__*/React.createElement(AnnouncementCard, {
@@ -3746,7 +4052,13 @@ function App() {
       onOpenPanel: openPanel,
       isPanelOpen: openPanelKeys.has(id)
     });
-  })), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
+  })), remaining > 0 && /*#__PURE__*/React.createElement("div", {
+    ref: sentinelRef,
+    className: "more-bar"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => setRenderLimit(l => l + RENDER_BATCH)
+  }, "Show ", Math.min(RENDER_BATCH, remaining), " more"), /*#__PURE__*/React.createElement("span", null, remaining, " not yet shown")), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3801,6 +4113,7 @@ function App() {
     onResetCategories: resetCategories,
     onResetOptions: resetOptions,
     hiddenCount: excludedCats.size,
+    backendUrl: backendUrl,
     readCount: readStore.size()
   }));
 }

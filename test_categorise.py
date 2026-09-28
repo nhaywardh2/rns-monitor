@@ -55,6 +55,40 @@ CASES = [
     ("Transaction in Own Shares", "Buyback"),
     ("Share Buyback Programme", "Buyback"),
 
+    # Takeover Code lifecycle. Before this was fixed, 30 of 68 of these tagged Other and
+    # several more were captured by Contract, Regulatory or Results first.
+    ("Increase in Price for the Recommended Acquisition", "M&A"),   # Tribal, 27 Sep 2026
+    ("Statement regarding Possible Offer", "M&A"),                  # I-RES, 28 Sep 2026
+    ("Statement regarding final offer for Capricorn", "M&A"),       # Capricorn, 28 Sep 2026
+    ("Rule 2.4 Announcement", "M&A"),
+    ("Rule 2.7 Announcement", "M&A"),
+    ("Statement re Press Speculation", "M&A"),
+    ("Response to Approach", "M&A"),
+    ("Irrevocable Undertakings", "M&A"),
+    ("Level of Acceptances", "M&A"),
+    ("Acceptance Level Update", "M&A"),
+    ("Unconditional in All Respects", "M&A"),
+    ("Formal Sale Process", "M&A"),
+    ("Strategic Review and Formal Sale Process", "M&A"),
+    ("Extension of PUSU Deadline", "M&A"),          # was Contract via 'extension'
+    ("Merger Agreement", "M&A"),                    # was Contract via 'agreement'
+    ("Court Sanction of Scheme", "M&A"),            # was Regulatory via 'sanction'
+    ("Results of Court Meeting and General Meeting", "M&A"),   # was Results
+    ("Scheme Document", "M&A"),                     # was Admin, i.e. hidden by default
+    ("Scheme Effective", "M&A"),
+    ("Recommended Increased Best and Final Offer", "M&A"),
+    ("Genel Energy PLC: INCREASED RECOMMENDED CASH ...", "M&A"),   # truncated listing headline
+    ("Sale of Business", "M&A"),
+    ("Recommended All-Share Combination", "M&A"),
+
+    # Near-misses that must stay OUT of M&A
+    ("Open Offer", "Fundraise"),
+    ("Retail Offer", "Fundraise"),
+    ("Offer for Subscription", "Fundraise"),
+    ("Results of Tender Offer", "Buyback"),
+    ("Opening Position Disclosure", "Admin"),
+    ("Form 8.3 - Tribal Group plc", "Admin"),
+
     # Contracts, holdings, dividends, admin
     ("Contract Award with NHS", "Contract"),
     ("Strategic Partnership", "Contract"),
@@ -78,6 +112,9 @@ TRAPS = [
 
 # Announcements that must never be hidden by default, whatever else changes.
 MUST_BE_VISIBLE = [
+    "Scheme Document",
+    "Statement regarding Possible Offer",
+    "Increase in Price for the Recommended Acquisition",
     "Half-year Report",
     "Interim Report and Accounts",
     "Full Year Results",
@@ -86,6 +123,9 @@ MUST_BE_VISIBLE = [
 ]
 
 # Watchlist entries that must stay wired end to end.
+# Investegate company codes that must map onto a watchlist ticker.
+REQUIRED_ALIASES = {"0QT8": "IRES"}
+
 REQUIRED_WATCHLIST = {
     "KEYS": "read_across",
     "BOOK": "core",
@@ -154,8 +194,26 @@ def check_watchlist():
     return fails
 
 
+def check_aliases():
+    """An aliased code must resolve to its watchlist ticker in every path that
+    identifies a company: ticker extraction, serve-time recompute, company pages."""
+    fails = []
+    for code, ticker in REQUIRED_ALIASES.items():
+        if app.canonical_ticker(code) != ticker:
+            fails.append(f"  canonical_ticker({code!r}) is {app.canonical_ticker(code)!r}, expected {ticker!r}")
+        if app.extract_ticker(f"SOME COMPANY NAME ({code})") != ticker:
+            fails.append(f"  extract_ticker did not map ({code}) to {ticker}")
+        if code not in app.company_codes(ticker):
+            fails.append(f"  company page for {code} would not be fetched for {ticker}")
+        if ticker not in app.DEFAULT_WATCHLIST:
+            fails.append(f"  alias target {ticker} is not on the watchlist")
+    print(f"{len(REQUIRED_ALIASES) - len(fails)}/{len(REQUIRED_ALIASES)} alias checks passed"
+          if not fails else "alias checks FAILED")
+    return fails
+
+
 def main():
-    fails = check_categories() + check_traps() + check_visibility() + check_watchlist()
+    fails = check_categories() + check_traps() + check_visibility() + check_watchlist() + check_aliases()
     for line in fails:
         print(line)
     if fails:
