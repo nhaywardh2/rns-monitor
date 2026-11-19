@@ -16,6 +16,7 @@ Each check is named after the behaviour it protects. Several exist because the
 behaviour broke in production (see the notes beside them).
 """
 import asyncio
+import re
 import gzip
 import os
 import sys
@@ -362,6 +363,67 @@ def test_formatted_body_falls_back_to_plain_text():
     check("fallback: plain text still available", "Adjusted EBITDA" in d.body_text)
     check("fallback: diagnostics say why", "AI summary" in (app._last_format_diag.get(url, {}).get("fallback_reason") or ""))
 
+
+
+# Modelled on the live Investegate page for Breedon "Total Voting Rights" (19 Nov 2026): same
+# blocks, order and wording. Since late 2026 the release text is loaded in the browser, so a
+# server-side fetch receives only the AI summary, disclaimer, sidebar and footer, as here.
+SUMMARY_ONLY_PAGE = """<html><head><title>Total Voting Rights | Company Announcement | Investegate</title></head><body>
+<div id="outterContent">
+<ul><li><a href="/welcome">Welcome</a></li><li><a href="/content">Articles</a></li><li><a href="/about-us">About</a></li><li><a href="/contact-us">Contact Us</a></li><li><a href="/help">Help</a></li></ul>
+<ul><li><a href="/">Home</a></li><li><a href="/search-company">Companies</a></li><li><a href="/advanced-search">Advanced search</a></li><li><a href="/announcement-archive">Archive</a></li><li><a href="/meetings">Meetings</a></li></ul>
+<h1>Total Voting Rights</h1>
+<h2>Summary by AI BETA<a href="#">Close X</a></h2>
+<p>Breedon Group plc announces that as of October 30, 2026, its issued share capital comprises 347,106,800 ordinary shares, with no shares held in treasury, resulting in 347,106,800 voting rights.</p>
+<a href="#">Disclaimer*</a>
+<h5>AI Summary Disclaimer BETA</h5><span>&times;</span>
+<p>The content you are viewing has been generated or assisted by artificial intelligence (AI). While efforts are made to ensure accuracy and clarity, AI-generated text may contain inaccuracies, outdated information, or subjective interpretations. This content is intended for general informational purposes only and should not be considered professional advice or factual confirmation.</p>
+<p>We encourage you to independently verify any information provided, especially if it will be relied upon for making decisions or taking action. Any reliance you place on this material is strictly at your own risk. The AI system that produced this content cannot assess the specifics of individual circumstances, and results may vary based on context and individual needs.</p>
+<h2>Companies</h2><a href="/company/BREE">Breedon Group (BREE)</a>
+<h6><b>UK 100</b></h6><a href="https://www.tradingview.com/">FTSE quotes</a> by TradingView
+<a href="/meetings"><img src="/assets/images/imc/imc-view-meetings@1x.gif" alt="Investor Meet Company View Meetings"></a>
+<h2>Latest directors dealings</h2>
+<ul><li>5 hours ago <a href="#">Kier Group</a></li><li>6 hours ago <a href="#">Banco Santander S.A.</a></li><li>6 hours ago <a href="#">Banco Santander S.A.</a></li><li>6 hours ago <a href="#">PZ Cussons</a></li><li>6 hours ago <a href="#">Oxford Nanopore Technologies</a></li></ul>
+<a href="/category/directors-dealings">All directors dealings today</a>
+<p>All intraday prices are subject to a delay of fifteen (15) minutes.</p>
+<p>Investegate takes no responsibility for the accuracy of the information within this site.</p>
+<p>&copy; 2026 Investor Meet Company Ltd</p>
+<h5>This website is for Private Investors*</h5><p>I am a Private Investor</p>
+<p>Please note, this site uses cookies.</p>
+</div></body></html>"""
+
+
+def test_summary_only_page_is_not_shown_as_the_release():
+    reset_state()
+    url, d = _detail_for(SUMMARY_ONLY_PAGE)
+    check("summary-only page: release marked unavailable", d.body_available is False)
+    check("summary-only page: no page furniture passed off as release text", d.body_text == "" and d.body_html == "")
+    check("summary-only page: no key figures invented from furniture", d.key_figures == [])
+    check("summary-only page: AI summary still provided", "347,106,800" in (d.ai_summary or ""))
+    url2, d2 = _detail_for(SAMPLE_RNS_PAGE)
+    check("page with a release: still available and formatted", d2.body_available is True and bool(d2.body_html))
+
+
+def test_version_stamp():
+    """Open tabs never reload themselves, so the page and the feed both carry a version and
+    the page can tell when a deploy has happened."""
+    reset_state()
+    c = TestClient(app.app)
+    page = c.get("/").text
+    m = re.search(r'<meta name="app-version" content="([0-9a-f]{12})">', page)
+    check("version: page is stamped with its version", bool(m))
+    r = c.get("/api/rns?include_all=true")
+    check("version: feed response carries the same version", m and r.headers.get("x-app-version") == m.group(1))
+    r304 = c.get("/api/rns?include_all=true", headers={"If-None-Match": r.headers.get("etag")})
+    check("version: a 304 also carries it", r304.status_code == 304 and r304.headers.get("x-app-version") == m.group(1))
+
+
+def test_widths_only_survive_on_tables():
+    raw = app.BeautifulSoup('<div style="width:820px; color:red" width="820"><p style="min-width:700px">x</p>'
+                            '<table width="900" style="width:900px"><tr><td width="120">1</td></tr></table></div>', "html.parser")
+    out = app.sanitise_rns_html(raw)
+    check("phone layout: fixed widths removed from text blocks", 'style="color: red"' in out and "820" not in out and "700px" not in out)
+    check("phone layout: table widths kept for structure", 'width="900"' in out and 'width="120"' in out)
 
 def test_debug_announcement_endpoint():
     reset_state()

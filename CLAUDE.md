@@ -66,6 +66,23 @@ documented at the top of `app.py`. `requirements.txt` must include `psycopg[bina
   Never add `allow-scripts` to that sandbox, and never render `body_html` outside it. If
   formatting fails a quality check, `body_html` is empty and plain text is shown instead.
   `/api/debug/announcement?url=...` shows how a given announcement was extracted.
+- **Investegate no longer serves release text (since late 2026).** Its announcement pages load
+  the release in the browser, so a server-side fetch gets only the AI summary, disclaimer,
+  sidebar and footer. `strip_page_chrome` detects this and returns `body_available: false`
+  rather than showing page furniture as the release. The reader then offers **paste to
+  read**: the user copies the release from Investegate and pastes it in; it is cleaned in the
+  browser with the same allow-list as the server (`sanitiseRelease`), trimmed to the release
+  (`trimToRelease`), stored on that device only for the day, and shown in the same sandboxed
+  frame. Investegate's terms restrict the site to private investors and prohibit commercial
+  reuse; that question has been raised with the user and is theirs to resolve.
+- **Phones must never scroll the text sideways.** Fixed widths are kept only on tables and
+  images; on narrow screens tables also drop their authored widths, and a table that still
+  doesn't fit scrolls inside its own box with a visible hint.
+- **Open tabs never reload themselves**, because auto-refresh fetches data, not the page. The
+  server stamps the page and every feed response with a version (`frontend_page`,
+  `X-App-Version`); a mismatch shows an update notice and reloads when the tab is hidden.
+- **Uploading through GitHub's web page flattens folders.** Files meant for `static/` or
+  `tests/` must be uploaded from inside that folder, or they land in the top level.
 - **`build.js` must keep `runtime: "classic"`.** Babel 8's default emits ES imports, which
   load to a blank page in a plain script tag. The build aborts if that happens.
 - **Verify before assuming.** Two production misses came from assuming what Investegate
