@@ -192,14 +192,35 @@ async def login(request: Request):
 STATIC_DIR = Path(__file__).parent / "static"
 NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
 
+# The frontend's version is a short hash of static/index.html. It is stamped into the
+# page as it is served and sent with every feed response (X-App-Version). A tab left open
+# all day keeps running the code it loaded, because auto-refresh fetches data, not the
+# page, so deploys never reached it. Comparing the two lets the page say an update exists.
+_frontend_cache: dict = {"mtime": None, "html": "", "version": ""}
+
+def frontend_page() -> tuple[str, str]:
+    """(html with version stamp, version). Re-read only when the file changes."""
+    html_path = STATIC_DIR / "index.html"
+    try:
+        mtime = html_path.stat().st_mtime
+    except OSError:
+        return "", ""
+    if _frontend_cache["mtime"] != mtime:
+        raw = html_path.read_text(encoding="utf-8")
+        version = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+        stamp = f'<meta name="app-version" content="{version}">'
+        html = raw.replace("<head>", "<head>\n" + stamp, 1) if "<head>" in raw else stamp + raw
+        _frontend_cache.update(mtime=mtime, html=html, version=version)
+    return _frontend_cache["html"], _frontend_cache["version"]
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend(request: Request):
     if APP_PASSWORD and not _cookie_ok(request.cookies.get(AUTH_COOKIE)):
         return RedirectResponse("/login")
-    html_path = STATIC_DIR / "index.html"
+    html, _ = frontend_page()
     # no-cache means the browser revalidates on every load, so a deploy shows up on the
     # next refresh instead of an old copy of the frontend lingering in the cache.
-    return HTMLResponse(content=html_path.read_text(encoding="utf-8"), headers=NO_CACHE)
+    return HTMLResponse(content=html, headers=NO_CACHE)
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -782,6 +803,10 @@ class DetailResponse(BaseModel):
     rns_number: Optional[str] = None
     fetched_at: str
     error: Optional[str] = None
+    # False when the page Investegate served contained no release text, only its own
+    # summary, disclaimer, sidebar and footer. The frontend then offers to read the release
+    # at source or paste it in, rather than showing page furniture as if it were the release.
+    body_available: bool = True
 
 class ShareholdingDetail(BaseModel):
     url: str
@@ -1408,8 +1433,13 @@ _KEEP_TAGS = {
     "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "colgroup", "col", "blockquote",
     "pre", "hr", "a", "img", "font", "center", "abbr", "cite", "code", "figure", "figcaption",
 }
-_KEEP_ATTRS_ANY = {"style", "align", "valign", "width", "height", "colspan", "rowspan", "nowrap",
+_KEEP_ATTRS_ANY = {"style", "align", "valign", "colspan", "rowspan", "nowrap",
                    "border", "cellpadding", "cellspacing", "span", "dir", "bgcolor"}
+# Fixed widths are what force sideways scrolling on a phone, so they survive only where a
+# layout needs them (table structure and images); paragraphs and blocks always reflow.
+_SIZED_TAGS = {"table", "td", "th", "col", "colgroup", "img"}
+_SIZE_ATTRS = {"width", "height"}
+_SIZE_CSS = {"width", "min-width", "max-width", "height"}
 _KEEP_ATTRS_TAG = {
     "a": {"href", "title"},
     "img": {"src", "alt"},
@@ -1429,13 +1459,15 @@ _KEEP_CSS = {
 }
 _BAD_CSS_VALUE = re.compile(r'url\s*\(|expression|javascript:|@import|behavior|\\|<', re.I)
 
-def _clean_style(style: str) -> str:
+def _clean_style(style: str, sized: bool = True) -> str:
     kept = []
     for decl in (style or "").split(";"):
         if ":" not in decl:
             continue
         prop, value = decl.split(":", 1)
         prop, value = prop.strip().lower(), value.strip()
+        if prop in _SIZE_CSS and not sized:
+            continue
         if prop in _KEEP_CSS and value and not _BAD_CSS_VALUE.search(value):
             kept.append(f"{prop}: {value}")
     return "; ".join(kept)
@@ -1470,12 +1502,12 @@ def sanitise_rns_html(root) -> str:
         if name not in _KEEP_TAGS:
             tag.unwrap()
             continue
-        allowed = _KEEP_ATTRS_ANY | _KEEP_ATTRS_TAG.get(name, set())
+        allowed = _KEEP_ATTRS_ANY | _KEEP_ATTRS_TAG.get(name, set()) | (_SIZE_ATTRS if name in _SIZED_TAGS else set())
         for attr in list(tag.attrs):
             if attr.lower() not in allowed:
                 del tag.attrs[attr]
         if "style" in tag.attrs:
-            cleaned = _clean_style(tag["style"])
+            cleaned = _clean_style(tag["style"], sized=name in _SIZED_TAGS)
             if cleaned:
                 tag["style"] = cleaned
             else:
@@ -1595,6 +1627,52 @@ def extract_formatted_body(content_div, body_text: str):
     return (html if reason is None else None), diag
 
 # ── Detail Scraping ──────────────────────────────────────────────────────────
+
+
+# Investegate's own page furniture. Since late 2026 its announcement pages load the
+# release text separately in the browser, so what a plain fetch receives is only the AI
+# summary, its disclaimer, the sidebar and the footer. These lines identify that material.
+_PAGE_CHROME_PHRASES = (
+    "AI Summary Disclaimer", "The content you are viewing has been generated or assisted by artificial intelligence",
+    "We encourage you to independently verify any information provided", "Latest directors dealings",
+    "All directors dealings today", "This website is for Private Investors", "by TradingView",
+    "Create your FREE account", "Personalise your experience", "Investor Meet Company",
+    "Complete Profile", "I am a Private Investor",
+    # Site footer. The plain-text cleaner stops at the first footer marker in its list rather
+    # than the earliest on the page, so these lines can survive it.
+    "All intraday prices are subject", "Investegate takes no responsibility",
+    "The announcements are supplied by the denoted source", "Investegate reserves the right",
+    "Please note, this site uses cookies", "Investor Meet Company Ltd",
+)
+_AGO_LINE = re.compile(r'^\d+\s+(second|minute|hour|day|week)s?\s+ago\b', re.I)
+
+def strip_page_chrome(body_text: str) -> tuple[str, bool]:
+    """(text without Investegate's page furniture, whether a release is plausibly present).
+
+    A release is judged absent when, once the furniture is removed, too little text is left
+    to be one. Measured on a summary-only page modelled on the live site, nothing substantive
+    survives; a short results release keeps over 300 characters. 150 sits between the two.
+    A genuinely tiny release could be judged absent; the reader then offers the source link
+    and paste option instead, which is a safe failure."""
+    kept = []
+    skip_next_name = False
+    for line in (body_text or "").split("\n"):
+        t = line.strip()
+        if not t:
+            continue
+        if any(p in t for p in _PAGE_CHROME_PHRASES):
+            continue
+        if _AGO_LINE.match(t):          # "5 hours ago" lines in the directors' dealings box
+            skip_next_name = len(t) < 20  # the company name sometimes sits on its own line
+            continue
+        if skip_next_name and len(t) < 60:
+            skip_next_name = False
+            continue
+        skip_next_name = False
+        kept.append(t)
+    cleaned = "\n".join(kept)
+    substantive = sum(len(t) for t in kept if len(t) > 40)
+    return cleaned, substantive >= 150
 
 # Diagnostics from the most recent formatting attempt per URL, for /api/debug/announcement.
 _last_format_diag: dict[str, dict] = {}
@@ -1759,7 +1837,10 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
                 body_text = body_text[:idx].rstrip()
                 break
 
-        key_figures = extract_key_figures(body_text)
+        body_text, body_available = strip_page_chrome(body_text)
+        if not body_available:
+            body_text = ""
+        key_figures = extract_key_figures(body_text) if body_available else []
         ai_summary = extract_ai_summary(soup)
 
         # body_html is the announcement with its source formatting, cleaned and safe to
@@ -1768,7 +1849,9 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
         # which nothing displayed.
         body_html = ""
         format_diag = {"used": False, "fallback_reason": "no announcement container found"}
-        if raw_container_html:
+        if not body_available:
+            format_diag = {"used": False, "fallback_reason": "release text not present on the page"}
+        elif raw_container_html:
             try:
                 formatted, format_diag = extract_formatted_body(
                     BeautifulSoup(raw_container_html, "html.parser"), body_text)
@@ -1786,6 +1869,7 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
             key_figures=key_figures,
             ai_summary=ai_summary,
             fetched_at=datetime.now().isoformat(),
+            body_available=body_available,
         )
 
 
@@ -2299,6 +2383,7 @@ async def health():
         "scrape_interval_seconds": SCRAPE_INTERVAL_SECONDS,
         "last_errors_count": len(daily_cache.last_errors),
         "watchlist_size": len(WATCHLIST),
+        "app_version": frontend_page()[1],
         "watchlist_storage": watchlist_store.status(),
         "session_days": [d.isoformat() for d in trading_window()],
         "bank_holidays_listed_until": max(UK_BANK_HOLIDAYS).isoformat(),
@@ -2368,7 +2453,7 @@ async def get_rns(
     fingerprint = json.dumps({k: v for k, v in body.items() if k != "scraped_at"},
                              sort_keys=True, default=str)
     etag = '"' + hashlib.sha1(fingerprint.encode()).hexdigest() + '"'
-    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    headers = {"ETag": etag, "Cache-Control": "no-cache", "X-App-Version": frontend_page()[1]}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
     return JSONResponse(content=body, headers=headers)
