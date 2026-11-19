@@ -1,0 +1,4469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>h2Radnor · RNS Monitor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* Terminal-density palette — slightly neutralised from the previous green-tinted blacks */
+      --bg-primary: #07090a;       /* outermost background */
+      --bg-sidebar: #0b0f10;       /* left filter rail */
+      --bg-toolbar: #0a0e0f;       /* top status strip */
+      --bg-card: #0e1314;          /* announcement row */
+      --bg-card-hover: #131a1c;
+      --bg-card-active: #16201f;   /* expanded card */
+      --bg-surface: #0c1112;       /* misc panels */
+      --bg-detail: #0a0e0f;
+      --border: #1a2326;
+      --border-strong: #243036;
+      --border-active: #2d4a36;
+      --text-primary: #d4dcd6;
+      --text-secondary: #7a8c80;
+      --text-muted: #4a5a52;
+      --text-dim: #34423b;
+      --accent: #3db86a;
+      --accent-dim: #2a7d49;
+      --accent-glow: rgba(61,184,106,0.10);
+      --watchlist: #f0c040;
+      --watchlist-bg: rgba(240,192,64,0.06);
+      --watchlist-border: rgba(240,192,64,0.22);
+      --core: #f0c040;
+      --readacross: #f97316;
+      --readacross-bg: rgba(249,115,22,0.06);
+      /* Category accent colours, kept restrained.
+         Note: --director and --regulatory deliberately avoid gold and orange, because those
+         are reserved for the core (gold) and read-across (orange) tier highlights. */
+      --results: #5ba8f7;
+      --trading: #a78bfa;
+      --ma: #f97066;
+      --fundraise: #34d399;
+      --director: #a8a29e;
+      --company-update: #60a5fa;
+      --contract: #2dd4bf;
+      --board-change: #c084fc;
+      --regulatory: #f43f5e;
+      --dividend: #a3e635;
+      --shareholding: #f472b6;
+      --buyback: #22d3ee;
+      --admin: #94a3b8;
+      --nonreg: #38bdf8;
+      --other: #8a9e8f;
+      --danger: #ef4444;
+      --new-cue: #3db86a;
+      --font-sans: 'DM Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+      --sidebar-w: 224px;
+      --toolbar-h: 48px;
+    }
+
+    /* Light theme. Applied by setting data-theme="light" on <html>. Every colour token is
+       re-pointed, so components need no theme-specific code of their own. Category hues are
+       darkened for legible contrast on white. */
+    html[data-theme="light"] {
+      --bg-primary: #f1f4f3;
+      --bg-sidebar: #e8eceb;
+      --bg-toolbar: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f4f8f6;
+      --bg-card-active: #ecf5f0;
+      --bg-surface: #f7f9f8;
+      --bg-detail: #fafbfa;
+      --border: #d7dedb;
+      --border-strong: #b9c4bf;
+      --border-active: #8cbf9f;
+      --text-primary: #14201b;
+      --text-secondary: #4a5c53;
+      --text-muted: #74847c;
+      --text-dim: #9aa6a0;
+      --accent: #1f8a4c;
+      --accent-dim: #166638;
+      --accent-glow: rgba(31,138,76,0.10);
+      --watchlist: #a67608;
+      --watchlist-bg: rgba(166,118,8,0.09);
+      --watchlist-border: rgba(166,118,8,0.30);
+      --core: #a67608;
+      --readacross: #c2410c;
+      --readacross-bg: rgba(194,65,12,0.08);
+      --results: #1d6fd0;
+      --trading: #6d3fd4;
+      --ma: #cf3527;
+      --fundraise: #0f8a5f;
+      --director: #6f6a66;
+      --company-update: #2563eb;
+      --contract: #0d8f86;
+      --board-change: #7c33c8;
+      --regulatory: #d01b3c;
+      --dividend: #4d7c0f;
+      --shareholding: #be1873;
+      --buyback: #0e7490;
+      --admin: #5c6b78;
+      --nonreg: #0369a1;
+      --other: #6b7280;
+      --danger: #dc2626;
+      --new-cue: #1f8a4c;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); min-height:100vh; }
+    body { font-size:13px; line-height:1.4; -webkit-font-smoothing:antialiased; }
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border); border-radius:0; }
+    ::-webkit-scrollbar-thumb:hover { background:var(--border-strong); }
+
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.35} }
+    @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    @keyframes slideInLeft { from{transform:translateX(-100%)} to{transform:translateX(0)} }
+    .fade-in { animation:fadeIn 0.18s ease-out both; }
+    .fade-up { animation:fadeIn 0.22s ease-out both; }  /* legacy alias, kept for older components */
+    .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-card-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:shimmer 1.8s ease-in-out infinite; }
+    .spinner { width:14px; height:14px; border:1.5px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
+
+    /* Top toolbar */
+    .toolbar { position:sticky; top:0; z-index:50; height:var(--toolbar-h); background:var(--bg-toolbar); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 14px; gap:14px; }
+    .brand { font-size:14px; font-weight:700; letter-spacing:-0.02em; }
+    .brand span { color:var(--accent); }
+    .toolbar-tag { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); padding:2px 8px; border:1px solid var(--border); border-radius:0; }
+    .toolbar-meta { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+    .toolbar-spacer { flex:1; }
+    .toolbar-btn { background:transparent; border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:11px; font-weight:500; padding:6px 12px; cursor:pointer; transition:all 0.15s; }
+    .toolbar-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .toolbar-btn.primary { background:var(--accent); color:var(--bg-primary); border-color:var(--accent); font-weight:600; }
+    .toolbar-btn.primary:hover { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--bg-primary); }
+    .toolbar-btn.icon { padding:5px 9px; display:inline-flex; align-items:center; justify-content:center; }
+    .toolbar-btn.icon svg { display:block; }
+    .toolbar-tab { background:transparent; border:none; color:var(--text-muted); font-family:var(--font-sans); font-size:12px; font-weight:600; padding:14px 14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; height:100%; display:flex; align-items:center; }
+    .toolbar-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .toolbar-tab:hover { color:var(--text-secondary); }
+
+    /* Layout grid */
+    .layout { display:grid; grid-template-columns:var(--sidebar-w) 1fr; min-height:calc(100vh - var(--toolbar-h)); }
+
+    /* Mobile toolbar bits */
+    .toolbar-icon-btn { background:transparent; border:1px solid var(--border); color:var(--text-secondary); font-size:16px; line-height:1; padding:8px 11px; cursor:pointer; transition:all 0.15s; }
+    .toolbar-icon-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Mobile tab bar (under toolbar) */
+    .mobile-tabbar { position:sticky; top:var(--toolbar-h); z-index:45; display:flex; background:var(--bg-toolbar); border-bottom:1px solid var(--border); }
+    .mobile-tab { flex:1; text-align:center; padding:13px 8px; font-size:13px; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; }
+    .mobile-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    /* Scrim + drawer + overflow menu */
+    .scrim { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:90; animation:fadeIn 0.18s ease-out both; }
+    .scrim.clear { background:transparent; }
+    .drawer { position:fixed; top:0; bottom:0; left:0; width:min(86%,330px); background:var(--bg-sidebar); border-right:1px solid var(--border); z-index:91; display:flex; flex-direction:column; animation:slideInLeft 0.2s ease-out both; }
+    .drawer-head { padding:14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .drawer-head-title { font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-secondary); }
+    .drawer-body { flex:1; overflow-y:auto; padding:14px 12px; }
+    .overflow-menu { position:fixed; top:calc(var(--toolbar-h) + 4px); right:8px; width:230px; background:var(--bg-card); border:1px solid var(--border-strong); z-index:91; animation:fadeIn 0.14s ease-out both; }
+    .overflow-item { display:flex; align-items:center; justify-content:space-between; padding:14px; font-size:13px; color:var(--text-secondary); cursor:pointer; border-bottom:1px solid var(--border); }
+    .overflow-item:last-child { border-bottom:none; }
+    .overflow-item:active, .overflow-item:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+    .overflow-val { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+
+    /* Bigger touch targets inside the drawer (no hover on touch) */
+    .drawer .filter-row { padding:11px 8px; }
+    .drawer .sidebar-search { padding:11px 12px; font-size:14px; }
+    .drawer .filter-toggle-hide { opacity:1; padding:4px 8px; font-size:13px; }
+
+    @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+    /* Tighten side padding on small screens; allow grid to drop to one column naturally */
+    @media (max-width: 560px) { .main { padding:12px 12px 60px; } .toolbar { padding:0 10px; gap:8px; } }
+
+    /* Sidebar */
+    .sidebar { background:var(--bg-sidebar); border-right:1px solid var(--border); padding:14px 12px; overflow-y:auto; max-height:calc(100vh - var(--toolbar-h)); position:sticky; top:var(--toolbar-h); align-self:start; }
+    .sidebar-section { margin-bottom:18px; }
+    .sidebar-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; padding:0 4px; display:flex; align-items:center; justify-content:space-between; }
+    .sidebar-search { width:100%; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-primary); font-family:var(--font-sans); font-size:12px; padding:7px 10px; outline:none; transition:border-color 0.15s; }
+    .sidebar-search::placeholder { color:var(--text-muted); }
+    .sidebar-search:focus { border-color:var(--accent); }
+    .filter-row { display:flex; align-items:center; justify-content:space-between; padding:5px 8px; cursor:pointer; color:var(--text-secondary); font-size:12px; transition:all 0.12s; user-select:none; border-left:2px solid transparent; }
+    .filter-row:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+    .filter-row.active { background:var(--bg-card-active); color:var(--accent); border-left-color:var(--accent); }
+    .filter-row.active .filter-count { color:var(--accent); background:var(--accent-glow); }
+    .filter-row.excluded { color:var(--danger); border-left-color:rgba(239,68,68,0.4); }
+    .filter-row.excluded .filter-label { text-decoration:line-through; }
+    .filter-label { display:flex; align-items:center; gap:6px; }
+    .filter-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .filter-count { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); background:var(--bg-surface); padding:1px 6px; min-width:24px; text-align:center; }
+    .filter-toggle-hide { opacity:0; padding:2px 6px; margin-left:4px; color:var(--text-muted); font-size:10px; transition:opacity 0.12s; }
+    .filter-row:hover .filter-toggle-hide { opacity:1; }
+    .filter-toggle-hide:hover { color:var(--danger); }
+
+    /* Main feed */
+    .main { padding:14px 16px 60px; overflow-x:hidden; }
+    .feed-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding:0 2px; }
+    .feed-counts { display:flex; gap:14px; font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+    .feed-counts span strong { color:var(--text-secondary); font-weight:500; }
+
+    /* Grid.
+       align-items:start is important: without it, grid items stretch to the tallest in their
+       row, so expanding one card inflated its neighbour into a tall empty box. */
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; }
+    /* Cards in a row share one height (the grid default, stretch), so their bottoms line up.
+       Aligning every card to the top instead left ragged rows whenever one headline ran to
+       two or three lines. */
+    /* ...except beside an open card. There the other cards in the same row stay compact at
+       the top rather than stretching into tall empty boxes. CSS cannot select "cards in the
+       same row", so the app marks them with data-beside-open (see useRowLevelling). */
+    .grid > .row[data-beside-open] { align-self:start; }
+    .grid.cols-1 { grid-template-columns:1fr; }
+    .grid.cols-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    /* Matches the 880px breakpoint the JS uses for mobile layout, and minmax(0,...) lets a
+       column shrink below its content width instead of forcing the page wider. */
+    @media (max-width: 880px) { .grid, .grid.cols-1, .grid.cols-2 { grid-template-columns:minmax(0, 1fr); } }
+
+    /* Announcement row — dense */
+    .row { background:var(--bg-card); border:1px solid var(--border); border-left:3px solid var(--border); cursor:pointer; transition:background-color 0.12s, border-color 0.12s; padding:9px 12px; }
+    .row:hover { background:var(--bg-card-hover); border-left-color:var(--accent-dim); }
+    .row.expanded { background:var(--bg-card-active); border-color:var(--border-strong); border-left-color:var(--accent); }
+    .row.watchlist { border-left-color:var(--watchlist); background:var(--watchlist-bg); }
+    .row.watchlist:hover { background:rgba(240,192,64,0.10); }
+    /* Read-across rows: orange highlight, distinct from the gold of core watchlist rows */
+    .row.readacross { border-left-color:var(--readacross); background:var(--readacross-bg); }
+    .row.readacross:hover { background:rgba(249,115,22,0.11); }
+    /* Read rows: the CONTENT dims, not the whole row, so the gold/orange tier bar on the left
+       keeps its full strength and a read watchlist item is still identifiable at a glance.
+       Hovering restores full opacity so re-reading is easy. */
+    .row.read .row-body { opacity:0.45; }
+    .row.read:hover .row-body { opacity:1; }
+    .row-body { transition:opacity 0.12s; }
+    /* New since the last refresh: a small accent flag plus a brief pulse on arrival. */
+    .row.is-new { box-shadow:inset 0 0 0 1px var(--accent-glow); }
+    .row.is-new .row-new-dot { display:inline-block; }
+    .row-new-dot { display:none; width:5px; height:5px; border-radius:50%; background:var(--new-cue); flex-shrink:0; animation:pulse-dot 2s ease-in-out 3; }
+    /* Keyboard focus ring for j/k navigation. */
+    .row.focused { outline:1px solid var(--accent); outline-offset:-1px; }
+    .row:focus-visible { outline:1px solid var(--accent); outline-offset:-1px; }
+    .row-read-btn { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:10px; padding:0 2px; line-height:1; flex-shrink:0; transition:color 0.12s; }
+    .row-read-btn:hover { color:var(--accent); }
+    .row-ra-map { font-family:var(--font-mono); font-size:9px; color:var(--readacross); background:var(--readacross-bg); padding:1px 5px; flex-shrink:0; }
+    /* The meta line must be allowed to wrap. Every child is flex-shrink:0, so with nowrap the
+       contents overflowed the card on narrow screens and .main's overflow-x:hidden silently
+       clipped the right-hand end (category chip, read toggle, chevron). The tags now wrap onto a
+       second line while the controls stay pinned top-right. */
+    .row-meta { display:flex; align-items:flex-start; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:wrap; }
+    .row-meta-tags { display:flex; align-items:center; flex-wrap:wrap; gap:8px; row-gap:4px; flex:1 1 auto; min-width:0; }
+    .row-meta-ctrl { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
+    .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
+    .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
+    .row-ticker.watchlist { color:var(--watchlist); }
+    .row-ticker.readacross { color:var(--readacross); }
+    .row-tag { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 6px; border-radius:0; flex-shrink:0; }
+    .row-tag.tier-core { background:rgba(240,192,64,0.12); color:var(--core); }
+    .row-tag.row-day { background:rgba(148,163,184,0.16); color:var(--text-secondary); letter-spacing:0.06em; }
+    .row-tag.tier-ra { background:rgba(249,115,22,0.12); color:var(--readacross); }
+    .row-category { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:1px 6px; flex-shrink:1; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .row-source { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); border:1px solid var(--border); padding:0 4px; flex-shrink:0; }
+    .row-spacer { flex:1; }
+    .row-chevron { color:var(--text-dim); font-size:9px; transition:transform 0.15s; flex-shrink:0; }
+    .row.expanded .row-chevron { transform:rotate(180deg); color:var(--accent); }
+    .row-company { font-size:11px; color:var(--text-secondary); font-weight:500; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .row-headline { font-size:13px; color:var(--text-primary); line-height:1.35; font-weight:500; word-wrap:break-word; overflow-wrap:anywhere; }
+    /* In multi-column layouts, cap closed headlines at two lines so one very long title
+       cannot make its whole row deep. The full title shows on hover and when opened. A
+       single column has no neighbours to keep level, so it shows headlines in full. */
+    @media (min-width: 881px) {
+      .grid:not(.cols-1) .row:not(.expanded) .row-headline {
+        display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden;
+      }
+    }
+
+    /* Expanded panel */
+    .expand { border-top:1px solid var(--border); padding:12px 14px; background:var(--bg-detail); overflow-wrap:anywhere; }
+    .expand-section { margin-bottom:14px; }
+    .expand-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
+    .expand-summary { font-size:12px; color:var(--text-primary); line-height:1.65; }
+    .key-figure { display:block; padding:6px 10px; margin:0 0 4px 0; background:rgba(61,184,106,0.05); border-left:2px solid rgba(61,184,106,0.25); font-size:11px; color:var(--accent); line-height:1.5; word-wrap:break-word; font-family:var(--font-mono); }
+    .detail-body { font-size:11px; line-height:1.6; color:var(--text-secondary); white-space:normal; word-wrap:break-word; max-height:400px; overflow-y:auto; padding:6px 0; font-family:var(--font-sans); }
+    .detail-body p { margin:0 0 8px 0; }
+    .expand-link { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary); text-decoration:none; padding:5px 10px; border:1px solid var(--border); transition:all 0.15s; }
+    .expand-link:hover { color:var(--accent); border-color:var(--accent); }
+    .expand-toggle { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--text-secondary); background:transparent; border:1px solid var(--border); padding:5px 10px; cursor:pointer; font-family:var(--font-sans); transition:all 0.15s; }
+    .expand-toggle:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Read-across tab styling kept consistent with terminal feel */
+    .ra-grid { background:var(--bg-card); border:1px solid var(--border); overflow:auto; }
+    .ra-grid table { border-collapse:collapse; width:100%; font-size:11px; }
+    .ra-grid th, .ra-grid td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:6px 8px; }
+
+    /* Empty / error states */
+    .empty { text-align:center; padding:60px 20px; background:var(--bg-card); border:1px solid var(--border); color:var(--text-muted); font-size:13px; }
+
+    /* ── Active filter chips ────────────────────────────────────────────────
+       Shows what is currently narrowing the feed, so an unexpectedly short list always has a
+       visible explanation. Matters most on mobile, where the sidebar is hidden in a drawer. */
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-family:var(--font-mono); letter-spacing:0.04em; text-transform:uppercase; color:var(--text-secondary); background:var(--bg-surface); border:1px solid var(--border); padding:3px 8px; }
+    .chip-x { cursor:pointer; color:var(--text-muted); font-size:11px; line-height:1; }
+    .chip-x:hover { color:var(--danger); }
+    .chip.clear-all { cursor:pointer; border-color:var(--border-strong); color:var(--text-muted); }
+    .chip.clear-all:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ── Options panel ──────────────────────────────────────────────────────
+       Centred dialog on desktop, bottom sheet on mobile. */
+    .sheet-wrap { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+    .sheet { background:var(--bg-card); border:1px solid var(--border-strong); width:100%; max-width:520px; max-height:84vh; overflow:auto; margin:20px; }
+    .sheet-head { position:sticky; top:0; background:var(--bg-card); display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); z-index:2; }
+    .sheet-title { font-size:15px; font-weight:600; }
+    .sheet-body { padding:6px 18px 18px; }
+    /* Shared close button for sheet and panel headers */
+    .float-close { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:14px; line-height:1; padding:5px 9px; cursor:pointer; flex-shrink:0; }
+    .float-close:hover { border-color:var(--danger); color:var(--danger); }
+    .opt-group { padding:14px 0; border-bottom:1px solid var(--border); }
+    .opt-group:last-child { border-bottom:none; }
+    .opt-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
+    .opt-hint { font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.45; }
+    .seg { display:flex; gap:6px; flex-wrap:wrap; }
+    .seg-btn { flex:1; min-width:78px; padding:9px 10px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:600; cursor:pointer; transition:border-color 0.12s, color 0.12s, background-color 0.12s; }
+    .seg-btn:hover { border-color:var(--border-strong); color:var(--text-primary); }
+    .seg-btn.on { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
+    .opt-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; }
+    .opt-row-text { font-size:13px; color:var(--text-primary); }
+    /* Accessible switch built from a button so it works with keyboard and touch. */
+    .switch { position:relative; width:38px; height:20px; flex-shrink:0; border-radius:20px; border:1px solid var(--border-strong); background:var(--bg-surface); cursor:pointer; transition:background-color 0.15s, border-color 0.15s; }
+    .switch.on { background:var(--accent); border-color:var(--accent); }
+    .switch-knob { position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--text-muted); transition:transform 0.15s, background-color 0.15s; }
+    .switch.on .switch-knob { transform:translateX(18px); background:var(--bg-primary); }
+    .opt-action { width:100%; text-align:left; padding:11px 12px; margin-bottom:6px; background:var(--bg-surface); border:1px solid var(--border); color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; cursor:pointer; transition:border-color 0.12s, color 0.12s; }
+    .opt-action:hover { border-color:var(--accent); color:var(--accent); }
+    /* Per-category colour overrides */
+    .swatch-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; }
+    .swatch-row { display:flex; align-items:center; gap:8px; padding:5px 7px; background:var(--bg-surface); border:1px solid var(--border); }
+    .swatch-row input[type="color"] { width:22px; height:22px; padding:0; border:1px solid var(--border); background:transparent; cursor:pointer; flex-shrink:0; }
+    .swatch-name { font-size:11px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .swatch-reset { margin-left:auto; cursor:pointer; color:var(--text-dim); font-size:11px; flex-shrink:0; }
+    .swatch-reset:hover { color:var(--danger); }
+
+    /* ── Detached reading panels ────────────────────────────────────────────
+       Non-blocking: no scrim, so the feed stays scrollable and clickable while panels are open.
+       Several can be open at once. Draggable and resizable by their header and corner handle. */
+    .panel { position:fixed; z-index:80; background:var(--bg-card); border:1px solid var(--border-strong); box-shadow:0 10px 34px rgba(0,0,0,0.45); display:flex; flex-direction:column; overflow:hidden; }
+    html[data-theme="light"] .panel { box-shadow:0 10px 30px rgba(20,32,27,0.20); }
+    .panel.raised { border-color:var(--accent-dim); }
+    .panel-head { display:flex; align-items:flex-start; gap:8px; padding:9px 10px; border-bottom:1px solid var(--border); background:var(--bg-toolbar); cursor:grab; flex-shrink:0; touch-action:none; }
+    .panel-head:active { cursor:grabbing; }
+    .panel-title { min-width:0; flex:1; }
+    .panel-headline { font-size:12px; font-weight:600; color:var(--text-primary); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+    .panel-btn { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:11px; line-height:1; padding:4px 7px; cursor:pointer; flex-shrink:0; }
+    .panel-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .panel-btn.close:hover { border-color:var(--danger); color:var(--danger); }
+    .panel-body { flex:1; overflow-y:auto; padding:11px 13px; }
+    .panel.collapsed .panel-body, .panel.collapsed .panel-resize { display:none; }
+    .panel.collapsed { height:auto !important; }
+    .panel-resize { position:absolute; right:0; bottom:0; width:15px; height:15px; cursor:nwse-resize; touch-action:none;
+      background:linear-gradient(135deg, transparent 50%, var(--border-strong) 50%, var(--border-strong) 70%, transparent 70%); }
+    /* Small bar listing open panels, with a close-all */
+    .panel-tray { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); z-index:79; display:flex; align-items:center; gap:8px; padding:5px 9px; background:var(--bg-card); border:1px solid var(--border-strong); font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
+    .panel-tray span.act { cursor:pointer; color:var(--text-secondary); }
+    .panel-tray span.act:hover { color:var(--accent); }
+
+    /* Mobile: side-by-side reading is not realistic on a phone, so open announcements collect in
+       a dock at the bottom. The feed stays browsable, and tapping a docked item expands it. */
+    .dock { position:fixed; left:0; right:0; bottom:0; z-index:80; background:var(--bg-sidebar); border-top:1px solid var(--border-strong); max-height:72vh; display:flex; flex-direction:column; }
+    .dock-bar { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border); font-family:var(--font-mono); font-size:10px; color:var(--text-muted); flex-shrink:0; }
+    .dock-list { overflow-y:auto; }
+    .dock-item { border-bottom:1px solid var(--border); background:var(--bg-card); }
+    .dock-item:last-child { border-bottom:none; }
+    .dock-head { display:flex; align-items:center; gap:8px; padding:11px 12px; cursor:pointer; }
+    .dock-headline { flex:1; min-width:0; font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dock-body { max-height:52vh; overflow-y:auto; padding:10px 12px; border-top:1px solid var(--border); }
+
+    /* Action bar at the TOP of an opened announcement, so the source link is reachable without
+       scrolling past a long release. */
+    .detail-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:9px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+    .detail-fetched { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-left:auto; }
+
+    @media (max-width: 680px) {
+      .sheet { margin:0; max-width:none; max-height:100vh; height:100vh; border:none; }
+      .sheet-wrap { align-items:stretch; }
+      .seg-btn { min-width:64px; font-size:12px; padding:11px 8px; }
+      .swatch-list { grid-template-columns:1fr 1fr; }
+    }
+
+    /* When the "dim once read" option is off, keep read rows at full strength. */
+    html.no-read-dim .row.read .row-body { opacity:1; }
+    /* Connection trouble banner */
+    /* Shared toggle button (plain-text and formatted versions) */
+    .fulltext-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:500; cursor:pointer; margin-bottom:10px; }
+    .fulltext-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .fulltext-chevron { font-size:10px; transition:transform 0.2s; }
+    button.expand-link { background:transparent; font-family:var(--font-sans); cursor:pointer; }
+    button.expand-link:hover, a.expand-link:hover { border-color:var(--accent); color:var(--accent); }
+    /* The announcement page itself: white, like the release at source. */
+    .rns-doc { display:block; width:100%; border:0; background:#fff; }
+    .rns-inline { border:1px solid var(--border); }
+    /* Reader */
+    .reader-wrap { position:fixed; inset:0; z-index:2000; background:rgba(4,6,6,0.78); display:flex; justify-content:center; align-items:stretch; padding:28px 20px; backdrop-filter:blur(3px); }
+    html[data-theme="light"] .reader-wrap { background:rgba(20,32,27,0.45); }
+    .reader { width:100%; max-width:980px; display:flex; flex-direction:column; background:var(--bg-card); border:1px solid var(--border-strong); min-height:0; }
+    .reader-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .reader-title { min-width:0; }
+    .reader-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; margin-bottom:4px; }
+    .reader-company { color:var(--text-secondary); font-size:12px; }
+    .reader-headline { font-size:17px; font-weight:600; line-height:1.3; color:var(--text-primary); margin:0; }
+    .reader-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .reader-btn { display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 11px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:600; text-decoration:none; cursor:pointer; }
+    .reader-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+    .reader-btn:disabled { opacity:0.4; cursor:default; }
+    .reader-btn.close:hover { border-color:var(--danger); color:var(--danger); }
+    .reader-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+    .reader-scroll { flex:1; overflow-y:auto; padding:22px; background:var(--bg-primary); min-height:0; }
+    .reader-paper { max-width:880px; margin:0 auto; background:#fff; box-shadow:0 1px 0 rgba(0,0,0,0.25); }
+    .reader-plain { padding:22px 26px 28px; color:#1b1d1c; font-family:Arial, Helvetica, sans-serif; line-height:1.5; }
+    .reader-plain p { margin:0 0 .75em; }
+    @media (max-width: 680px) {
+      .reader-wrap { padding:0; }
+      .reader { max-width:none; border:0; }
+      .reader-head { flex-direction:column; gap:10px; padding:12px 14px; }
+      .reader-controls { justify-content:flex-start; }
+      .reader-scroll { padding:0; }
+    }
+    @media (prefers-reduced-motion: reduce) { .fulltext-chevron { transition:none; } }
+    .more-bar { display:flex; align-items:center; gap:12px; justify-content:center; padding:16px 0 8px; font-size:11px; color:var(--text-muted); }
+    .wl-msg { font-size:12px; line-height:1.45; padding:8px 10px; border:1px solid var(--border); }
+    .wl-msg.error { color:var(--danger); border-color:rgba(239,68,68,0.35); background:rgba(239,68,68,0.06); }
+    .wl-msg.warning { color:var(--text-secondary); border-color:var(--watchlist-border); background:var(--watchlist-bg); }
+    .wl-msg.ok { color:var(--accent); border-color:var(--accent-dim); background:var(--accent-glow); }
+    .diag { margin-top:10px; font-size:11px; color:var(--text-secondary); }
+    .diag-store { padding:7px 9px; margin-bottom:8px; border:1px solid var(--border); line-height:1.45; }
+    .diag-store.ok { border-color:var(--accent-dim); }
+    .diag-store.warn { border-color:var(--watchlist-border); background:var(--watchlist-bg); }
+    .diag-meta { margin-bottom:8px; line-height:1.45; }
+    .diag-table { display:flex; flex-direction:column; gap:2px; }
+    .diag-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; padding:4px 6px; background:var(--bg-surface); align-items:center; }
+    .diag-row.bad { outline:1px solid rgba(239,68,68,0.35); }
+    .diag-src { font-family:var(--font-mono); font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .diag-err { grid-column:1 / -1; color:var(--danger); }
+    .reconnect { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:8px 11px; background:var(--watchlist-bg); border:1px solid var(--watchlist-border); font-size:11px; color:var(--text-secondary); }
+    /* Watchlist modal grouping */
+    .wl-group-label { font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin:12px 0 6px; }
+    /* Light theme: the shimmer skeleton needs a lighter gradient to read correctly. */
+    html[data-theme="light"] .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-sidebar) 50%,var(--bg-card) 75%); background-size:200% 100%; }
+    html[data-theme="light"] .sheet-wrap { background:rgba(20,32,27,0.42); }
+    html[data-theme="light"] .scrim { background:rgba(20,32,27,0.42); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+/* Precompiled from /home/claude/rd/index.src.html via Babel. Edit /home/claude/rd/index.src.html and re-run build.js, not this file. */
+const {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo
+} = React;
+const API_BASE = "";
+
+// Stable identity for an announcement. Used for read state, new-item tracking and as the
+// React key. Deliberately excludes the array index: keying by index meant every filter
+// change or refresh remounted the cards, losing expansion state and replaying animations.
+const annId = ann => ann.url || `${ann.ticker || ann.company}|${ann.headline}`;
+
+// A per-day localStorage set. Used for both read state and seen state; both reset each
+// morning in step with the daily feed.
+// London calendar day as yyyy-mm-dd. The backend's day runs on London time; UTC lags
+// by an hour during BST, so between midnight and 01:00 the stores used to think it was
+// still yesterday and anything marked read in that hour vanished at 01:00.
+function londonDayKey() {
+  try {
+    const p = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    const get = t => (p.find(x => x.type === t) || {}).value;
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+// fetch with a timeout, for every request other than the main feed (which has its own
+// abort logic). Without it, a request to a sleeping backend could leave a spinner up
+// indefinitely.
+function fetchWithTimeout(url, options = {}, ms = 30000) {
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => {
+    try {
+      ctrl.abort();
+    } catch (e) {}
+  }, ms) : null;
+  return fetch(url, ctrl ? {
+    ...options,
+    signal: ctrl.signal
+  } : options).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+// Rows of cards share one height so their bottoms line up. The one exception is a row
+// containing an open card: marking its other cards lets CSS keep them compact instead of
+// stretching to the open card's height. Rows are identified by position (cards in the
+// same row share a top edge), recomputed whenever a card opens or closes, the list
+// changes, or the window is resized.
+function useRowLevelling(grid) {
+  useEffect(() => {
+    if (!grid) return;
+    let frame = 0;
+    const relevel = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const cards = [...grid.children].filter(el => el.classList.contains("row"));
+        const openTops = new Set(cards.filter(el => el.classList.contains("expanded")).map(el => el.offsetTop));
+        for (const el of cards) {
+          const beside = openTops.size > 0 && !el.classList.contains("expanded") && openTops.has(el.offsetTop);
+          if (beside) el.setAttribute("data-beside-open", "");else el.removeAttribute("data-beside-open");
+        }
+      });
+    };
+    relevel();
+    // Only class changes and added/removed cards matter; our own data attribute is not
+    // watched, so marking cards cannot trigger another pass.
+    const mo = new MutationObserver(relevel);
+    mo.observe(grid, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+    window.addEventListener("resize", relevel);
+    return () => {
+      mo.disconnect();
+      window.removeEventListener("resize", relevel);
+      cancelAnimationFrame(frame);
+    };
+  }, [grid]);
+}
+function makeDaySet(storageKey) {
+  const today = londonDayKey();
+  let ids = new Set();
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    if (raw && raw.date === today && Array.isArray(raw.ids)) ids = new Set(raw.ids);
+  } catch (e) {}
+  const persist = () => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({
+        date: today,
+        ids: [...ids]
+      }));
+    } catch (e) {}
+  };
+  return {
+    has: k => ids.has(k),
+    size: () => ids.size,
+    mark: k => {
+      if (!ids.has(k)) {
+        ids.add(k);
+        persist();
+      }
+    },
+    unmark: k => {
+      if (ids.delete(k)) persist();
+    },
+    markAll: keys => {
+      let changed = false;
+      keys.forEach(k => {
+        if (!ids.has(k)) {
+          ids.add(k);
+          changed = true;
+        }
+      });
+      if (changed) persist();
+    },
+    clear: () => {
+      ids = new Set();
+      persist();
+    }
+  };
+}
+
+// Which announcements have been opened. Read rows dim their content but stay visible.
+const readStore = makeDaySet("rns_read_v1");
+// Which announcements the user has already had sight of. Anything absent from this set on a
+// later refresh is genuinely new and gets flagged in the feed.
+const seenStore = makeDaySet("rns_seen_v1");
+
+// ── Preference store ─────────────────────────────────────────────────────
+// Persists view settings (filters, sort, theme, tag colours, expand style, density) so the
+// app opens the way it was left.
+const PREFS_KEY = "rns_prefs_v1";
+const prefsStore = {
+  load: () => {
+    try {
+      return JSON.parse(localStorage.getItem(PREFS_KEY) || "null");
+    } catch (e) {
+      return null;
+    }
+  },
+  save: p => {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+    } catch (e) {}
+  }
+};
+
+// Theme is applied to <html> so every CSS variable swaps at once.
+const applyTheme = theme => {
+  try {
+    document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
+  } catch (e) {}
+};
+
+// ── Category colours ─────────────────────────────────────────────────────
+// All colours reference CSS variables so they follow the active theme automatically.
+const CATEGORY_COLORS = {
+  "Results": {
+    color: "var(--results)",
+    bg: "rgba(91,168,247,0.10)"
+  },
+  "Trading Update": {
+    color: "var(--trading)",
+    bg: "rgba(167,139,250,0.10)"
+  },
+  "Company Update": {
+    color: "var(--company-update)",
+    bg: "rgba(96,165,250,0.10)"
+  },
+  "M&A": {
+    color: "var(--ma)",
+    bg: "rgba(249,112,102,0.10)"
+  },
+  "Contract": {
+    color: "var(--contract)",
+    bg: "rgba(45,212,191,0.10)"
+  },
+  "Fundraise": {
+    color: "var(--fundraise)",
+    bg: "rgba(52,211,153,0.10)"
+  },
+  "Buyback": {
+    color: "var(--buyback)",
+    bg: "rgba(34,211,238,0.10)"
+  },
+  "Board Change": {
+    color: "var(--board-change)",
+    bg: "rgba(192,132,252,0.10)"
+  },
+  "Director Dealing": {
+    color: "var(--director)",
+    bg: "rgba(168,162,158,0.12)"
+  },
+  "Shareholding": {
+    color: "var(--shareholding)",
+    bg: "rgba(244,114,182,0.10)"
+  },
+  "Regulatory": {
+    color: "var(--regulatory)",
+    bg: "rgba(244,63,94,0.10)"
+  },
+  "Dividend": {
+    color: "var(--dividend)",
+    bg: "rgba(163,230,53,0.10)"
+  },
+  "Non-Reg": {
+    color: "var(--nonreg)",
+    bg: "rgba(56,189,248,0.10)"
+  },
+  "Admin": {
+    color: "var(--admin)",
+    bg: "rgba(148,163,184,0.10)"
+  },
+  "Other": {
+    color: "var(--other)",
+    bg: "rgba(138,158,143,0.08)"
+  }
+};
+
+// Categories that carry real IR signal. Used by the "Semantic" colour scheme, which greys
+// out procedural announcements so the material ones are what catch the eye.
+const MATERIAL_CATEGORIES = new Set(["Results", "Trading Update", "Company Update", "M&A", "Contract", "Board Change", "Regulatory"]);
+const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
+const hexToRgba = (hex, alpha) => {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+  if (!m) return "transparent";
+  return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
+};
+
+// Resolve the colour for a category tag under the active scheme, honouring any per-category
+// override the user has picked in Options.
+function makeCatColor(scheme, custom) {
+  return cat => {
+    const override = custom && custom[cat];
+    if (override) return {
+      color: override,
+      bg: hexToRgba(override, 0.13)
+    };
+    if (scheme === "mono") return {
+      color: "var(--text-secondary)",
+      bg: "transparent"
+    };
+    if (scheme === "semantic") {
+      return MATERIAL_CATEGORIES.has(cat) ? CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"] : {
+        color: "var(--text-muted)",
+        bg: "transparent"
+      };
+    }
+    return CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"];
+  };
+}
+
+// Announcements can now come from earlier in the session (e.g. a Sunday takeover
+// statement shown on Monday). The backend stamps each with its real dd/mm/yyyy date.
+const londonTodayStr = () => {
+  try {
+    return new Date().toLocaleDateString("en-GB", {
+      timeZone: "Europe/London"
+    });
+  } catch (e) {
+    return new Date().toLocaleDateString("en-GB");
+  }
+};
+// "27/09/2026" -> "SUN 27", or null when it is today.
+function earlierDayLabel(dateStr) {
+  if (!dateStr || dateStr === londonTodayStr()) return null;
+  const [d, m, y] = dateStr.split("/").map(Number);
+  if (!d || !m || !y) return null;
+  const day = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    weekday: "short",
+    timeZone: "UTC"
+  });
+  return `${day.toUpperCase()} ${d}`;
+}
+const dateKey = ds => {
+  const p = (ds || "").split("/");
+  return p.length === 3 ? p[2] + p[1] + p[0] : "";
+};
+
+// "07:05" plus a relative age, for feeds being scanned through the morning.
+// If the stamp looks more than a couple of minutes in the future, the browser clock and the
+// feed's timezone disagree, so no age is shown at all rather than a misleading one.
+function relativeAge(hhmm) {
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  const now = new Date();
+  const then = new Date(now);
+  then.setHours(h, m, 0, 0);
+  let mins = Math.round((now - then) / 60000);
+  if (mins < -2) return null;
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h${mins % 60 ? ` ${mins % 60}m` : ""}`;
+}
+function StatusDot({
+  status
+}) {
+  const c = {
+    connected: "var(--accent)",
+    loading: "var(--watchlist)",
+    reconnecting: "var(--watchlist)",
+    error: "var(--danger)",
+    idle: "var(--text-muted)"
+  };
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-block",
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: c[status] || c.idle,
+      animation: status === "loading" || status === "reconnecting" ? "pulse-dot 1.2s infinite" : "none",
+      marginRight: 8,
+      flexShrink: 0
+    }
+  });
+}
+
+// Inline SVG icons. Unicode glyphs were the wrong tool here: a sun-with-rays and a cog are
+// both small radial shapes and were indistinguishable at toolbar size, and glyph rendering
+// varies by platform font. These use different shape languages so they cannot be confused.
+function Icon({
+  name,
+  size = 15
+}) {
+  const box = {
+    width: size,
+    height: size
+  };
+  const stroke = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  if (name === "sun") return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: box,
+    ...stroke,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "4.1"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "1.8",
+    x2: "12",
+    y2: "4.2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "19.8",
+    x2: "12",
+    y2: "22.2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "1.8",
+    y1: "12",
+    x2: "4.2",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "19.8",
+    y1: "12",
+    x2: "22.2",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4.9",
+    y1: "4.9",
+    x2: "6.6",
+    y2: "6.6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "17.4",
+    y1: "17.4",
+    x2: "19.1",
+    y2: "19.1"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4.9",
+    y1: "19.1",
+    x2: "6.6",
+    y2: "17.4"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "17.4",
+    y1: "6.6",
+    x2: "19.1",
+    y2: "4.9"
+  }));
+  if (name === "moon") return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: box,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M20.6 14.3A9 9 0 1 1 10.2 3.1a7 7 0 0 0 10.4 11.2z",
+    fill: "currentColor"
+  }));
+  // Sliders for Options: three horizontal tracks with offset handles. No radial element at
+  // all, so it reads as clearly different from the theme control beside it.
+  if (name === "sliders") return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: box,
+    ...stroke,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "6",
+    x2: "21",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "12",
+    x2: "21",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "18",
+    x2: "21",
+    y2: "18"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "9",
+    cy: "6",
+    r: "2.5",
+    fill: "var(--bg-toolbar)"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "16",
+    cy: "12",
+    r: "2.5",
+    fill: "var(--bg-toolbar)"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "7.5",
+    cy: "18",
+    r: "2.5",
+    fill: "var(--bg-toolbar)"
+  }));
+  return null;
+}
+function FilterPill({
+  label,
+  active,
+  onClick,
+  count
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    onClick: onClick,
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+      borderRadius: 20,
+      background: active ? "var(--accent-glow)" : "transparent",
+      color: active ? "var(--accent)" : "var(--text-secondary)",
+      fontFamily: "var(--font-sans)",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer",
+      transition: "all 0.2s",
+      whiteSpace: "nowrap"
+    }
+  }, label, count !== undefined && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: active ? "var(--accent)" : "var(--border)",
+      color: active ? "var(--bg-primary)" : "var(--text-secondary)",
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "1px 7px",
+      borderRadius: 10,
+      fontFamily: "var(--font-mono)"
+    }
+  }, count));
+}
+function CategoryBadge({
+  category
+}) {
+  const cat = CATEGORY_COLORS[category] || CATEGORY_COLORS["Other"];
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      padding: "2px 10px",
+      borderRadius: 12,
+      background: cat.bg,
+      color: cat.color,
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: "0.03em",
+      textTransform: "uppercase"
+    }
+  }, category);
+}
+
+// ── Shareholding Summary Strip ──
+function ShareholdingStrip({
+  data
+}) {
+  if (!data) return null;
+
+  // Check if structured data looks confident (both old and new pct present and different)
+  const confident = data.old_pct !== null && data.new_pct !== null && data.old_pct !== data.new_pct && data.direction;
+  const dir = data.direction;
+  const dirColor = dir === "increase" ? "var(--accent)" : dir === "decrease" ? "var(--ma)" : "var(--text-muted)";
+  const arrow = dir === "increase" ? "\u25B2" : dir === "decrease" ? "\u25BC" : "";
+  const changePP = data.change_pp !== null && data.change_pp !== undefined ? `${data.change_pp > 0 ? "+" : ""}${data.change_pp.toFixed(2)}pp` : "";
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      padding: "10px 16px",
+      background: "rgba(244,114,182,0.06)",
+      border: "1px solid rgba(244,114,182,0.12)",
+      borderRadius: 8
+    }
+  }, confident && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: data.summary ? 8 : 0
+    }
+  }, data.holder && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "var(--text-primary)"
+    }
+  }, data.holder), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 12,
+      color: "var(--text-secondary)"
+    }
+  }, data.old_pct.toFixed(2), "%", /*#__PURE__*/React.createElement("span", {
+    style: {
+      margin: "0 4px",
+      color: "var(--text-muted)"
+    }
+  }, "\u2192"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: dirColor,
+      fontWeight: 600
+    }
+  }, data.new_pct.toFixed(2), "%")), changePP && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 3,
+      padding: "2px 8px",
+      borderRadius: 10,
+      background: dir === "increase" ? "rgba(61,184,106,0.12)" : dir === "decrease" ? "rgba(249,112,102,0.12)" : "rgba(138,158,143,0.08)",
+      color: dirColor,
+      fontSize: 11,
+      fontWeight: 600,
+      fontFamily: "var(--font-mono)"
+    }
+  }, arrow, " ", changePP), data.voting_rights && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)",
+      fontFamily: "var(--font-mono)"
+    }
+  }, data.voting_rights, " votes")), data.summary && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-secondary)",
+      lineHeight: 1.6
+    }
+  }, data.summary), !data.summary && !confident && data.holder && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-secondary)"
+    }
+  }, data.holder, data.new_pct !== null ? ` — ${data.new_pct.toFixed(2)}%` : ""));
+}
+
+// ── Full Text Toggle ──
+// Join hard-wrapped lines from the plain-text extraction back into paragraphs.
+// A line that doesn't end a sentence, or a following line that starts lower case,
+// belongs to the same paragraph.
+function buildParagraphs(raw) {
+  const lines = (raw || "").split("\n").filter(l => l.trim());
+  const paragraphs = [];
+  let current = "";
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    if (!current) {
+      current = line;
+    } else {
+      const prevEnds = /[.!?:;"\u2019\u201D]$/.test(current);
+      const curStartsLower = /^[a-z]/.test(line);
+      if (!prevEnds || curStartsLower) {
+        current += " " + line;
+      } else {
+        paragraphs.push(current);
+        current = line;
+      }
+    }
+  }
+  if (current) paragraphs.push(current);
+  return paragraphs;
+}
+function FullTextToggle({
+  text
+}) {
+  const [showFull, setShowFull] = useState(false);
+  if (!text || text === "Could not extract announcement body from the page.") return null;
+  const paragraphs = buildParagraphs(text);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      setShowFull(!showFull);
+    },
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      border: "1px solid var(--border)",
+      borderRadius: 8,
+      background: "transparent",
+      color: "var(--text-secondary)",
+      fontFamily: "var(--font-sans)",
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: "pointer",
+      transition: "all 0.2s",
+      marginBottom: showFull ? 10 : 0
+    }
+  }, showFull ? "Hide full announcement" : "Show full announcement", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      transition: "transform 0.2s",
+      transform: showFull ? "rotate(180deg)" : "rotate(0)"
+    }
+  }, "▼")), showFull && /*#__PURE__*/React.createElement("div", {
+    className: "detail-body"
+  }, paragraphs.map((p, i) => /*#__PURE__*/React.createElement("p", {
+    key: i,
+    style: {
+      margin: "0 0 10px 0"
+    }
+  }, p))));
+}
+
+// ── Formatted announcement reader ────────────────────────────────────────
+// The backend sends each announcement's body as cleaned HTML that keeps its source
+// formatting. It is displayed inside a sandboxed frame: no allow-scripts, so nothing in
+// it can run, plus a Content-Security-Policy that blocks scripts, fonts and connections
+// even if the server-side cleaning ever missed something. allow-same-origin is there
+// only so this page can measure the frame's height; without scripts it grants the
+// announcement nothing.
+const RNS_SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
+const RNS_CSP = "default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'";
+function buildRnsDocument(html, scale) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${RNS_CSP}">
+<base target="_blank">
+<style>
+  html { background:#fff; }
+  body { margin:0; padding:22px 26px 28px; color:#1b1d1c; background:#fff;
+         font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.5;
+         zoom:${scale}; -webkit-text-size-adjust:100%; }
+  p { margin:0 0 .75em; }
+  p, li, h1, h2, h3, h4 { overflow-wrap:anywhere; }
+  h1, h2, h3, h4 { line-height:1.3; margin:1.1em 0 .5em; }
+  h1 { font-size:1.3em; } h2 { font-size:1.18em; } h3 { font-size:1.08em; } h4 { font-size:1em; }
+  ul, ol { margin:0 0 .75em; padding-left:1.4em; }
+  li { margin:.15em 0; }
+  .rns-tw { overflow-x:auto; max-width:100%; margin:0 0 .9em; }
+  table { border-collapse:collapse; font-size:inherit; }
+  td, th { padding:3px 8px; vertical-align:top; }
+  img { max-width:100%; height:auto; }
+  a[href] { color:#1f5fbf; }
+  hr { border:0; border-top:1px solid #c9cfcb; margin:1em 0; }
+  @media (max-width:600px) { body { padding:14px 14px 18px; } }
+</style></head><body>${html}</body></html>`;
+}
+
+// The announcement as a white document page, sized to its content so the surrounding
+// card or reader does the scrolling.
+function RnsDocument({
+  html,
+  scale = 1,
+  title = "Announcement"
+}) {
+  const ref = useRef(null);
+  const [height, setHeight] = useState(240);
+  const doc = useMemo(() => buildRnsDocument(html, scale), [html, scale]);
+  useEffect(() => {
+    const frame = ref.current;
+    if (!frame) return;
+    let ro = null;
+    const measure = () => {
+      try {
+        const d = frame.contentDocument;
+        // The document's own box, not scrollHeight: scrollHeight never reports less than
+        // the frame's current height, so the frame could grow but never shrink back.
+        if (d && d.documentElement) setHeight(Math.max(60, Math.ceil(d.documentElement.getBoundingClientRect().height)));
+      } catch (e) {}
+    };
+    const onLoad = () => {
+      measure();
+      try {
+        const d = frame.contentDocument;
+        if (typeof ResizeObserver !== "undefined" && d && d.body) {
+          ro = new ResizeObserver(measure);
+          ro.observe(d.body);
+        }
+        if (d) [...d.images].forEach(img => img.addEventListener("load", measure));
+      } catch (e) {}
+    };
+    frame.addEventListener("load", onLoad);
+    return () => {
+      frame.removeEventListener("load", onLoad);
+      if (ro) ro.disconnect();
+    };
+  }, [doc]);
+  return /*#__PURE__*/React.createElement("iframe", {
+    ref: ref,
+    className: "rns-doc",
+    title: title,
+    sandbox: RNS_SANDBOX,
+    srcDoc: doc,
+    style: {
+      height
+    }
+  });
+}
+
+// In-card expansion of the formatted announcement.
+function FormattedToggle({
+  html,
+  title
+}) {
+  const [open, setOpen] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "fulltext-btn",
+    onClick: e => {
+      e.stopPropagation();
+      setOpen(o => !o);
+    },
+    "aria-expanded": open
+  }, open ? "Hide full announcement" : "Show full announcement", /*#__PURE__*/React.createElement("span", {
+    className: "fulltext-chevron",
+    style: {
+      transform: open ? "rotate(180deg)" : "none"
+    }
+  }, "▼")), open && /*#__PURE__*/React.createElement("div", {
+    className: "rns-inline",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement(RnsDocument, {
+    html: html,
+    title: title
+  })));
+}
+const READER_SCALES = [0.85, 1, 1.15, 1.3, 1.5];
+const readerScaleStore = {
+  load: () => {
+    try {
+      const v = Number(localStorage.getItem("rns_reader_scale"));
+      return READER_SCALES.includes(v) ? v : 1;
+    } catch (e) {
+      return 1;
+    }
+  },
+  save: v => {
+    try {
+      localStorage.setItem("rns_reader_scale", String(v));
+    } catch (e) {}
+  }
+};
+
+// Full-screen reader for long announcements and wide tables. Rendered into <body> so
+// no card or panel styling can affect its positioning. While it is open the feed's
+// keyboard shortcuts are paused (see the guard in App), and Escape closes it.
+function ReaderView({
+  ann,
+  detail,
+  onClose
+}) {
+  const [scale, setScale] = useState(readerScaleStore.load);
+  const closeRef = useRef(null);
+  useEffect(() => {
+    readerScaleStore.save(scale);
+  }, [scale]);
+  useEffect(() => {
+    const returnTo = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (closeRef.current) closeRef.current.focus();
+    const onKey = e => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (returnTo && returnTo.focus) {
+        try {
+          returnTo.focus();
+        } catch (e) {}
+      }
+    };
+  }, [onClose]);
+  const step = dir => setScale(cur => {
+    const i = READER_SCALES.indexOf(cur);
+    return READER_SCALES[Math.min(READER_SCALES.length - 1, Math.max(0, (i < 0 ? 1 : i) + dir))];
+  });
+  const hasFormatted = !!(detail && detail.body_html);
+  const paragraphs = hasFormatted ? [] : buildParagraphs(detail && detail.body_text);
+  const view = /*#__PURE__*/React.createElement("div", {
+    className: "reader-wrap",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": `Announcement: ${ann.headline}`,
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "reader",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "reader-head"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "reader-title"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "reader-meta"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, earlierDayLabel(ann.date_str) ? `${earlierDayLabel(ann.date_str)} ` : "", ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker"
+  }, ann.ticker), /*#__PURE__*/React.createElement("span", {
+    className: "reader-company"
+  }, ann.company)), /*#__PURE__*/React.createElement("h2", {
+    className: "reader-headline"
+  }, ann.headline)), /*#__PURE__*/React.createElement("div", {
+    className: "reader-controls"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "reader-btn",
+    onClick: () => step(-1),
+    disabled: scale === READER_SCALES[0],
+    "aria-label": "Smaller text"
+  }, "A−"), /*#__PURE__*/React.createElement("button", {
+    className: "reader-btn",
+    onClick: () => step(1),
+    disabled: scale === READER_SCALES[READER_SCALES.length - 1],
+    "aria-label": "Larger text"
+  }, "A+"), ann.url && /*#__PURE__*/React.createElement("a", {
+    className: "reader-btn",
+    href: ann.url,
+    target: "_blank",
+    rel: "noopener noreferrer"
+  }, "View on Investegate ↗"), /*#__PURE__*/React.createElement("button", {
+    ref: closeRef,
+    className: "reader-btn close",
+    onClick: onClose,
+    "aria-label": "Close reader (Esc)"
+  }, "✕"))), /*#__PURE__*/React.createElement("div", {
+    className: "reader-scroll"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "reader-paper"
+  }, hasFormatted ? /*#__PURE__*/React.createElement(RnsDocument, {
+    html: detail.body_html,
+    scale: scale,
+    title: ann.headline
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "reader-plain",
+    style: {
+      fontSize: `${14 * scale}px`
+    }
+  }, paragraphs.length ? paragraphs.map((p, i) => /*#__PURE__*/React.createElement("p", {
+    key: i
+  }, p)) : /*#__PURE__*/React.createElement("p", null, "The full text of this announcement couldn't be extracted. Use View on Investegate to read it at source."))))));
+  return ReactDOM.createPortal(view, document.body);
+}
+
+// ── Expandable Announcement Row — dense terminal style ──
+// Detail responses are cached in memory for the session, so collapsing and re-opening an
+// announcement, or re-opening it in a panel, is instant rather than another round trip.
+const detailCache = new Map();
+const shCache = new Map();
+
+// The body of an opened announcement. Used both for inline expansion and inside detached
+// reading panels, so the two stay identical in content and behaviour.
+function AnnouncementDetail({
+  ann,
+  backendUrl
+}) {
+  const [readerOpen, setReaderOpen] = useState(false);
+  const closeReader = useCallback(() => setReaderOpen(false), []);
+  const [detail, setDetail] = useState(() => detailCache.get(ann.url) || null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [shData, setShData] = useState(() => shCache.get(ann.url) || null);
+  const [shLoading, setShLoading] = useState(false);
+  useEffect(() => {
+    if (!ann.url || detail) return;
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    fetchWithTimeout(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(ann.url)}`, {}, 45000).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }).then(json => {
+      if (json.error) throw new Error(json.error);
+      detailCache.set(ann.url, json);
+      if (alive) setDetail(json);
+    }).catch(err => {
+      if (alive) setError(err.name === "AbortError" ? "The server took too long to respond. Close and reopen to try again." : err.message);
+    }).finally(() => {
+      if (alive) setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ann.url, backendUrl, detail]);
+  useEffect(() => {
+    if (ann.category !== "Shareholding" || !ann.url || shData) return;
+    let alive = true;
+    setShLoading(true);
+    fetchWithTimeout(`${backendUrl}/api/rns/shareholding?url=${encodeURIComponent(ann.url)}`, {}, 45000).then(r => r.ok ? r.json() : null).then(json => {
+      if (json && !json.error) {
+        shCache.set(ann.url, json);
+        if (alive) setShData(json);
+      }
+    }).catch(() => {}).finally(() => {
+      if (alive) setShLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ann.category, ann.url, backendUrl, shData]);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "detail-actions"
+  }, detail && (detail.body_html || detail.body_text && detail.body_text !== "Could not extract announcement body from the page.") && /*#__PURE__*/React.createElement("button", {
+    className: "expand-link reader-open",
+    onClick: e => {
+      e.stopPropagation();
+      setReaderOpen(true);
+    }
+  }, "Open in reader"), ann.url && /*#__PURE__*/React.createElement("a", {
+    href: ann.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "expand-link",
+    onClick: e => e.stopPropagation()
+  }, "View on Investegate ↗"), detail && detail.fetched_at && !isNaN(new Date(detail.fetched_at)) && /*#__PURE__*/React.createElement("span", {
+    className: "detail-fetched"
+  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))), loading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "spinner"
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)"
+    }
+  }, "Fetching announcement...")), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 10px",
+      background: "rgba(239,68,68,0.06)",
+      border: "1px solid rgba(239,68,68,0.18)",
+      fontSize: 11,
+      color: "var(--danger)",
+      marginBottom: 10
+    }
+  }, "Failed to load: ", error), ann.category === "Shareholding" && shLoading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "spinner",
+    style: {
+      width: 11,
+      height: 11,
+      borderWidth: 1.5
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)"
+    }
+  }, "Loading shareholding data...")), ann.category === "Shareholding" && shData && /*#__PURE__*/React.createElement(ShareholdingStrip, {
+    data: shData
+  }), detail && /*#__PURE__*/React.createElement(React.Fragment, null, detail.ai_summary && /*#__PURE__*/React.createElement("div", {
+    className: "expand-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand-label"
+  }, "Summary"), /*#__PURE__*/React.createElement("div", {
+    className: "expand-summary"
+  }, detail.ai_summary)), detail.key_figures && detail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "expand-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand-label"
+  }, "Key figures"), detail.key_figures.map((fig, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "key-figure"
+  }, fig))), detail.body_html ? /*#__PURE__*/React.createElement(FormattedToggle, {
+    html: detail.body_html,
+    title: ann.headline
+  }) : /*#__PURE__*/React.createElement(FullTextToggle, {
+    text: detail.body_text
+  })), readerOpen && detail && /*#__PURE__*/React.createElement(ReaderView, {
+    ann: ann,
+    detail: detail,
+    onClose: closeReader
+  }));
+}
+function AnnouncementCard({
+  ann,
+  backendUrl,
+  tier,
+  isNew,
+  isFocused,
+  expandStyle,
+  catColorFor,
+  showRelative,
+  raTargets,
+  readVersion,
+  onFocusRow,
+  onOpenPanel,
+  isPanelOpen
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const id = annId(ann);
+  const [isRead, setIsRead] = useState(() => readStore.has(id));
+  const detached = expandStyle === "panel";
+
+  // Re-sync from the store when a bulk action changes it.
+  useEffect(() => {
+    setIsRead(readStore.has(id));
+  }, [readVersion, id]);
+  const activate = () => {
+    readStore.mark(id);
+    setIsRead(true);
+    if (detached) onOpenPanel && onOpenPanel(ann, tier);else setExpanded(e => !e);
+  };
+  const toggleRead = e => {
+    e.stopPropagation();
+    if (isRead) {
+      readStore.unmark(id);
+      setIsRead(false);
+    } else {
+      readStore.mark(id);
+      setIsRead(true);
+    }
+  };
+  const catColor = catColorFor(ann.category);
+  const isWL = ann.is_watchlist;
+  const isRA = tier === "read_across";
+  const rowClasses = ["row"];
+  if (isWL) rowClasses.push(isRA ? "readacross" : "watchlist");
+  if (expanded && !detached) rowClasses.push("expanded");
+  if (isRead && !expanded) rowClasses.push("read");
+  if (isNew) rowClasses.push("is-new");
+  if (isFocused) rowClasses.push("focused");
+  const age = showRelative ? relativeAge(ann.time) : null;
+  return /*#__PURE__*/React.createElement("div", {
+    id: `row-${id}`,
+    className: rowClasses.join(" "),
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": detached ? undefined : expanded,
+    onFocus: onFocusRow,
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        activate();
+      }
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-body",
+    onClick: activate
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta-tags"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-new-dot",
+    title: "New since your last refresh"
+  }), earlierDayLabel(ann.date_str) && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag row-day",
+    title: `Released ${ann.date_str}, before today`
+  }, earlierDayLabel(ann.date_str)), /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, ann.time, age && !earlierDayLabel(ann.date_str) ? ` · ${age}` : ""), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker" + (isWL ? isRA ? " readacross" : " watchlist" : "")
+  }, ann.ticker), tier === "core" && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-core"
+  }, "CORE"), isRA && /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-ra"
+  }, "R/A"), isRA && raTargets && raTargets.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "row-ra-map",
+    title: `Reads across to ${raTargets.join(", ")}`
+  }, "→ ", raTargets.join(" ")), /*#__PURE__*/React.createElement("span", {
+    className: "row-category",
+    style: {
+      color: catColor.color,
+      background: catColor.bg
+    }
+  }, ann.category), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
+    className: "row-source"
+  }, ann.source_feed)), /*#__PURE__*/React.createElement("div", {
+    className: "row-meta-ctrl"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "row-read-btn",
+    onClick: toggleRead,
+    title: isRead ? "Mark as unread" : "Mark as read"
+  }, isRead ? "\u25CB" : "\u25CF"), /*#__PURE__*/React.createElement("span", {
+    className: "row-chevron",
+    style: detached && isPanelOpen ? {
+      color: "var(--accent)"
+    } : undefined
+  }, detached ? "\u2197" : "\u25BC"))), /*#__PURE__*/React.createElement("div", {
+    className: "row-company"
+  }, ann.company), /*#__PURE__*/React.createElement("div", {
+    className: "row-headline",
+    title: ann.headline
+  }, ann.headline)), expanded && !detached && /*#__PURE__*/React.createElement("div", {
+    className: "expand"
+  }, /*#__PURE__*/React.createElement(AnnouncementDetail, {
+    ann: ann,
+    backendUrl: backendUrl
+  })));
+}
+function SkeletonCard() {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      cursor: "default"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: 36,
+      height: 11
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: 32,
+      height: 11
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: 64,
+      height: 11
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: "55%",
+      height: 11,
+      marginBottom: 5
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton",
+    style: {
+      width: "90%",
+      height: 13
+    }
+  }));
+}
+
+// Small reusable pieces for the options panel
+function Switch({
+  on,
+  onClick
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    className: "switch" + (on ? " on" : ""),
+    onClick: onClick,
+    role: "switch",
+    "aria-checked": on
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "switch-knob"
+  }));
+}
+function Seg({
+  value,
+  options,
+  onChange
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "seg"
+  }, options.map(o => /*#__PURE__*/React.createElement("button", {
+    key: o.v,
+    className: "seg-btn" + (value === o.v ? " on" : ""),
+    onClick: () => onChange(o.v)
+  }, o.l)));
+}
+function OptRow({
+  label,
+  on,
+  onToggle
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "opt-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "opt-row-text"
+  }, label), /*#__PURE__*/React.createElement(Switch, {
+    on: on,
+    onClick: onToggle
+  }));
+}
+
+// ── Options panel ────────────────────────────────────────────────────────
+// Centred dialog on desktop, full-height sheet on mobile.
+function OptionsModal({
+  opts,
+  setOpt,
+  onClose,
+  onMarkAllRead,
+  onClearRead,
+  onMarkAllSeen,
+  onResetCategories,
+  onResetOptions,
+  hiddenCount,
+  readCount,
+  backendUrl
+}) {
+  const [showSwatches, setShowSwatches] = useState(false);
+  const [health, setHealth] = useState(null);
+  const [showDiag, setShowDiag] = useState(false);
+  useEffect(() => {
+    if (!showDiag) return;
+    let alive = true;
+    fetchWithTimeout(`${backendUrl}/api/health`, {}, 20000).then(r => r.ok ? r.json() : null).then(j => {
+      if (alive) setHealth(j || {
+        error: true
+      });
+    }).catch(() => {
+      if (alive) setHealth({
+        error: true
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [showDiag, backendUrl]);
+  const custom = opts.customColors || {};
+  const setCustom = (cat, hex) => setOpt("customColors", {
+    ...custom,
+    [cat]: hex
+  });
+  const clearCustom = cat => {
+    const n = {
+      ...custom
+    };
+    delete n[cat];
+    setOpt("customColors", n);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sheet-wrap",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sheet-title"
+  }, "Options"), /*#__PURE__*/React.createElement("button", {
+    className: "float-close",
+    onClick: onClose,
+    title: "Close (Esc)"
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Appearance"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.theme,
+    onChange: v => setOpt("theme", v),
+    options: [{
+      v: "dark",
+      l: "Dark"
+    }, {
+      v: "light",
+      l: "Light"
+    }]
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Tag colours"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.tagScheme,
+    onChange: v => setOpt("tagScheme", v),
+    options: [{
+      v: "vivid",
+      l: "Vivid"
+    }, {
+      v: "semantic",
+      l: "Semantic"
+    }, {
+      v: "mono",
+      l: "Mono"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Vivid gives every category its own colour. Semantic greys out procedural types (Admin, Shareholding, Director Dealing, Buyback, Fundraise, Dividend) so material news stands out. Mono drops tag colour entirely."), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => setShowSwatches(s => !s)
+  }, showSwatches ? "Hide" : "Customise", " individual tag colours", Object.keys(custom).length > 0 ? ` (${Object.keys(custom).length} set)` : ""), showSwatches && /*#__PURE__*/React.createElement("div", {
+    className: "swatch-list"
+  }, ALL_CATEGORIES.map(cat => /*#__PURE__*/React.createElement("div", {
+    className: "swatch-row",
+    key: cat
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "color",
+    value: custom[cat] || "#888888",
+    onChange: e => setCustom(cat, e.target.value),
+    title: `Colour for ${cat}`
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "swatch-name"
+  }, cat), custom[cat] && /*#__PURE__*/React.createElement("span", {
+    className: "swatch-reset",
+    title: "Reset this tag",
+    onClick: () => clearCustom(cat)
+  }, "↻"))))), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Opening an announcement"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.expandStyle,
+    onChange: v => setOpt("expandStyle", v),
+    options: [{
+      v: "inline",
+      l: "Read in line"
+    }, {
+      v: "panel",
+      l: "Detached panels"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "In line expands the announcement inside the feed. Detached panels open it in a floating window that does not block the page, so you can keep scrolling and open several announcements side by side. On a phone the open announcements collect in a dock at the bottom of the screen instead.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Feed density"), /*#__PURE__*/React.createElement(Seg, {
+    value: opts.columns,
+    onChange: v => setOpt("columns", v),
+    options: [{
+      v: "auto",
+      l: "Auto"
+    }, {
+      v: "1",
+      l: "1 column"
+    }, {
+      v: "2",
+      l: "2 columns"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "A single column keeps the relevance ranking in a clean top-to-bottom order. Auto fits as many columns as the window allows.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Behaviour"), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Show relative time (07:05 · 22m)",
+    on: opts.showRelative,
+    onToggle: () => setOpt("showRelative", !opts.showRelative)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Flag new items since last refresh",
+    on: opts.flagNew,
+    onToggle: () => setOpt("flagNew", !opts.flagNew)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Show read-across target on rows",
+    on: opts.showRaMap,
+    onToggle: () => setOpt("showRaMap", !opts.showRaMap)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Dim announcements once read",
+    on: opts.dimRead,
+    onToggle: () => setOpt("dimRead", !opts.dimRead)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Keyboard shortcuts (j/k, Enter, /)",
+    on: opts.keyboardNav,
+    onToggle: () => setOpt("keyboardNav", !opts.keyboardNav)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "j and k move, Enter opens, Esc closes, / jumps to search, r refreshes. Shift+R runs a hard refresh.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Auto-refresh interval"), /*#__PURE__*/React.createElement(Seg, {
+    value: String(opts.refreshSecs),
+    onChange: v => setOpt("refreshSecs", Number(v)),
+    options: [{
+      v: "60",
+      l: "60s"
+    }, {
+      v: "120",
+      l: "2 min"
+    }, {
+      v: "300",
+      l: "5 min"
+    }]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Auto-refresh keeps polling whether or not this tab is in front, which is what stops the backend going to sleep. Turn auto-refresh off in the toolbar if you would rather it idled.")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Actions"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onMarkAllRead
+  }, "Mark everything showing as read"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onClearRead
+  }, "Clear read state", readCount ? ` (${readCount} marked)` : ""), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onMarkAllSeen
+  }, "Clear the new-item flags"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onResetCategories
+  }, "Reset hidden categories to defaults", hiddenCount === 0 ? " (nothing hidden now)" : ` (${hiddenCount} hidden)`), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: onResetOptions
+  }, "Reset all options to defaults")), /*#__PURE__*/React.createElement("div", {
+    className: "opt-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Diagnostics"), /*#__PURE__*/React.createElement("button", {
+    className: "opt-action",
+    onClick: () => setShowDiag(v => !v)
+  }, showDiag ? "Hide" : "Show", " what the last scrape collected"), showDiag && !health && /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Loading..."), showDiag && health && health.error && /*#__PURE__*/React.createElement("div", {
+    className: "opt-hint"
+  }, "Could not load diagnostics from the server."), showDiag && health && !health.error && (() => {
+    const st = health.last_scrape_stats || {};
+    const src = st.sources || {};
+    const store = health.watchlist_storage || {};
+    const short = u => u.replace("https://www.investegate.co.uk", "") || "/";
+    const rows = Object.entries(src).filter(([k]) => k !== "company_pages");
+    const cp = src.company_pages;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "diag"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "diag-store " + (store.durable ? "ok" : "warn")
+    }, store.note, store.last_error ? ` Last error: ${store.last_error}` : ""), /*#__PURE__*/React.createElement("div", {
+      className: "diag-meta"
+    }, "Last scrape ", st.finished_at ? new Date(st.finished_at).toLocaleTimeString("en-GB") : "not yet run", st.duration_seconds != null ? `, took ${st.duration_seconds}s` : "", st.truncated_headlines_resolved ? `, ${st.truncated_headlines_resolved} shortened headlines completed` : "", ".", health.bank_holiday_list_needs_update ? " The bank holiday list in app.py needs extending." : ""), /*#__PURE__*/React.createElement("div", {
+      className: "diag-table"
+    }, rows.map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+      key: k,
+      className: "diag-row" + (v.ok ? "" : " bad")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "diag-src",
+      title: k
+    }, short(k)), /*#__PURE__*/React.createElement("span", null, v.pages, " page", v.pages === 1 ? "" : "s"), /*#__PURE__*/React.createElement("span", null, v.rows_in_session, " rows"), !v.ok && /*#__PURE__*/React.createElement("span", {
+      className: "diag-err",
+      title: v.error || ""
+    }, "failed"))), cp && /*#__PURE__*/React.createElement("div", {
+      className: "diag-row" + (cp.failed && cp.failed.length ? " bad" : "")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "diag-src"
+    }, "Watchlist company pages"), /*#__PURE__*/React.createElement("span", null, cp.requested, " fetched"), /*#__PURE__*/React.createElement("span", null, cp.rows_in_session, " rows"), cp.failed && cp.failed.length > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "diag-err"
+    }, "failed: ", cp.failed.join(", ")))));
+  })()))));
+}
+
+// ── Active filter chips ──────────────────────────────────────────────────
+function FilterChips({
+  items,
+  onClearAll
+}) {
+  if (items.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "chips"
+  }, items.map(it => /*#__PURE__*/React.createElement("span", {
+    className: "chip",
+    key: it.key
+  }, it.label, /*#__PURE__*/React.createElement("span", {
+    className: "chip-x",
+    onClick: it.onClear,
+    title: "Clear"
+  }, "✕"))), items.length > 1 && /*#__PURE__*/React.createElement("span", {
+    className: "chip clear-all",
+    onClick: onClearAll
+  }, "Clear all"));
+}
+function WatchlistModal({
+  watchlist,
+  onClose,
+  onAdd,
+  onRemove
+}) {
+  const [ticker, setTicker] = useState("");
+  const [name, setName] = useState("");
+  const [sector, setSector] = useState("");
+  const [tier, setTier] = useState("core");
+  const [q, setQ] = useState("");
+  const [msg, setMsg] = useState(null); // {kind:"error"|"warning"|"ok", text}
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!ticker || !name || busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await onAdd(ticker.trim().toUpperCase(), name.trim(), sector, tier);
+    setBusy(false);
+    if (!res || !res.ok) {
+      setMsg({
+        kind: "error",
+        text: res && res.error || "The company was not added."
+      });
+      return;
+    }
+    setMsg(res.warning ? {
+      kind: "warning",
+      text: `Added ${ticker.trim().toUpperCase()}. ${res.warning}`
+    } : {
+      kind: "ok",
+      text: `Added ${ticker.trim().toUpperCase()}.`
+    });
+    setTicker("");
+    setName("");
+    setSector("");
+    setTier("core");
+  };
+  const is = {
+    background: "var(--bg-surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 0,
+    padding: "8px 12px",
+    color: "var(--text-primary)",
+    fontFamily: "var(--font-sans)",
+    fontSize: 13,
+    outline: "none",
+    width: "100%"
+  };
+  const tierBtn = (val, label) => /*#__PURE__*/React.createElement("button", {
+    className: "seg-btn" + (tier === val ? " on" : ""),
+    onClick: () => setTier(val)
+  }, label);
+
+  // Grouped and searchable: a flat list of 40+ names was hard to scan.
+  const entries = Object.entries(watchlist);
+  const ql = q.trim().toLowerCase();
+  const match = ([t, info]) => !ql || t.toLowerCase().includes(ql) || (info.name || "").toLowerCase().includes(ql) || (info.sector || "").toLowerCase().includes(ql);
+  const sortFn = (a, b) => (a[1].name || a[0]).localeCompare(b[1].name || b[0]);
+  const core = entries.filter(e => (e[1].tier || "core") !== "read_across").filter(match).sort(sortFn);
+  const ra = entries.filter(e => (e[1].tier || "core") === "read_across").filter(match).sort(sortFn);
+  const renderRow = ([t, info]) => /*#__PURE__*/React.createElement("div", {
+    key: t,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "8px 12px",
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border)",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 12,
+      fontWeight: 600,
+      color: "var(--accent)",
+      background: "var(--accent-glow)",
+      padding: "2px 8px"
+    }
+  }, t), (info.tier || "core") === "read_across" ? /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-ra"
+  }, "R/A") : /*#__PURE__*/React.createElement("span", {
+    className: "row-tag tier-core"
+  }, "CORE"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "var(--text-primary)"
+    }
+  }, info.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)"
+    }
+  }, info.sector)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onRemove(t),
+    style: {
+      background: "none",
+      border: "none",
+      color: "var(--text-muted)",
+      cursor: "pointer",
+      fontSize: 14,
+      padding: "2px 6px"
+    },
+    onMouseOver: e => e.target.style.color = "var(--danger)",
+    onMouseOut: e => e.target.style.color = "var(--text-muted)"
+  }, "✕"));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sheet-wrap",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sheet-title"
+  }, "Watchlist (", entries.length, ")"), /*#__PURE__*/React.createElement("button", {
+    className: "float-close",
+    onClick: onClose,
+    title: "Close (Esc)"
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-body"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "sidebar-search",
+    value: q,
+    onChange: e => setQ(e.target.value),
+    placeholder: "Search watchlist...",
+    style: {
+      marginBottom: 4
+    }
+  }), core.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "wl-group-label"
+  }, "Core (", core.length, ")"), core.map(renderRow)), ra.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "wl-group-label"
+  }, "Read-across (", ra.length, ")"), ra.map(renderRow)), core.length === 0 && ra.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-muted)",
+      padding: "14px 0"
+    }
+  }, "No companies match that search."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid var(--border)",
+      paddingTop: 16,
+      marginTop: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "opt-label"
+  }, "Add to watchlist"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: ticker,
+    onChange: e => setTicker(e.target.value),
+    placeholder: "Ticker",
+    style: {
+      ...is,
+      maxWidth: 100,
+      fontFamily: "var(--font-mono)"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: name,
+    onChange: e => setName(e.target.value),
+    placeholder: "Company name",
+    style: is
+  })), /*#__PURE__*/React.createElement("input", {
+    value: sector,
+    onChange: e => setSector(e.target.value),
+    placeholder: "Sector (optional)",
+    style: is
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)",
+      marginBottom: 6
+    }
+  }, "Tier"), /*#__PURE__*/React.createElement("div", {
+    className: "seg"
+  }, tierBtn("core", "Core"), tierBtn("read_across", "Read-across"))), msg && /*#__PURE__*/React.createElement("div", {
+    className: "wl-msg " + msg.kind,
+    role: "status"
+  }, msg.text), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !ticker || !name || busy,
+    style: {
+      background: ticker && name && !busy ? "var(--accent)" : "var(--border)",
+      color: ticker && name && !busy ? "var(--bg-primary)" : "var(--text-muted)",
+      border: "none",
+      padding: "10px 16px",
+      fontFamily: "var(--font-sans)",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: ticker && name && !busy ? "pointer" : "not-allowed"
+    }
+  }, busy ? "Checking Investegate..." : "Add company")))));
+}
+function ReadAcrossView({
+  backendUrl,
+  refreshTick
+}) {
+  const [raData, setRaData] = useState(null);
+  const [raLoading, setRaLoading] = useState(true);
+  const [raError, setRaError] = useState(null);
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [liveDetails, setLiveDetails] = useState({});
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const rowRefs = useRef({});
+  const fetchRA = useCallback(async () => {
+    setRaLoading(true);
+    try {
+      const r = await fetchWithTimeout(`${backendUrl}/api/readacross`, {}, 45000);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setRaData(j);
+      setRaError(null);
+    } catch (e) {
+      setRaError(e.message);
+    } finally {
+      setRaLoading(false);
+    }
+  }, [backendUrl]);
+  useEffect(() => {
+    fetchRA();
+  }, [fetchRA, refreshTick]);
+  if (raLoading && !raData) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 10
+      }
+    }, [0, 1, 2].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
+      key: i,
+      index: i
+    })));
+  }
+  if (raError && !raData) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 20,
+        background: "rgba(239,68,68,0.08)",
+        border: "1px solid rgba(239,68,68,0.2)",
+        borderRadius: 8,
+        color: "var(--danger)"
+      }
+    }, "Failed to load read-across: ", raError);
+  }
+  if (!raData) return null;
+  const {
+    matrix,
+    rel_types: RT,
+    core,
+    read_across,
+    triggered
+  } = raData;
+  const activeCoreSet = new Set();
+  Object.values(matrix).forEach(row => {
+    Object.keys(row).forEach(t => activeCoreSet.add(t));
+  });
+  const activeCore = core.filter(c => activeCoreSet.has(c.ticker));
+  const inactiveCore = core.filter(c => !activeCoreSet.has(c.ticker));
+  const filterMatch = rel => typeFilter === "ALL" || rel.type === typeFilter;
+  const triggerCount = Object.keys(triggered).length;
+  const isTriggered = ticker => triggered[ticker] && triggered[ticker].length > 0;
+  const handleCellClick = async (ra_ticker, core_ticker) => {
+    const rel = matrix[ra_ticker]?.[core_ticker];
+    if (!rel) return;
+    const key = `${ra_ticker}-${core_ticker}`;
+    if (selectedCell === key) {
+      setSelectedCell(null);
+      return;
+    }
+    setSelectedCell(key);
+    const anns = triggered[ra_ticker] || [];
+    if (anns.length > 0 && anns[0].url && !liveDetails[anns[0].url]) {
+      setLoadingDetail(true);
+      try {
+        const r = await fetchWithTimeout(`${backendUrl}/api/rns/detail?url=${encodeURIComponent(anns[0].url)}`, {}, 45000);
+        if (r.ok) {
+          const j = await r.json();
+          setLiveDetails(prev => ({
+            ...prev,
+            [anns[0].url]: j
+          }));
+        }
+      } catch {} finally {
+        setLoadingDetail(false);
+      }
+    }
+  };
+  const scrollToRow = ra_ticker => {
+    const el = rowRefs.current[ra_ticker];
+    if (el) el.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fade-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20,
+      padding: "14px 18px",
+      background: triggerCount > 0 ? "rgba(240,192,64,0.08)" : "var(--bg-card)",
+      border: `1px solid ${triggerCount > 0 ? "rgba(240,192,64,0.25)" : "var(--border)"}`,
+      borderRadius: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: triggerCount > 0 ? 12 : 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)",
+      animation: triggerCount > 0 ? "pulse-dot 1.5s infinite" : "none"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: triggerCount > 0 ? "var(--watchlist)" : "var(--text-muted)"
+    }
+  }, triggerCount === 0 ? "No live read-across triggers yet today" : `${triggerCount} live read-across ${triggerCount === 1 ? "trigger" : "triggers"} today`)), triggerCount > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, Object.entries(triggered).map(([ra_ticker, anns]) => {
+    const raCompany = read_across.find(r => r.ticker === ra_ticker);
+    const affectedCores = Object.keys(matrix[ra_ticker] || {});
+    return /*#__PURE__*/React.createElement("div", {
+      key: ra_ticker,
+      onClick: () => scrollToRow(ra_ticker),
+      style: {
+        padding: "10px 14px",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        cursor: "pointer",
+        transition: "all 0.15s"
+      },
+      onMouseOver: e => {
+        e.currentTarget.style.borderColor = "var(--watchlist)";
+      },
+      onMouseOut: e => {
+        e.currentTarget.style.borderColor = "var(--border)";
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        fontWeight: 700,
+        color: "var(--watchlist)",
+        background: "rgba(240,192,64,0.1)",
+        padding: "2px 6px",
+        borderRadius: 4
+      }
+    }, ra_ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: "var(--text-primary)"
+      }
+    }, raCompany?.name || ra_ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        fontSize: 11,
+        color: "var(--text-muted)",
+        fontFamily: "var(--font-mono)"
+      }
+    }, anns[0].time)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-secondary)",
+        marginBottom: 6
+      }
+    }, anns.slice(0, 3).map((a, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        marginBottom: 4,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement(CategoryBadge, {
+      category: a.category
+    }), /*#__PURE__*/React.createElement("span", null, a.headline))), anns.length > 3 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-muted)",
+        marginTop: 4
+      }
+    }, "+ ", anns.length - 3, " more")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-muted)"
+      }
+    }, "Reads across to ", affectedCores.length, " core ", affectedCores.length === 1 ? "company" : "companies", ": ", affectedCores.join(", ")));
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 16,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(FilterPill, {
+    label: "All types",
+    active: typeFilter === "ALL",
+    onClick: () => setTypeFilter("ALL")
+  }), Object.entries(RT).map(([k, r]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setTypeFilter(k),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      borderRadius: 20,
+      border: `1px solid ${typeFilter === k ? r.border : "var(--border)"}`,
+      background: typeFilter === k ? r.bg : "transparent",
+      color: typeFilter === k ? r.color : "var(--text-secondary)",
+      fontFamily: "var(--font-sans)",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 14,
+      height: 14,
+      borderRadius: 3,
+      background: r.bg,
+      border: `1px solid ${r.border}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: r.color,
+      fontFamily: "var(--font-mono)"
+    }
+  }, r.short)), r.label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: "auto",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: "collapse",
+      minWidth: "100%",
+      fontSize: 11
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      background: "var(--bg-surface)"
+    }
+  }, /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: "12px 14px",
+      textAlign: "left",
+      borderBottom: "1px solid var(--border)",
+      borderRight: "1px solid var(--border)",
+      position: "sticky",
+      left: 0,
+      background: "var(--bg-surface)",
+      zIndex: 2,
+      minWidth: 180
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: "var(--text-muted)"
+    }
+  }, "Read-across ↓  Core →")), activeCore.map(c => /*#__PURE__*/React.createElement("th", {
+    key: c.ticker,
+    title: `${c.name} · ${c.sector}`,
+    style: {
+      padding: "10px 8px",
+      borderBottom: "1px solid var(--border)",
+      borderRight: "1px solid var(--border)",
+      minWidth: 64,
+      background: "var(--bg-surface)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 10,
+      fontWeight: 700,
+      color: "var(--accent)",
+      letterSpacing: "0.04em"
+    }
+  }, c.ticker), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "var(--text-muted)",
+      marginTop: 2,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      maxWidth: 56
+    }
+  }, c.sector.split(" / ")[0]))))), /*#__PURE__*/React.createElement("tbody", null, read_across.map((ra, ri) => {
+    const rowData = matrix[ra.ticker] || {};
+    const triggered_here = isTriggered(ra.ticker);
+    const rowBg = triggered_here ? "rgba(240,192,64,0.05)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+    const stickyBg = triggered_here ? "rgba(240,192,64,0.08)" : ri % 2 === 0 ? "var(--bg-card)" : "var(--bg-primary)";
+    return /*#__PURE__*/React.createElement("tr", {
+      key: ra.ticker,
+      ref: el => rowRefs.current[ra.ticker] = el,
+      style: {
+        background: rowBg
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        padding: "10px 14px",
+        borderRight: "1px solid var(--border)",
+        borderBottom: "1px solid var(--border)",
+        position: "sticky",
+        left: 0,
+        zIndex: 1,
+        background: stickyBg,
+        borderLeft: triggered_here ? "3px solid var(--watchlist)" : "3px solid transparent"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        fontWeight: 700,
+        color: triggered_here ? "var(--watchlist)" : "var(--accent)",
+        background: triggered_here ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+        padding: "2px 6px",
+        borderRadius: 4
+      }
+    }, ra.ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-primary)"
+      }
+    }, ra.name), triggered_here && /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: "var(--watchlist)",
+        color: "var(--bg-primary)",
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        animation: "pulse-dot 2s infinite"
+      }
+    }, "LIVE")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--text-muted)",
+        marginTop: 2,
+        paddingLeft: 2
+      }
+    }, ra.sector)), activeCore.map(c => {
+      const rel = rowData[c.ticker];
+      const cellKey = `${ra.ticker}-${c.ticker}`;
+      const isSelected = selectedCell === cellKey;
+      const visible = rel && filterMatch(rel);
+      const r = visible ? RT[rel.type] : null;
+      return /*#__PURE__*/React.createElement("td", {
+        key: c.ticker,
+        style: {
+          padding: "6px 8px",
+          textAlign: "center",
+          borderRight: "1px solid var(--border)",
+          borderBottom: "1px solid var(--border)",
+          cursor: visible ? "pointer" : "default",
+          background: isSelected ? "rgba(61,184,106,0.12)" : "transparent",
+          transition: "background 0.15s"
+        },
+        onClick: () => handleCellClick(ra.ticker, c.ticker)
+      }, visible && r && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 3
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 26,
+          height: 26,
+          borderRadius: 6,
+          background: triggered_here ? r.bg : isSelected ? r.bg : "rgba(255,255,255,0.03)",
+          border: `1px solid ${triggered_here ? r.border : isSelected ? r.border : "rgba(255,255,255,0.06)"}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: triggered_here ? `0 0 10px ${r.bg}` : "none",
+          transition: "all 0.15s"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          fontWeight: 700,
+          color: r.color,
+          fontFamily: "var(--font-mono)"
+        }
+      }, r.short)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 1.5
+        }
+      }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+        key: s,
+        style: {
+          width: 4,
+          height: 4,
+          borderRadius: "50%",
+          background: s <= rel.strength ? r.color : "var(--border)",
+          opacity: s <= rel.strength ? 1 : 0.5
+        }
+      })))));
+    }));
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 16,
+      marginBottom: 24,
+      flexWrap: "wrap",
+      fontSize: 11,
+      color: "var(--text-muted)",
+      alignItems: "center"
+    }
+  }, Object.entries(RT).map(([k, r]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+      background: r.bg,
+      border: `1px solid ${r.border}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      fontWeight: 700,
+      color: r.color,
+      fontFamily: "var(--font-mono)"
+    }
+  }, r.short)), /*#__PURE__*/React.createElement("span", null, r.label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 2
+    }
+  }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+    key: s,
+    style: {
+      width: 5,
+      height: 5,
+      borderRadius: "50%",
+      background: "var(--accent)",
+      opacity: 0.3 + s * 0.23
+    }
+  }))), /*#__PURE__*/React.createElement("span", null, "Strength (1 to 3)")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 12,
+      height: 12,
+      borderRadius: 3,
+      background: "rgba(240,192,64,0.15)",
+      border: "1px solid rgba(240,192,64,0.4)"
+    }
+  }), /*#__PURE__*/React.createElement("span", null, "Live trigger today"))), selectedCell && (() => {
+    const [ra_ticker, core_ticker] = selectedCell.split("-");
+    const rel = matrix[ra_ticker]?.[core_ticker];
+    if (!rel) return null;
+    const ra = read_across.find(r => r.ticker === ra_ticker);
+    const coreComp = core.find(c => c.ticker === core_ticker);
+    const r = RT[rel.type];
+    const liveAnns = triggered[ra_ticker] || [];
+    const topAnn = liveAnns[0];
+    const liveDetail = topAnn ? liveDetails[topAnn.url] : null;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "fade-up",
+      style: {
+        marginBottom: 24,
+        padding: "18px 22px",
+        background: "var(--bg-card)",
+        border: `1px solid ${liveAnns.length > 0 ? "rgba(240,192,64,0.3)" : r.border}`,
+        borderRadius: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 14,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        fontWeight: 700,
+        color: liveAnns.length > 0 ? "var(--watchlist)" : "var(--accent)",
+        background: liveAnns.length > 0 ? "rgba(240,192,64,0.12)" : "var(--accent-glow)",
+        padding: "3px 8px",
+        borderRadius: 5
+      }
+    }, ra.ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        fontWeight: 500
+      }
+    }, ra.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--text-muted)"
+      }
+    }, "→"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        fontWeight: 700,
+        color: "var(--accent)",
+        background: "var(--accent-glow)",
+        padding: "3px 8px",
+        borderRadius: 5
+      }
+    }, coreComp.ticker), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        fontWeight: 500
+      }
+    }, coreComp.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: "3px 10px",
+        borderRadius: 10,
+        background: r.bg,
+        border: `1px solid ${r.border}`,
+        color: r.color,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, r.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 3,
+        alignItems: "center"
+      }
+    }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+      key: s,
+      style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: s <= rel.strength ? r.color : "var(--border)"
+      }
+    })))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: liveAnns.length > 0 ? 18 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "var(--text-muted)",
+        marginBottom: 8
+      }
+    }, "Read-across rationale"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        lineHeight: 1.7
+      }
+    }, rel.note)), liveAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        paddingTop: 16,
+        borderTop: "1px dashed rgba(240,192,64,0.3)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: "var(--watchlist)",
+        animation: "pulse-dot 1.5s infinite"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "var(--watchlist)"
+      }
+    }, "Live today · ", liveAnns.length, " announcement", liveAnns.length === 1 ? "" : "s", " from ", ra.ticker)), liveAnns.map((ann, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        padding: "12px 14px",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        marginBottom: i < liveAnns.length - 1 ? 8 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        color: "var(--text-muted)"
+      }
+    }, ann.time), /*#__PURE__*/React.createElement(CategoryBadge, {
+      category: ann.category
+    }), ann.source_feed && ann.source_feed !== "RNS" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        padding: "1px 6px",
+        borderRadius: 3,
+        fontSize: 9,
+        fontFamily: "var(--font-mono)",
+        color: "var(--text-muted)",
+        border: "1px solid var(--border)"
+      }
+    }, ann.source_feed)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "var(--text-primary)",
+        fontWeight: 500,
+        marginBottom: 6
+      }
+    }, ann.headline), i === 0 && loadingDetail && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 0"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "spinner",
+      style: {
+        width: 12,
+        height: 12,
+        borderWidth: 1.5
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-muted)"
+      }
+    }, "Loading summary...")), i === 0 && liveDetail && liveDetail.ai_summary && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        padding: "10px 12px",
+        background: "var(--bg-primary)",
+        borderRadius: 6,
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "var(--text-muted)",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        marginBottom: 4
+      }
+    }, "Summary"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-secondary)",
+        lineHeight: 1.6
+      }
+    }, liveDetail.ai_summary)), i === 0 && liveDetail && liveDetail.key_figures && liveDetail.key_figures.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "var(--text-muted)",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        marginBottom: 6
+      }
+    }, "Key figures"), liveDetail.key_figures.slice(0, 5).map((fig, j) => /*#__PURE__*/React.createElement("div", {
+      key: j,
+      className: "key-figure",
+      style: {
+        margin: "0 0 4px 0",
+        fontSize: 11
+      }
+    }, fig))), ann.url && /*#__PURE__*/React.createElement("a", {
+      href: ann.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      onClick: e => e.stopPropagation(),
+      style: {
+        display: "inline-block",
+        marginTop: 10,
+        fontSize: 11,
+        color: "var(--accent)",
+        textDecoration: "none"
+      }
+    }, "View full announcement ↗")))));
+  })(), inactiveCore.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 18px",
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: "var(--text-muted)",
+      marginBottom: 8
+    }
+  }, "Core companies with no current read-across mapping"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginBottom: 6
+    }
+  }, inactiveCore.map(c => /*#__PURE__*/React.createElement("span", {
+    key: c.ticker,
+    title: `${c.name} · ${c.sector}`,
+    style: {
+      fontFamily: "var(--font-mono)",
+      fontSize: 10,
+      fontWeight: 600,
+      color: "var(--text-muted)",
+      background: "var(--bg-surface)",
+      padding: "3px 8px",
+      borderRadius: 4,
+      border: "1px solid var(--border)"
+    }
+  }, c.ticker))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)"
+    }
+  }, "No current read-across company maps to these directly.")));
+}
+
+// ── Detached reading panel (desktop) ─────────────────────────────────────
+// Deliberately not a modal: there is no scrim, so the feed behind stays scrollable and
+// clickable and several announcements can be read side by side. Dragged by the header,
+// resized from the bottom-right corner.
+function DetachedPanel({
+  p,
+  backendUrl,
+  catColorFor,
+  onClose,
+  onRaise,
+  onToggle,
+  onChange
+}) {
+  const ann = p.ann;
+  const catColor = catColorFor(ann.category);
+  const isRA = p.tier === "read_across";
+  const startDrag = (e, mode) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onRaise(p.key);
+    const startX = e.clientX,
+      startY = e.clientY;
+    const base = {
+      x: p.x,
+      y: p.y,
+      w: p.w,
+      h: p.h
+    };
+    const maxX = (window.innerWidth || 1200) - 80;
+    const maxY = (window.innerHeight || 800) - 60;
+    const move = ev => {
+      const dx = ev.clientX - startX,
+        dy = ev.clientY - startY;
+      if (mode === "move") {
+        onChange(p.key, {
+          x: Math.min(Math.max(0, base.x + dx), maxX),
+          y: Math.min(Math.max(0, base.y + dy), maxY)
+        });
+      } else {
+        onChange(p.key, {
+          w: Math.max(300, base.w + dx),
+          h: Math.max(150, base.h + dy)
+        });
+      }
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "panel" + (p.collapsed ? " collapsed" : "") + (p.raised ? " raised" : ""),
+    style: {
+      left: p.x,
+      top: p.y,
+      width: p.w,
+      height: p.collapsed ? "auto" : p.h,
+      zIndex: 80 + (p.z || 0)
+    },
+    onMouseDown: () => onRaise(p.key)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-head",
+    onMouseDown: e => startDrag(e, "move"),
+    title: "Drag to move"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "panel-title"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row-meta",
+    style: {
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "row-time"
+  }, ann.time), ann.ticker && /*#__PURE__*/React.createElement("span", {
+    className: "row-ticker" + (ann.is_watchlist ? isRA ? " readacross" : " watchlist" : "")
+  }, ann.ticker), /*#__PURE__*/React.createElement("span", {
+    className: "row-category",
+    style: {
+      color: catColor.color,
+      background: catColor.bg
+    }
+  }, ann.category)), /*#__PURE__*/React.createElement("div", {
+    className: "panel-headline"
+  }, ann.headline), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-muted)",
+      marginTop: 2,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, ann.company)), /*#__PURE__*/React.createElement("button", {
+    className: "panel-btn",
+    onClick: e => {
+      e.stopPropagation();
+      onToggle(p.key);
+    },
+    onMouseDown: e => e.stopPropagation(),
+    title: p.collapsed ? "Expand" : "Collapse"
+  }, p.collapsed ? "\u25A1" : "\u2013"), /*#__PURE__*/React.createElement("button", {
+    className: "panel-btn close",
+    onClick: e => {
+      e.stopPropagation();
+      onClose(p.key);
+    },
+    onMouseDown: e => e.stopPropagation(),
+    title: "Close"
+  }, "✕")), !p.collapsed && /*#__PURE__*/React.createElement("div", {
+    className: "panel-body"
+  }, /*#__PURE__*/React.createElement(AnnouncementDetail, {
+    ann: ann,
+    backendUrl: backendUrl
+  })), !p.collapsed && /*#__PURE__*/React.createElement("div", {
+    className: "panel-resize",
+    onMouseDown: e => startDrag(e, "resize"),
+    title: "Drag to resize"
+  }));
+}
+
+// ── Panel dock (mobile) ──────────────────────────────────────────────────
+// Floating windows do not work on a phone, so open announcements collect in a dock at the
+// bottom. The feed above stays browsable and any docked item can be expanded in place.
+function PanelDock({
+  panels,
+  backendUrl,
+  catColorFor,
+  onClose,
+  onToggle,
+  onCloseAll
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "dock"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "dock-bar"
+  }, /*#__PURE__*/React.createElement("span", null, panels.length, " open"), /*#__PURE__*/React.createElement("span", {
+    className: "act",
+    onClick: onCloseAll,
+    style: {
+      cursor: "pointer",
+      color: "var(--text-secondary)"
+    }
+  }, "Close all")), /*#__PURE__*/React.createElement("div", {
+    className: "dock-list"
+  }, panels.map(p => {
+    const catColor = catColorFor(p.ann.category);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "dock-item",
+      key: p.key
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "dock-head",
+      onClick: () => onToggle(p.key)
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "row-chevron",
+      style: {
+        transform: p.collapsed ? "none" : "rotate(180deg)"
+      }
+    }, "▼"), p.ann.ticker && /*#__PURE__*/React.createElement("span", {
+      className: "row-ticker"
+    }, p.ann.ticker), /*#__PURE__*/React.createElement("span", {
+      className: "dock-headline"
+    }, p.ann.headline), /*#__PURE__*/React.createElement("span", {
+      className: "row-category",
+      style: {
+        color: catColor.color,
+        background: catColor.bg
+      }
+    }, p.ann.category), /*#__PURE__*/React.createElement("button", {
+      className: "panel-btn close",
+      onClick: e => {
+        e.stopPropagation();
+        onClose(p.key);
+      },
+      title: "Close"
+    }, "✕")), !p.collapsed && /*#__PURE__*/React.createElement("div", {
+      className: "dock-body"
+    }, /*#__PURE__*/React.createElement(AnnouncementDetail, {
+      ann: p.ann,
+      backendUrl: backendUrl
+    })));
+  })));
+}
+
+// Defaults for everything in the Options panel.
+const OPTION_DEFAULTS = {
+  theme: "dark",
+  tagScheme: "vivid",
+  customColors: {},
+  expandStyle: "inline",
+  columns: "auto",
+  showRelative: true,
+  flagNew: true,
+  showRaMap: true,
+  dimRead: true,
+  keyboardNav: true,
+  refreshSecs: 120
+};
+function App() {
+  // Restore saved preferences (null on first ever visit)
+  const savedPrefs = useMemo(() => prefsStore.load(), []);
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState("idle");
+  const [filter, setFilter] = useState(() => savedPrefs?.filter ?? "all");
+  const [categoryFilter, setCategoryFilter] = useState(() => savedPrefs?.categoryFilter ?? "all");
+  // Auto-refresh is on by default. If it is switched off deliberately, that choice is
+  // remembered rather than reset on the next visit.
+  const [autoRefresh, setAutoRefresh] = useState(() => savedPrefs?.autoRefresh ?? true);
+  const [showWatchlist, setShowWatchlist] = useState(false);
+  const [watchlist, setWatchlist] = useState({});
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [backendUrl, setBackendUrl] = useState(API_BASE);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState(() => savedPrefs?.sortMode ?? "relevance");
+  const intervalRef = useRef(null);
+  const [tab, setTab] = useState("feed");
+  const [excludedCats, setExcludedCats] = useState(() => savedPrefs?.excludedCats ? new Set(savedPrefs.excludedCats) : new Set());
+  // Mining and metals companies arrive flagged excluded_sector and are hidden unless this
+  // is on. M&A and watchlist announcements are never flagged by the server.
+  const [showMining, setShowMining] = useState(() => savedPrefs?.showMining ?? false);
+  const [sourceFilter, setSourceFilter] = useState(() => savedPrefs?.sourceFilter ?? "all"); // all | rns | nonreg
+  const defaultsAppliedRef = useRef(savedPrefs != null);
+  // Options, merged over defaults so a new option added later still has a sane value.
+  const [opts, setOpts] = useState(() => {
+    const merged = {
+      ...OPTION_DEFAULTS,
+      ...(savedPrefs?.options || {})
+    };
+    // The old blocking "modal" mode was replaced by non-blocking detached panels.
+    if (merged.expandStyle === "modal") merged.expandStyle = "panel";
+    return merged;
+  });
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const setOpt = (k, v) => setOpts(prev => ({
+    ...prev,
+    [k]: v
+  }));
+  // New-item tracking, read-state bumping, keyboard focus
+  const [newIds, setNewIds] = useState(() => new Set());
+  const [readVersion, setReadVersion] = useState(0);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  // A full day is 600 to 1,000 announcements now that pagination captures everything.
+  // Rendering them all at once made filtering and typing sluggish, especially on a phone,
+  // so the feed renders a batch and adds more as you scroll towards the end.
+  const RENDER_BATCH = 150;
+  const [renderLimit, setRenderLimit] = useState(RENDER_BATCH);
+  const sentinelRef = useRef(null);
+  const [gridEl, setGridEl] = useState(null);
+  useRowLevelling(gridEl);
+  const [raMap, setRaMap] = useState({});
+  // Open reading panels. Non-modal, so several can be open while the feed stays usable.
+  const [panels, setPanels] = useState([]);
+  const zRef = useRef(1);
+  const serverDefaultsRef = useRef([]); // server's default_hidden_categories, for "reset"
+  const searchRef = useRef(null);
+  const isHardRef = useRef(false);
+  // Connection resilience
+  const inFlightRef = useRef(false); // stops background ticks stacking up
+  const inFlightStartRef = useRef(0); // when it started, so a dead lock can be broken
+  const abortRef = useRef(null); // controller for the live request, so it can be killed
+  const retryRef = useRef(null); // pending retry
+  const failRef = useRef(0); // consecutive failures
+  const lastSuccessRef = useRef(0); // wall-clock time of the last good fetch
+  const fetchRef = useRef(null); // always points at the current fetchData
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [signedOut, setSignedOut] = useState(false);
+  const signedOutRef = useRef(false);
+  useEffect(() => {
+    signedOutRef.current = signedOut;
+  }, [signedOut]);
+  const etagRef = useRef(null); // last feed ETag, for conditional requests
+
+  // Responsive state
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 880);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    const onResize = () => {
+      const m = window.innerWidth < 880;
+      setIsMobile(m);
+      if (!m) {
+        setDrawerOpen(false);
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Theme and read-dimming are applied on <html> so all CSS variables swap together.
+  useEffect(() => {
+    applyTheme(opts.theme);
+  }, [opts.theme]);
+  useEffect(() => {
+    try {
+      document.documentElement.classList.toggle("no-read-dim", !opts.dimRead);
+    } catch (e) {}
+  }, [opts.dimRead]);
+
+  // Persist filters and options together.
+  useEffect(() => {
+    prefsStore.save({
+      filter,
+      categoryFilter,
+      sortMode,
+      sourceFilter,
+      excludedCats: [...excludedCats],
+      autoRefresh,
+      showMining,
+      options: opts
+    });
+  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, autoRefresh, showMining, opts]);
+  const NONREG_SOURCES = ["GNW", "UKN", "PRN", "MFN", "EQS"];
+  const toggleExcludeCat = cat => {
+    setExcludedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);else next.add(cat);
+      return next;
+    });
+  };
+
+  // `slow` means "expect a synchronous rescrape", so it only widens the timeout and sends
+  // force=true. It deliberately does NOT send hard=true: on the backend, hard wipes the day's
+  // accumulated cache, so announcements from earlier in the morning that have since scrolled
+  // off Investegate's 50-row index pages are destroyed and cannot be recovered.
+  // ── Connecting to the backend ────────────────────────────────────────────
+  // Kept deliberately simple. Auto-refresh polls on its interval whether or not the tab is in
+  // front, which is what keeps the Render service awake and is how this worked originally.
+  // Pausing polls while the tab was hidden let the service spin down, and every return then
+  // needed a slow cold-start recovery, so that behaviour has been removed.
+  //
+  // The only safeguards kept are the two that stop a genuine wedge: every request has a
+  // timeout, so it cannot hang forever, and the in-flight lock has a ceiling, so a dead
+  // request cannot block later polls.
+  const REQUEST_TIMEOUT_MS = 45000; // normal poll
+  const HARD_TIMEOUT_MS = 300000; // hard refresh asks for a synchronous rescrape
+  const LOCK_CEILING_MS = 320000; // beyond this an in-flight request is assumed dead
+
+  const fetchData = useCallback(async (hard = false, silent = false, opt = {}) => {
+    const now = Date.now();
+    // One request at a time. A user-initiated refresh, or a request that has outlived its own
+    // timeout, is allowed to take over.
+    if (inFlightRef.current) {
+      const age = now - (inFlightStartRef.current || 0);
+      if (!opt.force && age < LOCK_CEILING_MS) return;
+      try {
+        if (abortRef.current) abortRef.current.abort();
+      } catch (e) {}
+      abortRef.current = null;
+    }
+    inFlightRef.current = true;
+    inFlightStartRef.current = now;
+    if (!silent) setStatus("loading");
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    abortRef.current = ctrl;
+    const killer = setTimeout(() => {
+      try {
+        ctrl && ctrl.abort();
+      } catch (e) {}
+    }, hard ? HARD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+    try {
+      const qs = `include_all=true&limit=2000${hard ? "&force=true" : ""}`;
+      // Send back the ETag from the last full response. When nothing has changed the
+      // server answers 304 with no body, so most polls transfer almost nothing.
+      const headers = etagRef.current ? {
+        "If-None-Match": etagRef.current
+      } : {};
+      const r = await fetch(`${backendUrl}/api/rns?${qs}`, {
+        signal: ctrl ? ctrl.signal : undefined,
+        cache: "no-store",
+        headers
+      });
+      // 401 means the sign-in cookie has expired. It used to be treated like a network
+      // failure, so the banner said the backend was unreachable and retried forever;
+      // only a full reload recovered. Stop polling and ask the user to sign in.
+      if (r.status === 401) {
+        setSignedOut(true);
+        setStatus("signed out");
+        setReconnectAttempt(0);
+        return;
+      }
+      if (r.status === 304) {
+        setStatus("connected");
+        setLastRefresh(new Date());
+        setReconnectAttempt(0);
+        failRef.current = 0;
+        lastSuccessRef.current = Date.now();
+        return;
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      etagRef.current = r.headers.get("ETag") || null;
+      const j = await r.json();
+      setData(j);
+      setStatus("connected");
+      setLastRefresh(new Date());
+      setReconnectAttempt(0);
+      failRef.current = 0;
+      lastSuccessRef.current = Date.now();
+      if (Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current = j.default_hidden_categories;
+      if (!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)) {
+        setExcludedCats(new Set(j.default_hidden_categories));
+        defaultsAppliedRef.current = true;
+      }
+      const ids = (j.announcements || []).map(annId);
+      if (seenStore.size() === 0) {
+        seenStore.markAll(ids);
+        setNewIds(new Set());
+      } else {
+        const fresh = ids.filter(id => !seenStore.has(id));
+        seenStore.markAll(ids);
+        if (fresh.length > 0) setNewIds(new Set(fresh));
+      }
+    } catch (e) {
+      console.error(e);
+      if (signedOutRef.current) return;
+      failRef.current += 1;
+      setStatus("reconnecting");
+      setReconnectAttempt(n => n + 1);
+      // No backoff chain to go wrong: the next scheduled poll simply tries again. A single
+      // quick retry covers a one-off blip without waiting a whole interval.
+      if (!retryRef.current) {
+        retryRef.current = setTimeout(() => {
+          retryRef.current = null;
+          fetchRef.current && fetchRef.current(false, true);
+        }, 8000);
+      }
+    } finally {
+      clearTimeout(killer);
+      abortRef.current = null;
+      inFlightRef.current = false;
+    }
+  }, [backendUrl]);
+  // Kept in a ref so timers and listeners always call the current version.
+  fetchRef.current = fetchData;
+  const fetchWatchlist = useCallback(async () => {
+    try {
+      const r = await fetchWithTimeout(`${backendUrl}/api/watchlist`, {}, 20000);
+      if (r.ok) {
+        const j = await r.json();
+        setWatchlist(j.watchlist || {});
+      }
+    } catch {}
+  }, [backendUrl]);
+
+  // The read-across matrix gives each read-across ticker the core name(s) it maps to, so a
+  // row can show "-> CML" without opening the read-across tab.
+  const fetchRaMap = useCallback(async () => {
+    try {
+      const r = await fetchWithTimeout(`${backendUrl}/api/readacross`, {}, 30000);
+      if (!r.ok) return;
+      const j = await r.json();
+      const m = {};
+      Object.entries(j.matrix || {}).forEach(([ra, links]) => {
+        m[ra] = Object.keys(links || {});
+      });
+      setRaMap(m);
+    } catch {}
+  }, [backendUrl]);
+  useEffect(() => {
+    fetchData();
+    fetchWatchlist();
+    fetchRaMap();
+  }, [fetchData, fetchWatchlist, fetchRaMap]);
+
+  // Auto-refresh: one interval, always running, hidden tab or not. This is what keeps the
+  // backend awake so there is nothing to recover from.
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      if (signedOutRef.current) return;
+      fetchRef.current && fetchRef.current(false, true);
+    }, (opts.refreshSecs || 120) * 1000);
+    intervalRef.current = id;
+    return () => clearInterval(id);
+  }, [autoRefresh, opts.refreshSecs]);
+
+  // Coming back to the tab refreshes immediately, so you never look at a stale feed while
+  // waiting for the next tick. Also covers waking from sleep, where the interval will not have
+  // fired.
+  useEffect(() => {
+    const onWake = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (Date.now() - (lastSuccessRef.current || 0) > 20000) {
+        fetchRef.current && fetchRef.current(false, false, {
+          force: true
+        });
+      }
+    };
+    // Coming back online always refetches: we may have missed a poll while disconnected, and
+    // the event itself is rare enough that there is no cost to being eager.
+    const onOnline = () => {
+      fetchRef.current && fetchRef.current(false, true, {
+        force: true
+      });
+    };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
+  // Clear any pending retry when the component goes away.
+  useEffect(() => () => {
+    if (retryRef.current) clearTimeout(retryRef.current);
+  }, []);
+
+  // Returns {ok, error, warning} so the watchlist dialog can say what happened. The server
+  // rejects tickers Investegate has no page for, and warns about alias codes and about
+  // changes that will not survive a restart.
+  const handleAdd = async (t, n, s, tier) => {
+    try {
+      const r = await fetchWithTimeout(`${backendUrl}/api/watchlist/add?ticker=${encodeURIComponent(t)}&name=${encodeURIComponent(n)}&sector=${encodeURIComponent(s)}&tier=${tier || "core"}`, {
+        method: "POST"
+      }, 30000);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return {
+        ok: false,
+        error: j.error || `The server rejected the change (HTTP ${r.status}).`
+      };
+      await fetchWatchlist();
+      fetchData(false, true, {
+        force: true
+      });
+      return {
+        ok: true,
+        warning: j.warning || null
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "Could not reach the server. Check your connection and try again."
+      };
+    }
+  };
+  const handleRemove = async t => {
+    try {
+      const r = await fetchWithTimeout(`${backendUrl}/api/watchlist/${encodeURIComponent(t)}`, {
+        method: "DELETE"
+      }, 30000);
+      const j = await r.json().catch(() => ({}));
+      await fetchWatchlist();
+      fetchData(false, true, {
+        force: true
+      });
+      return {
+        ok: r.ok,
+        warning: j.warning || null
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "Could not reach the server."
+      };
+    }
+  };
+  const allAnns = data?.announcements || [];
+  const {
+    wlCount,
+    coreCount,
+    raCount,
+    secCount,
+    rnsCount,
+    nonregCount,
+    miningCount,
+    catCounts,
+    sortedCats
+  } = useMemo(() => {
+    const cc = {};
+    allAnns.forEach(a => {
+      cc[a.category] = (cc[a.category] || 0) + 1;
+    });
+    return {
+      wlCount: allAnns.filter(a => a.is_watchlist).length,
+      coreCount: allAnns.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core").length,
+      raCount: allAnns.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across").length,
+      secCount: allAnns.filter(a => a.sector_relevant).length,
+      rnsCount: allAnns.filter(a => !a.source_feed || a.source_feed === "RNS").length,
+      nonregCount: allAnns.filter(a => NONREG_SOURCES.includes(a.source_feed)).length,
+      miningCount: allAnns.filter(a => a.excluded_sector).length,
+      catCounts: cc,
+      sortedCats: Object.entries(cc).sort((a, b) => b[1] - a[1]).map(([c]) => c)
+    };
+  }, [allAnns, watchlist]);
+  const anns = useMemo(() => {
+    let out = allAnns;
+    if (!showMining) out = out.filter(a => !a.excluded_sector);
+    if (filter === "watchlist") out = out.filter(a => a.is_watchlist);else if (filter === "core") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core");else if (filter === "read_across") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across");else if (filter === "sector") out = out.filter(a => a.sector_relevant);
+    if (categoryFilter !== "all") out = out.filter(a => a.category === categoryFilter);
+    if (excludedCats.size > 0) out = out.filter(a => !excludedCats.has(a.category));
+    if (sourceFilter === "rns") out = out.filter(a => !a.source_feed || a.source_feed === "RNS");else if (sourceFilter === "nonreg") out = out.filter(a => NONREG_SOURCES.includes(a.source_feed));
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      out = out.filter(a => a.company.toLowerCase().includes(q) || a.headline.toLowerCase().includes(q) || (a.ticker || "").toLowerCase().includes(q));
+    }
+    if (sortMode === "latest") {
+      // Date first, then time, so a Sunday 18:00 release sorts below Monday 07:00.
+      out = [...out].sort((a, b) => {
+        const ka = dateKey(a.date_str) + a.time,
+          kb = dateKey(b.date_str) + b.time;
+        return ka > kb ? -1 : ka < kb ? 1 : 0;
+      });
+    }
+    return out;
+  }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode, showMining]);
+  const tierFor = ticker => watchlist[ticker]?.tier;
+  const catColorFor = useMemo(() => makeCatColor(opts.tagScheme, opts.customColors), [opts.tagScheme, opts.customColors]);
+  const newCount = useMemo(() => anns.filter(a => newIds.has(annId(a))).length, [anns, newIds]);
+  const anyModalOpen = optionsOpen || showWatchlist;
+
+  // ── Reading panels ─────────────────────────────────────────────────────
+  const raisePanel = useCallback(key => {
+    zRef.current += 1;
+    const z = zRef.current;
+    setPanels(prev => prev.map(p => ({
+      ...p,
+      z: p.key === key ? z : p.z,
+      raised: p.key === key
+    })));
+  }, []);
+  const openPanel = useCallback((ann, tier) => {
+    const key = annId(ann);
+    setPanels(prev => {
+      const existing = prev.find(p => p.key === key);
+      zRef.current += 1;
+      const z = zRef.current;
+      if (existing) {
+        // Already open: bring it forward and make sure it is not collapsed.
+        return prev.map(p => p.key === key ? {
+          ...p,
+          collapsed: false,
+          z,
+          raised: true
+        } : {
+          ...p,
+          raised: false
+        });
+      }
+      const mobile = typeof window !== "undefined" && window.innerWidth < 880;
+      if (mobile) {
+        // On a phone the newest opens expanded and the rest fold down into the dock.
+        return [{
+          key,
+          ann,
+          tier,
+          collapsed: false,
+          z,
+          raised: true
+        }, ...prev.map(p => ({
+          ...p,
+          collapsed: true,
+          raised: false
+        }))];
+      }
+      // Cascade so a second panel does not land exactly on top of the first.
+      const n = prev.length;
+      const w = Math.min(560, Math.max(340, (window.innerWidth || 1200) - 60));
+      const h = Math.min(460, Math.max(220, (window.innerHeight || 800) - 220));
+      const x = Math.min(120 + n * 30, Math.max(20, (window.innerWidth || 1200) - w - 20));
+      const y = Math.min(90 + n * 28, Math.max(60, (window.innerHeight || 800) - h - 40));
+      return [...prev.map(p => ({
+        ...p,
+        raised: false
+      })), {
+        key,
+        ann,
+        tier,
+        x,
+        y,
+        w,
+        h,
+        collapsed: false,
+        z,
+        raised: true
+      }];
+    });
+  }, []);
+  const closePanel = useCallback(key => setPanels(prev => prev.filter(p => p.key !== key)), []);
+  const closeAllPanels = useCallback(() => setPanels([]), []);
+  const togglePanel = useCallback(key => setPanels(prev => prev.map(p => p.key === key ? {
+    ...p,
+    collapsed: !p.collapsed
+  } : p)), []);
+  const updatePanel = useCallback((key, patch) => setPanels(prev => prev.map(p => p.key === key ? {
+    ...p,
+    ...patch
+  } : p)), []);
+  const openPanelKeys = useMemo(() => new Set(panels.map(p => p.key)), [panels]);
+
+  // ── Bulk actions ───────────────────────────────────────────────────────
+  const markAllRead = () => {
+    readStore.markAll(anns.map(annId));
+    setReadVersion(v => v + 1);
+  };
+  const clearRead = () => {
+    readStore.clear();
+    setReadVersion(v => v + 1);
+  };
+  const markAllSeen = () => {
+    seenStore.markAll(allAnns.map(annId));
+    setNewIds(new Set());
+  };
+  const resetCategories = () => {
+    setExcludedCats(new Set(serverDefaultsRef.current || []));
+    setCategoryFilter("all");
+  };
+  const resetOptions = () => setOpts({
+    ...OPTION_DEFAULTS
+  });
+  useEffect(() => {
+    setRenderLimit(RENDER_BATCH);
+  }, [filter, categoryFilter, sourceFilter, searchText, sortMode, excludedCats, showMining]);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(en => en.isIntersecting)) setRenderLimit(l => l + RENDER_BATCH);
+    }, {
+      rootMargin: "600px"
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [renderLimit, anns.length]);
+  const clearAllFilters = () => {
+    setFilter("all");
+    setCategoryFilter("all");
+    setSourceFilter("all");
+    setSearchText("");
+  };
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!opts.keyboardNav) return;
+    const onKey = e => {
+      // The reader handles its own keys (Escape closes it); the feed must not react.
+      if (typeof document !== "undefined" && document.querySelector(".reader-wrap")) return;
+      const t = e.target;
+      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+      if (e.key === "Escape") {
+        if (menuOpen) {
+          setMenuOpen(false);
+          return;
+        }
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          return;
+        }
+        if (optionsOpen) {
+          setOptionsOpen(false);
+          return;
+        }
+        if (showWatchlist) {
+          setShowWatchlist(false);
+          return;
+        }
+        if (typing) {
+          t.blur();
+          return;
+        }
+        // Close the front-most reading panel before giving up keyboard focus.
+        if (panels.length > 0) {
+          const front = panels.reduce((a, b) => (b.z || 0) > (a.z || 0) ? b : a, panels[0]);
+          closePanel(front.key);
+          return;
+        }
+        setFocusedIdx(-1);
+        return;
+      }
+      if (typing || anyModalOpen || tab !== "feed") return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current && searchRef.current.focus();
+        return;
+      }
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedIdx(i => {
+          const next = Math.min((i < 0 ? -1 : i) + 1, anns.length - 1);
+          if (next >= renderLimit - 5) setRenderLimit(l => l + RENDER_BATCH); // keep the focused row rendered
+          return next;
+        });
+        return;
+      }
+      if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedIdx(i => Math.max((i < 0 ? 0 : i) - 1, 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        if (focusedIdx < 0 || focusedIdx >= anns.length) return;
+        e.preventDefault();
+        const el = document.getElementById(`row-${annId(anns[focusedIdx])}`);
+        const body = el && el.querySelector(".row-body");
+        if (body) body.click();
+        return;
+      }
+      if (e.key === "r") {
+        e.preventDefault();
+        fetchData(false, false, {
+          force: true
+        });
+        return;
+      }
+      if (e.key === "R") {
+        e.preventDefault();
+        fetchData(true, false, {
+          force: true
+        });
+        return;
+      } // forced rescrape, non-destructive
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [opts.keyboardNav, anns, focusedIdx, menuOpen, drawerOpen, optionsOpen, showWatchlist, anyModalOpen, tab, fetchData, panels, closePanel, renderLimit]);
+
+  // Keep the keyboard-focused row in view.
+  useEffect(() => {
+    if (focusedIdx < 0 || focusedIdx >= anns.length) return;
+    const el = document.getElementById(`row-${annId(anns[focusedIdx])}`);
+    if (el && el.scrollIntoView) el.scrollIntoView({
+      block: "nearest"
+    });
+  }, [focusedIdx, anns]);
+
+  // ── Active filter chips ────────────────────────────────────────────────
+  const chipItems = useMemo(() => {
+    const items = [];
+    const tierLabels = {
+      watchlist: "Watchlist",
+      core: "Core",
+      read_across: "Read-across",
+      sector: "Sector relevant"
+    };
+    if (filter !== "all") items.push({
+      key: "tier",
+      label: `Tier: ${tierLabels[filter] || filter}`,
+      onClear: () => setFilter("all")
+    });
+    if (sourceFilter !== "all") items.push({
+      key: "src",
+      label: `Source: ${sourceFilter === "rns" ? "RNS only" : "Non-Reg only"}`,
+      onClear: () => setSourceFilter("all")
+    });
+    if (categoryFilter !== "all") items.push({
+      key: "cat",
+      label: `Type: ${categoryFilter}`,
+      onClear: () => setCategoryFilter("all")
+    });
+    if (searchText) items.push({
+      key: "q",
+      label: `Search: ${searchText}`,
+      onClear: () => setSearchText("")
+    });
+    if (excludedCats.size > 0) items.push({
+      key: "hid",
+      label: `${excludedCats.size} type${excludedCats.size === 1 ? "" : "s"} hidden`,
+      onClear: resetCategories
+    });
+    if (!showMining && miningCount > 0) items.push({
+      key: "mining",
+      label: `${miningCount} mining and metals hidden`,
+      onClear: () => setShowMining(true)
+    });
+    return items;
+  }, [filter, sourceFilter, categoryFilter, searchText, excludedCats, showMining, miningCount]);
+
+  // Sidebar filter helpers
+  const TierRow = ({
+    label,
+    value,
+    count,
+    dotColor
+  }) => /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (filter === value ? " active" : ""),
+    onClick: () => setFilter(value)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, dotColor && /*#__PURE__*/React.createElement("span", {
+    className: "filter-dot",
+    style: {
+      background: dotColor
+    }
+  }), label), /*#__PURE__*/React.createElement("span", {
+    className: "filter-count"
+  }, count));
+  const SourceRow = ({
+    label,
+    value,
+    count
+  }) => /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (sourceFilter === value ? " active" : ""),
+    onClick: () => setSourceFilter(value)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, label), /*#__PURE__*/React.createElement("span", {
+    className: "filter-count"
+  }, count));
+  const sidebarContent = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: searchRef,
+    className: "sidebar-search",
+    value: searchText,
+    onChange: e => setSearchText(e.target.value),
+    placeholder: "Search ticker, company, headline..."
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Tier"), /*#__PURE__*/React.createElement(TierRow, {
+    label: "All",
+    value: "all",
+    count: allAnns.length
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Watchlist",
+    value: "watchlist",
+    count: wlCount,
+    dotColor: "var(--watchlist)"
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Core",
+    value: "core",
+    count: coreCount,
+    dotColor: "var(--core)"
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Read-across",
+    value: "read_across",
+    count: raCount,
+    dotColor: "var(--readacross)"
+  }), /*#__PURE__*/React.createElement(TierRow, {
+    label: "Sector relevant",
+    value: "sector",
+    count: secCount,
+    dotColor: "var(--accent)"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Source"), /*#__PURE__*/React.createElement(SourceRow, {
+    label: "All",
+    value: "all",
+    count: allAnns.length
+  }), /*#__PURE__*/React.createElement(SourceRow, {
+    label: "RNS only",
+    value: "rns",
+    count: rnsCount
+  }), /*#__PURE__*/React.createElement(SourceRow, {
+    label: "Non-Reg only",
+    value: "nonreg",
+    count: nonregCount
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, "Sectors"), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row",
+    onClick: () => setShowMining(v => !v),
+    role: "switch",
+    "aria-checked": showMining,
+    title: "Mining and metals companies. Their M&A announcements always show."
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-dot",
+    style: {
+      background: showMining ? "var(--accent)" : "var(--text-dim)"
+    }
+  }), "Mining and metals ", showMining ? "shown" : "hidden"), /*#__PURE__*/React.createElement("span", {
+    className: "filter-count"
+  }, miningCount))), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, /*#__PURE__*/React.createElement("span", null, "Sort")), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (sortMode === "relevance" ? " active" : ""),
+    onClick: () => setSortMode("relevance")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, "Relevance")), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (sortMode === "latest" ? " active" : ""),
+    onClick: () => setSortMode("latest")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, "Latest first"))), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-section"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-label"
+  }, /*#__PURE__*/React.createElement("span", null, "Categories"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, excludedCats.size > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      cursor: "pointer",
+      color: "var(--text-secondary)",
+      textTransform: "none",
+      letterSpacing: 0,
+      fontSize: 9
+    },
+    onClick: () => setExcludedCats(new Set())
+  }, "show all"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      cursor: "pointer",
+      color: "var(--text-secondary)",
+      textTransform: "none",
+      letterSpacing: 0,
+      fontSize: 9
+    },
+    onClick: resetCategories,
+    title: "Restore the default hidden categories"
+  }, "defaults"))), /*#__PURE__*/React.createElement("div", {
+    className: "filter-row" + (categoryFilter === "all" && excludedCats.size === 0 ? " active" : ""),
+    onClick: () => {
+      setCategoryFilter("all");
+      setExcludedCats(new Set());
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "filter-label"
+  }, "All types")), sortedCats.map(cat => {
+    const isExcluded = excludedCats.has(cat);
+    const isActive = categoryFilter === cat;
+    const catColor = catColorFor(cat).color;
+    const cls = "filter-row" + (isActive ? " active" : "") + (isExcluded ? " excluded" : "");
+    return /*#__PURE__*/React.createElement("div", {
+      key: cat,
+      className: cls
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "filter-label",
+      onClick: () => {
+        if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
+      },
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "filter-dot",
+      style: {
+        background: catColor
+      }
+    }), cat), /*#__PURE__*/React.createElement("span", {
+      className: "filter-count",
+      onClick: () => {
+        if (!isExcluded) setCategoryFilter(isActive ? "all" : cat);else toggleExcludeCat(cat);
+      }
+    }, catCounts[cat]), /*#__PURE__*/React.createElement("span", {
+      className: "filter-toggle-hide",
+      onClick: e => {
+        e.stopPropagation();
+        toggleExcludeCat(cat);
+        if (categoryFilter === cat) setCategoryFilter("all");
+      },
+      title: isExcluded ? "Restore" : "Hide",
+      style: isExcluded ? {
+        opacity: 1,
+        color: "var(--danger)"
+      } : undefined
+    }, isExcluded ? "\u21BA" : "\u2715"));
+  })));
+  const gridClass = "grid" + (opts.columns === "1" ? " cols-1" : opts.columns === "2" ? " cols-2" : "");
+  const visibleAnns = anns.slice(0, renderLimit);
+  const remaining = anns.length - visibleAnns.length;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, !isMobile ? /*#__PURE__*/React.createElement("div", {
+    className: "toolbar"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", null, "h2"), "Radnor"), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-tag"
+  }, "RNS Monitor"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-tab" + (tab === "feed" ? " active" : ""),
+    onClick: () => setTab("feed")
+  }, "Feed"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-tab" + (tab === "readacross" ? " active" : ""),
+    onClick: () => setTab("readacross")
+  }, "Read-across"), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-spacer"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-meta"
+  }, /*#__PURE__*/React.createElement(StatusDot, {
+    status: status
+  }), status === "connected" && lastRefresh ? `${data?.date || ''} · Updated ${lastRefresh.toLocaleTimeString("en-GB")}` : status), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => fetchData(false, false, {
+      force: true
+    }),
+    disabled: false
+  }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => fetchData(true, false, {
+      force: true
+    }),
+    disabled: false,
+    title: "Rescrape Investegate now, bypassing the cache freshness check. Earlier announcements from today are kept. (Shift+R)"
+  }, "Force refresh"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => setAutoRefresh(!autoRefresh),
+    style: autoRefresh ? {
+      borderColor: "var(--accent)",
+      color: "var(--accent)"
+    } : undefined
+  }, "Auto ", autoRefresh ? "ON" : "OFF"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => setShowWatchlist(true)
+  }, "WL (", Object.keys(watchlist).length, ")"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn icon",
+    onClick: () => setOpt("theme", opts.theme === "dark" ? "light" : "dark"),
+    title: opts.theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+    "aria-label": opts.theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: opts.theme === "dark" ? "sun" : "moon"
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn icon",
+    onClick: () => setOptionsOpen(true),
+    title: "Options",
+    "aria-label": "Options"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "sliders"
+  }))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "toolbar"
+  }, tab === "feed" && /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-icon-btn",
+    onClick: () => setDrawerOpen(true),
+    title: "Filters"
+  }, "☰"), /*#__PURE__*/React.createElement("span", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", null, "h2"), "Radnor"), /*#__PURE__*/React.createElement("span", {
+    className: "toolbar-spacer"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => fetchData(false, false, {
+      force: true
+    }),
+    disabled: false
+  }, status === "loading" ? "..." : "Refresh"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-icon-btn",
+    onClick: () => setMenuOpen(!menuOpen),
+    title: "More"
+  }, "⋮")), /*#__PURE__*/React.createElement("div", {
+    className: "mobile-tabbar"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "mobile-tab" + (tab === "feed" ? " active" : ""),
+    onClick: () => setTab("feed")
+  }, "Feed"), /*#__PURE__*/React.createElement("button", {
+    className: "mobile-tab" + (tab === "readacross" ? " active" : ""),
+    onClick: () => setTab("readacross")
+  }, "Read-across"))), isMobile && menuOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "scrim clear",
+    onClick: () => setMenuOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-menu"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      fetchData(true, false, {
+        force: true
+      });
+      setMenuOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Force refresh"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val"
+  }, "↻")), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setAutoRefresh(!autoRefresh);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Auto-refresh"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val",
+    style: autoRefresh ? {
+      color: "var(--accent)"
+    } : undefined
+  }, autoRefresh ? "ON" : "OFF")), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setOpt("theme", opts.theme === "dark" ? "light" : "dark");
+    }
+  }, /*#__PURE__*/React.createElement("span", null, opts.theme === "dark" ? "Switch to light mode" : "Switch to dark mode"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val",
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: opts.theme === "dark" ? "sun" : "moon",
+    size: 14
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setShowWatchlist(true);
+      setMenuOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Watchlist"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val"
+  }, Object.keys(watchlist).length)), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-item",
+    onClick: () => {
+      setOptionsOpen(true);
+      setMenuOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Options"), /*#__PURE__*/React.createElement("span", {
+    className: "overflow-val",
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "sliders",
+    size: 14
+  }))))), configOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px 16px",
+      background: "var(--bg-sidebar)",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-muted)",
+      fontFamily: "var(--font-mono)"
+    }
+  }, "Backend URL:"), /*#__PURE__*/React.createElement("input", {
+    value: backendUrl,
+    onChange: e => setBackendUrl(e.target.value),
+    style: {
+      flex: 1,
+      minWidth: 160,
+      maxWidth: 400,
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border)",
+      padding: "5px 10px",
+      color: "var(--text-primary)",
+      fontFamily: "var(--font-mono)",
+      fontSize: 11,
+      outline: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => {
+      fetchData();
+      setConfigOpen(false);
+    }
+  }, "Connect")), isMobile && drawerOpen && tab === "feed" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "scrim",
+    onClick: () => setDrawerOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "drawer"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "drawer-head"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "drawer-head-title"
+  }, "Filters"), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => setDrawerOpen(false)
+  }, "Done")), /*#__PURE__*/React.createElement("div", {
+    className: "drawer-body"
+  }, sidebarContent))), /*#__PURE__*/React.createElement("div", {
+    className: "layout"
+  }, tab === "feed" && !isMobile && /*#__PURE__*/React.createElement("aside", {
+    className: "sidebar"
+  }, sidebarContent), /*#__PURE__*/React.createElement("main", {
+    className: "main",
+    style: {
+      ...(tab !== "feed" || isMobile ? {
+        gridColumn: "1 / -1"
+      } : {}),
+      ...(isMobile && panels.length > 0 ? {
+        paddingBottom: "78vh"
+      } : {})
+    }
+  }, tab === "readacross" && /*#__PURE__*/React.createElement(ReadAcrossView, {
+    backendUrl: backendUrl,
+    refreshTick: lastRefresh ? lastRefresh.getTime() : 0
+  }), tab === "feed" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "feed-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "feed-counts"
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, anns.length), " showing"), /*#__PURE__*/React.createElement("span", null, "/ ", allAnns.length, " total"), wlCount > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--watchlist)"
+    }
+  }, wlCount, " watchlist"), opts.flagNew && newCount > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--accent)",
+      cursor: "pointer"
+    },
+    onClick: markAllSeen,
+    title: "Clear the new flags"
+  }, newCount, " new"), isMobile && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: "auto",
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(StatusDot, {
+    status: status
+  }), status === "connected" && lastRefresh ? lastRefresh.toLocaleTimeString("en-GB") : status))), signedOut && /*#__PURE__*/React.createElement("div", {
+    className: "reconnect"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 160
+    }
+  }, "Your sign-in has expired, so the feed has stopped updating. Sign in again to continue."), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn primary",
+    onClick: () => {
+      try {
+        window.location.href = "/login";
+      } catch (e) {}
+    }
+  }, "Sign in again")), !signedOut && reconnectAttempt > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "reconnect"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "spinner",
+    style: {
+      width: 12,
+      height: 12,
+      borderWidth: 1.5
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 160
+    }
+  }, "Cannot reach the backend, retrying automatically.", reconnectAttempt > 1 ? ` (attempt ${reconnectAttempt})` : ""), /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => fetchData(false, false, {
+      force: true
+    })
+  }, "Retry now")), /*#__PURE__*/React.createElement(FilterChips, {
+    items: chipItems,
+    onClearAll: clearAllFilters
+  }), data?.errors?.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10,
+      padding: "6px 10px",
+      background: "rgba(239,68,68,0.06)",
+      border: "1px solid rgba(239,68,68,0.18)",
+      fontSize: 11,
+      color: "var(--danger)",
+      fontFamily: "var(--font-mono)"
+    }
+  }, data.errors.length, " scrape error", data.errors.length === 1 ? "" : "s", ": ", data.errors.slice(0, 3).map(e => e.split(":")[0]).join(", "), data.errors.length > 3 ? ` +${data.errors.length - 3} more` : ""), status === "error" && !data && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      marginBottom: 6,
+      color: "var(--text-primary)"
+    }
+  }, "Can't reach the backend"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11
+    }
+  }, "Check ", /*#__PURE__*/React.createElement("code", {
+    style: {
+      fontFamily: "var(--font-mono)",
+      color: "var(--accent)"
+    }
+  }, backendUrl), " is running.")), status === "loading" && !data && /*#__PURE__*/React.createElement("div", {
+    className: gridClass
+  }, [0, 1, 2, 3, 4, 5, 6, 7].map(i => /*#__PURE__*/React.createElement(SkeletonCard, {
+    key: i
+  }))), anns.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: gridClass,
+    ref: setGridEl
+  }, visibleAnns.map((a, i) => {
+    const id = annId(a);
+    const tier = tierFor(a.ticker);
+    return /*#__PURE__*/React.createElement(AnnouncementCard, {
+      key: id,
+      ann: a,
+      backendUrl: backendUrl,
+      tier: tier,
+      isNew: opts.flagNew && newIds.has(id),
+      isFocused: focusedIdx === i,
+      expandStyle: opts.expandStyle,
+      catColorFor: catColorFor,
+      showRelative: opts.showRelative,
+      raTargets: opts.showRaMap && tier === "read_across" ? raMap[a.ticker] : null,
+      readVersion: readVersion,
+      onFocusRow: () => setFocusedIdx(i),
+      onOpenPanel: openPanel,
+      isPanelOpen: openPanelKeys.has(id)
+    });
+  })), remaining > 0 && /*#__PURE__*/React.createElement("div", {
+    ref: sentinelRef,
+    className: "more-bar"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "toolbar-btn",
+    onClick: () => setRenderLimit(l => l + RENDER_BATCH)
+  }, "Show ", Math.min(RENDER_BATCH, remaining), " more"), /*#__PURE__*/React.createElement("span", null, remaining, " not yet shown")), data && anns.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      marginBottom: 6,
+      color: "var(--text-primary)"
+    }
+  }, "Nothing matches"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11
+    }
+  }, "Broaden the filters or unhide categories in the sidebar."))))), showWatchlist && /*#__PURE__*/React.createElement(WatchlistModal, {
+    watchlist: watchlist,
+    onClose: () => setShowWatchlist(false),
+    onAdd: handleAdd,
+    onRemove: handleRemove
+  }), !isMobile && panels.map(p => /*#__PURE__*/React.createElement(DetachedPanel, {
+    key: p.key,
+    p: p,
+    backendUrl: backendUrl,
+    catColorFor: catColorFor,
+    onClose: closePanel,
+    onRaise: raisePanel,
+    onToggle: togglePanel,
+    onChange: updatePanel
+  })), !isMobile && panels.length > 1 && /*#__PURE__*/React.createElement("div", {
+    className: "panel-tray"
+  }, /*#__PURE__*/React.createElement("span", null, panels.length, " panels open"), /*#__PURE__*/React.createElement("span", {
+    className: "act",
+    onClick: () => setPanels(prev => prev.map(p => ({
+      ...p,
+      collapsed: true
+    })))
+  }, "collapse all"), /*#__PURE__*/React.createElement("span", {
+    className: "act",
+    onClick: closeAllPanels
+  }, "close all")), isMobile && panels.length > 0 && /*#__PURE__*/React.createElement(PanelDock, {
+    panels: panels,
+    backendUrl: backendUrl,
+    catColorFor: catColorFor,
+    onClose: closePanel,
+    onToggle: togglePanel,
+    onCloseAll: closeAllPanels
+  }), optionsOpen && /*#__PURE__*/React.createElement(OptionsModal, {
+    opts: opts,
+    setOpt: setOpt,
+    onClose: () => setOptionsOpen(false),
+    onMarkAllRead: markAllRead,
+    onClearRead: clearRead,
+    onMarkAllSeen: markAllSeen,
+    onResetCategories: resetCategories,
+    onResetOptions: resetOptions,
+    hiddenCount: excludedCats.size,
+    backendUrl: backendUrl,
+    readCount: readStore.size()
+  }));
+}
+ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById("root"));
+  </script>
+</body>
+</html>

@@ -207,7 +207,14 @@
     /* Grid.
        align-items:start is important: without it, grid items stretch to the tallest in their
        row, so expanding one card inflated its neighbour into a tall empty box. */
-    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; align-items:start; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:8px; }
+    /* Cards in a row share one height (the grid default, stretch), so their bottoms line up.
+       Aligning every card to the top instead left ragged rows whenever one headline ran to
+       two or three lines. */
+    /* ...except beside an open card. There the other cards in the same row stay compact at
+       the top rather than stretching into tall empty boxes. CSS cannot select "cards in the
+       same row", so the app marks them with data-beside-open (see useRowLevelling). */
+    .grid > .row[data-beside-open] { align-self:start; }
     .grid.cols-1 { grid-template-columns:1fr; }
     .grid.cols-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
     /* Matches the 880px breakpoint the JS uses for mobile layout, and minmax(0,...) lets a
@@ -261,6 +268,14 @@
     .row.expanded .row-chevron { transform:rotate(180deg); color:var(--accent); }
     .row-company { font-size:11px; color:var(--text-secondary); font-weight:500; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .row-headline { font-size:13px; color:var(--text-primary); line-height:1.35; font-weight:500; word-wrap:break-word; overflow-wrap:anywhere; }
+    /* In multi-column layouts, cap closed headlines at two lines so one very long title
+       cannot make its whole row deep. The full title shows on hover and when opened. A
+       single column has no neighbours to keep level, so it shows headlines in full. */
+    @media (min-width: 881px) {
+      .grid:not(.cols-1) .row:not(.expanded) .row-headline {
+        display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden;
+      }
+    }
 
     /* Expanded panel */
     .expand { border-top:1px solid var(--border); padding:12px 14px; background:var(--bg-detail); overflow-wrap:anywhere; }
@@ -377,6 +392,42 @@
     /* When the "dim once read" option is off, keep read rows at full strength. */
     html.no-read-dim .row.read .row-body { opacity:1; }
     /* Connection trouble banner */
+    /* Shared toggle button (plain-text and formatted versions) */
+    .fulltext-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:500; cursor:pointer; margin-bottom:10px; }
+    .fulltext-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .fulltext-chevron { font-size:10px; transition:transform 0.2s; }
+    button.expand-link { background:transparent; font-family:var(--font-sans); cursor:pointer; }
+    button.expand-link:hover, a.expand-link:hover { border-color:var(--accent); color:var(--accent); }
+    /* The announcement page itself: white, like the release at source. */
+    .rns-doc { display:block; width:100%; border:0; background:#fff; }
+    .rns-inline { border:1px solid var(--border); }
+    /* Reader */
+    .reader-wrap { position:fixed; inset:0; z-index:2000; background:rgba(4,6,6,0.78); display:flex; justify-content:center; align-items:stretch; padding:28px 20px; backdrop-filter:blur(3px); }
+    html[data-theme="light"] .reader-wrap { background:rgba(20,32,27,0.45); }
+    .reader { width:100%; max-width:980px; display:flex; flex-direction:column; background:var(--bg-card); border:1px solid var(--border-strong); min-height:0; }
+    .reader-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .reader-title { min-width:0; }
+    .reader-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; margin-bottom:4px; }
+    .reader-company { color:var(--text-secondary); font-size:12px; }
+    .reader-headline { font-size:17px; font-weight:600; line-height:1.3; color:var(--text-primary); margin:0; }
+    .reader-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .reader-btn { display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 11px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:600; text-decoration:none; cursor:pointer; }
+    .reader-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+    .reader-btn:disabled { opacity:0.4; cursor:default; }
+    .reader-btn.close:hover { border-color:var(--danger); color:var(--danger); }
+    .reader-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+    .reader-scroll { flex:1; overflow-y:auto; padding:22px; background:var(--bg-primary); min-height:0; }
+    .reader-paper { max-width:880px; margin:0 auto; background:#fff; box-shadow:0 1px 0 rgba(0,0,0,0.25); }
+    .reader-plain { padding:22px 26px 28px; color:#1b1d1c; font-family:Arial, Helvetica, sans-serif; line-height:1.5; }
+    .reader-plain p { margin:0 0 .75em; }
+    @media (max-width: 680px) {
+      .reader-wrap { padding:0; }
+      .reader { max-width:none; border:0; }
+      .reader-head { flex-direction:column; gap:10px; padding:12px 14px; }
+      .reader-controls { justify-content:flex-start; }
+      .reader-scroll { padding:0; }
+    }
+    @media (prefers-reduced-motion: reduce) { .fulltext-chevron { transition:none; } }
     .more-bar { display:flex; align-items:center; gap:12px; justify-content:center; padding:16px 0 8px; font-size:11px; color:var(--text-muted); }
     .wl-msg { font-size:12px; line-height:1.45; padding:8px 10px; border:1px solid var(--border); }
     .wl-msg.error { color:var(--danger); border-color:rgba(239,68,68,0.35); background:rgba(239,68,68,0.06); }
@@ -436,6 +487,37 @@
       const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, ms) : null;
       return fetch(url, ctrl ? { ...options, signal: ctrl.signal } : options)
         .finally(() => { if (timer) clearTimeout(timer); });
+    }
+
+    // Rows of cards share one height so their bottoms line up. The one exception is a row
+    // containing an open card: marking its other cards lets CSS keep them compact instead of
+    // stretching to the open card's height. Rows are identified by position (cards in the
+    // same row share a top edge), recomputed whenever a card opens or closes, the list
+    // changes, or the window is resized.
+    function useRowLevelling(grid) {
+      useEffect(() => {
+        if (!grid) return;
+        let frame = 0;
+        const relevel = () => {
+          cancelAnimationFrame(frame);
+          frame = requestAnimationFrame(() => {
+            const cards = [...grid.children].filter((el) => el.classList.contains("row"));
+            const openTops = new Set(cards.filter((el) => el.classList.contains("expanded")).map((el) => el.offsetTop));
+            for (const el of cards) {
+              const beside = openTops.size > 0 && !el.classList.contains("expanded") && openTops.has(el.offsetTop);
+              if (beside) el.setAttribute("data-beside-open", "");
+              else el.removeAttribute("data-beside-open");
+            }
+          });
+        };
+        relevel();
+        // Only class changes and added/removed cards matter; our own data attribute is not
+        // watched, so marking cards cannot trigger another pass.
+        const mo = new MutationObserver(relevel);
+        mo.observe(grid, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+        window.addEventListener("resize", relevel);
+        return () => { mo.disconnect(); window.removeEventListener("resize", relevel); cancelAnimationFrame(frame); };
+      }, [grid]);
     }
 
     function makeDaySet(storageKey) {
@@ -667,37 +749,36 @@
     }
 
     // ── Full Text Toggle ──
+    // Join hard-wrapped lines from the plain-text extraction back into paragraphs.
+    // A line that doesn't end a sentence, or a following line that starts lower case,
+    // belongs to the same paragraph.
+    function buildParagraphs(raw) {
+      const lines = (raw || "").split("\n").filter(l => l.trim());
+      const paragraphs = [];
+      let current = "";
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        if (!current) {
+          current = line;
+        } else {
+          const prevEnds = /[.!?:;"\u2019\u201D]$/.test(current);
+          const curStartsLower = /^[a-z]/.test(line);
+          if (!prevEnds || curStartsLower) {
+            current += " " + line;
+          } else {
+            paragraphs.push(current);
+            current = line;
+          }
+        }
+      }
+      if (current) paragraphs.push(current);
+      return paragraphs;
+    }
+
     function FullTextToggle({text}) {
       const [showFull, setShowFull] = useState(false);
       if (!text || text === "Could not extract announcement body from the page.") return null;
-
-      // Join broken lines into proper paragraphs
-      // Lines that don't end with a period/colon and are followed by a lowercase line = same paragraph
-      const buildParagraphs = (raw) => {
-        const lines = raw.split("\n").filter(l => l.trim());
-        const paragraphs = [];
-        let current = "";
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          if (!current) {
-            current = line;
-          } else {
-            // If previous line doesn't end with sentence-ending punctuation
-            // and current line starts with lowercase or continues mid-sentence, join them
-            const prevEnds = /[.!?:;"\u2019\u201D]$/.test(current);
-            const curStartsLower = /^[a-z]/.test(line);
-            if (!prevEnds || curStartsLower) {
-              current += " " + line;
-            } else {
-              paragraphs.push(current);
-              current = line;
-            }
-          }
-        }
-        if (current) paragraphs.push(current);
-        return paragraphs;
-      };
 
       const paragraphs = buildParagraphs(text);
 
@@ -722,6 +803,155 @@
       );
     }
 
+
+    // ── Formatted announcement reader ────────────────────────────────────────
+    // The backend sends each announcement's body as cleaned HTML that keeps its source
+    // formatting. It is displayed inside a sandboxed frame: no allow-scripts, so nothing in
+    // it can run, plus a Content-Security-Policy that blocks scripts, fonts and connections
+    // even if the server-side cleaning ever missed something. allow-same-origin is there
+    // only so this page can measure the frame's height; without scripts it grants the
+    // announcement nothing.
+    const RNS_SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
+    const RNS_CSP = "default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'";
+    function buildRnsDocument(html, scale) {
+      return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${RNS_CSP}">
+<base target="_blank">
+<style>
+  html { background:#fff; }
+  body { margin:0; padding:22px 26px 28px; color:#1b1d1c; background:#fff;
+         font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.5;
+         zoom:${scale}; -webkit-text-size-adjust:100%; }
+  p { margin:0 0 .75em; }
+  p, li, h1, h2, h3, h4 { overflow-wrap:anywhere; }
+  h1, h2, h3, h4 { line-height:1.3; margin:1.1em 0 .5em; }
+  h1 { font-size:1.3em; } h2 { font-size:1.18em; } h3 { font-size:1.08em; } h4 { font-size:1em; }
+  ul, ol { margin:0 0 .75em; padding-left:1.4em; }
+  li { margin:.15em 0; }
+  .rns-tw { overflow-x:auto; max-width:100%; margin:0 0 .9em; }
+  table { border-collapse:collapse; font-size:inherit; }
+  td, th { padding:3px 8px; vertical-align:top; }
+  img { max-width:100%; height:auto; }
+  a[href] { color:#1f5fbf; }
+  hr { border:0; border-top:1px solid #c9cfcb; margin:1em 0; }
+  @media (max-width:600px) { body { padding:14px 14px 18px; } }
+</style></head><body>${html}</body></html>`;
+    }
+
+    // The announcement as a white document page, sized to its content so the surrounding
+    // card or reader does the scrolling.
+    function RnsDocument({html, scale = 1, title = "Announcement"}) {
+      const ref = useRef(null);
+      const [height, setHeight] = useState(240);
+      const doc = useMemo(() => buildRnsDocument(html, scale), [html, scale]);
+      useEffect(() => {
+        const frame = ref.current;
+        if (!frame) return;
+        let ro = null;
+        const measure = () => {
+          try {
+            const d = frame.contentDocument;
+            // The document's own box, not scrollHeight: scrollHeight never reports less than
+            // the frame's current height, so the frame could grow but never shrink back.
+            if (d && d.documentElement) setHeight(Math.max(60, Math.ceil(d.documentElement.getBoundingClientRect().height)));
+          } catch (e) {}
+        };
+        const onLoad = () => {
+          measure();
+          try {
+            const d = frame.contentDocument;
+            if (typeof ResizeObserver !== "undefined" && d && d.body) { ro = new ResizeObserver(measure); ro.observe(d.body); }
+            if (d) [...d.images].forEach(img => img.addEventListener("load", measure));
+          } catch (e) {}
+        };
+        frame.addEventListener("load", onLoad);
+        return () => { frame.removeEventListener("load", onLoad); if (ro) ro.disconnect(); };
+      }, [doc]);
+      return <iframe ref={ref} className="rns-doc" title={title} sandbox={RNS_SANDBOX} srcDoc={doc} style={{height}} />;
+    }
+
+    // In-card expansion of the formatted announcement.
+    function FormattedToggle({html, title}) {
+      const [open, setOpen] = useState(false);
+      return (
+        <div style={{marginBottom:16}}>
+          <button className="fulltext-btn" onClick={(e)=>{e.stopPropagation();setOpen(o=>!o);}} aria-expanded={open}>
+            {open ? "Hide full announcement" : "Show full announcement"}
+            <span className="fulltext-chevron" style={{transform:open?"rotate(180deg)":"none"}}>&#9660;</span>
+          </button>
+          {open && <div className="rns-inline" onClick={e=>e.stopPropagation()}><RnsDocument html={html} title={title}/></div>}
+        </div>
+      );
+    }
+
+    const READER_SCALES = [0.85, 1, 1.15, 1.3, 1.5];
+    const readerScaleStore = {
+      load: () => { try { const v = Number(localStorage.getItem("rns_reader_scale")); return READER_SCALES.includes(v) ? v : 1; } catch (e) { return 1; } },
+      save: (v) => { try { localStorage.setItem("rns_reader_scale", String(v)); } catch (e) {} },
+    };
+
+    // Full-screen reader for long announcements and wide tables. Rendered into <body> so
+    // no card or panel styling can affect its positioning. While it is open the feed's
+    // keyboard shortcuts are paused (see the guard in App), and Escape closes it.
+    function ReaderView({ann, detail, onClose}) {
+      const [scale, setScale] = useState(readerScaleStore.load);
+      const closeRef = useRef(null);
+      useEffect(() => { readerScaleStore.save(scale); }, [scale]);
+      useEffect(() => {
+        const returnTo = document.activeElement;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        if (closeRef.current) closeRef.current.focus();
+        const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
+        window.addEventListener("keydown", onKey);
+        return () => {
+          window.removeEventListener("keydown", onKey);
+          document.body.style.overflow = prevOverflow;
+          if (returnTo && returnTo.focus) { try { returnTo.focus(); } catch (e) {} }
+        };
+      }, [onClose]);
+      const step = (dir) => setScale(cur => {
+        const i = READER_SCALES.indexOf(cur);
+        return READER_SCALES[Math.min(READER_SCALES.length - 1, Math.max(0, (i < 0 ? 1 : i) + dir))];
+      });
+      const hasFormatted = !!(detail && detail.body_html);
+      const paragraphs = hasFormatted ? [] : buildParagraphs(detail && detail.body_text);
+      const view = (
+        <div className="reader-wrap" role="dialog" aria-modal="true" aria-label={`Announcement: ${ann.headline}`} onClick={onClose}>
+          <div className="reader" onClick={e=>e.stopPropagation()}>
+            <div className="reader-head">
+              <div className="reader-title">
+                <div className="reader-meta">
+                  <span className="row-time">{earlierDayLabel(ann.date_str) ? `${earlierDayLabel(ann.date_str)} ` : ""}{ann.time}</span>
+                  {ann.ticker && <span className="row-ticker">{ann.ticker}</span>}
+                  <span className="reader-company">{ann.company}</span>
+                </div>
+                <h2 className="reader-headline">{ann.headline}</h2>
+              </div>
+              <div className="reader-controls">
+                <button className="reader-btn" onClick={()=>step(-1)} disabled={scale===READER_SCALES[0]} aria-label="Smaller text">A&minus;</button>
+                <button className="reader-btn" onClick={()=>step(1)} disabled={scale===READER_SCALES[READER_SCALES.length-1]} aria-label="Larger text">A+</button>
+                {ann.url && <a className="reader-btn" href={ann.url} target="_blank" rel="noopener noreferrer">View on Investegate &#8599;</a>}
+                <button ref={closeRef} className="reader-btn close" onClick={onClose} aria-label="Close reader (Esc)">&#10005;</button>
+              </div>
+            </div>
+            <div className="reader-scroll">
+              <div className="reader-paper">
+                {hasFormatted
+                  ? <RnsDocument html={detail.body_html} scale={scale} title={ann.headline}/>
+                  : <div className="reader-plain" style={{fontSize:`${14*scale}px`}}>
+                      {paragraphs.length
+                        ? paragraphs.map((p,i)=><p key={i}>{p}</p>)
+                        : <p>The full text of this announcement couldn't be extracted. Use View on Investegate to read it at source.</p>}
+                    </div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+      return ReactDOM.createPortal(view, document.body);
+    }
+
     // ── Expandable Announcement Row — dense terminal style ──
     // Detail responses are cached in memory for the session, so collapsing and re-opening an
     // announcement, or re-opening it in a panel, is instant rather than another round trip.
@@ -731,6 +961,8 @@
     // The body of an opened announcement. Used both for inline expansion and inside detached
     // reading panels, so the two stay identical in content and behaviour.
     function AnnouncementDetail({ann, backendUrl}) {
+      const [readerOpen, setReaderOpen] = useState(false);
+      const closeReader = useCallback(() => setReaderOpen(false), []);
       const [detail, setDetail] = useState(() => detailCache.get(ann.url) || null);
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState(null);
@@ -772,12 +1004,19 @@
           {/* Source link sits at the TOP: on a long release you should not have to scroll to the
               bottom to reach Investegate. */}
           <div className="detail-actions">
+            {detail && (detail.body_html || (detail.body_text && detail.body_text !== "Could not extract announcement body from the page.")) && (
+              <button className="expand-link reader-open" onClick={(e)=>{e.stopPropagation();setReaderOpen(true);}}>
+                Open in reader
+              </button>
+            )}
             {ann.url && (
               <a href={ann.url} target="_blank" rel="noopener noreferrer" className="expand-link" onClick={e=>e.stopPropagation()}>
                 View on Investegate &#8599;
               </a>
             )}
-            {detail && <span className="detail-fetched">{new Date(detail.fetched_at).toLocaleTimeString("en-GB")}</span>}
+            {detail && detail.fetched_at && !isNaN(new Date(detail.fetched_at)) && (
+              <span className="detail-fetched">{new Date(detail.fetched_at).toLocaleTimeString("en-GB")}</span>
+            )}
           </div>
 
           {loading && (
@@ -812,9 +1051,12 @@
                   {detail.key_figures.map((fig,i) => <span key={i} className="key-figure">{fig}</span>)}
                 </div>
               )}
-              <FullTextToggle text={detail.body_text} />
+              {detail.body_html
+                ? <FormattedToggle html={detail.body_html} title={ann.headline}/>
+                : <FullTextToggle text={detail.body_text} />}
             </>
           )}
+          {readerOpen && detail && <ReaderView ann={ann} detail={detail} onClose={closeReader}/>}
         </>
       );
     }
@@ -890,7 +1132,7 @@
               </div>
             </div>
             <div className="row-company">{ann.company}</div>
-            <div className="row-headline">{ann.headline}</div>
+            <div className="row-headline" title={ann.headline}>{ann.headline}</div>
           </div>
 
           {expanded && !detached && (
@@ -1738,6 +1980,8 @@
       const RENDER_BATCH = 150;
       const [renderLimit,setRenderLimit]=useState(RENDER_BATCH);
       const sentinelRef=useRef(null);
+      const [gridEl,setGridEl]=useState(null);
+      useRowLevelling(gridEl);
       const [raMap,setRaMap]=useState({});
       // Open reading panels. Non-modal, so several can be open while the feed stays usable.
       const [panels,setPanels]=useState([]);
@@ -2070,6 +2314,8 @@
       useEffect(()=>{
         if(!opts.keyboardNav) return;
         const onKey=(e)=>{
+          // The reader handles its own keys (Escape closes it); the feed must not react.
+          if(typeof document!=="undefined" && document.querySelector(".reader-wrap")) return;
           const t=e.target;
           const typing = t && (t.tagName==="INPUT" || t.tagName==="TEXTAREA" || t.isContentEditable);
           if(e.key==="Escape"){
@@ -2393,7 +2639,7 @@
                   )}
 
                   {anns.length>0 && (
-                    <div className={gridClass}>
+                    <div className={gridClass} ref={setGridEl}>
                       {visibleAnns.map((a,i) => {
                         const id=annId(a);
                         const tier=tierFor(a.ticker);

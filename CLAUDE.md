@@ -60,6 +60,12 @@ documented at the top of `app.py`. `requirements.txt` must include `psycopg[bina
   `UK_BANK_HOLIDAYS` must be extended each year; `/api/health` flags when it runs out.
 - **Energy is in scope** (since September 2026). Only mining and metals are excluded, and
   they are flagged rather than dropped so the user can reveal them. M&A is never excluded.
+- **The reader displays third-party HTML, so it has two safeguards; keep both.** The
+  backend cleans each announcement to an allow-list (`sanitise_rns_html`), and the
+  frontend shows it in a sandboxed frame with a Content-Security-Policy (`RnsDocument`).
+  Never add `allow-scripts` to that sandbox, and never render `body_html` outside it. If
+  formatting fails a quality check, `body_html` is empty and plain text is shown instead.
+  `/api/debug/announcement?url=...` shows how a given announcement was extracted.
 - **`build.js` must keep `runtime: "classic"`.** Babel 8's default emits ES imports, which
   load to a blank page in a plain script tag. The build aborts if that happens.
 - **Verify before assuming.** Two production misses came from assuming what Investegate
