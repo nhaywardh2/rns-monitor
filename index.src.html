@@ -252,6 +252,12 @@
        second line while the controls stay pinned top-right. */
     .row-meta { display:flex; align-items:flex-start; gap:8px; margin-bottom:3px; font-size:10px; flex-wrap:wrap; }
     .row-meta-tags { display:flex; align-items:center; flex-wrap:wrap; gap:8px; row-gap:4px; flex:1 1 auto; min-width:0; }
+    /* Wide screens: keep the tags to one line so the read toggle and arrow never drop to a
+       second line and make one card in a row deeper than the rest. Phones keep wrapping. */
+    @media (min-width: 881px) {
+      .row-meta { flex-wrap:nowrap; }
+      .row-meta-tags { flex-wrap:nowrap; overflow:hidden; }
+    }
     .row-meta-ctrl { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
     .row-time { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); font-weight:500; flex-shrink:0; }
     .row-ticker { font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent); letter-spacing:0.02em; flex-shrink:0; }
@@ -392,6 +398,21 @@
     /* When the "dim once read" option is off, keep read rows at full strength. */
     html.no-read-dim .row.read .row-body { opacity:1; }
     /* Connection trouble banner */
+    /* Paste-to-read */
+    .release-missing { font-size:12px; line-height:1.5; color:var(--text-secondary); padding:9px 11px; border:1px dashed var(--border-strong); margin-bottom:12px; }
+    .paste-panel { padding:22px 24px 26px; color:#1b1d1c; font-family:var(--font-sans); font-size:14px; line-height:1.5; }
+    .paste-lead { margin:0 0 12px; font-weight:600; }
+    .paste-steps { margin:0 0 16px; padding-left:1.3em; }
+    .paste-steps li { margin:.25em 0; }
+    .paste-steps a { color:#1f5fbf; }
+    .paste-actions { margin-bottom:12px; }
+    .paste-panel .reader-btn { color:#1b1d1c; border-color:#b9c4bf; height:38px; }
+    .paste-panel .reader-btn.primary { background:#1f8a4c; border-color:#1f8a4c; color:#fff; }
+    .paste-box { display:block; width:100%; min-height:88px; padding:10px 12px; margin-bottom:10px; border:1px dashed #9aa6a0; background:#f7f9f8; color:#1b1d1c; font:inherit; resize:vertical; }
+    .paste-box:focus { outline:2px solid #1f8a4c; outline-offset:1px; }
+    .paste-msg { margin:10px 0; padding:8px 10px; border:1px solid #e7b9b9; background:#fdf3f3; color:#8a1f1f; font-size:13px; }
+    .paste-note { margin:14px 0 0; font-size:12px; color:#5c6b78; }
+    @media (max-width: 680px) { .paste-panel { padding:16px 14px 20px; } }
     /* Shared toggle button (plain-text and formatted versions) */
     .fulltext-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text-secondary); font-family:var(--font-sans); font-size:12px; font-weight:500; cursor:pointer; margin-bottom:10px; }
     .fulltext-btn:hover { border-color:var(--accent); color:var(--accent); }
@@ -519,6 +540,11 @@
         return () => { mo.disconnect(); window.removeEventListener("resize", relevel); cancelAnimationFrame(frame); };
       }, [grid]);
     }
+
+    const LOADED_VERSION = (() => {
+      try { const m = document.querySelector('meta[name="app-version"]'); return m ? m.getAttribute("content") : null; }
+      catch (e) { return null; }
+    })();
 
     function makeDaySet(storageKey) {
       const today = londonDayKey();
@@ -829,12 +855,21 @@
   ul, ol { margin:0 0 .75em; padding-left:1.4em; }
   li { margin:.15em 0; }
   .rns-tw { overflow-x:auto; max-width:100%; margin:0 0 .9em; }
+  /* Added by the page when a table is wider than the screen, so its hidden columns are obvious. */
+  .rns-tw-scroll::before { content:"Scroll sideways to see the whole table →"; display:block; position:sticky; left:0;
+    font-size:11px; color:#5c6b78; margin-bottom:4px; white-space:nowrap; }
   table { border-collapse:collapse; font-size:inherit; }
   td, th { padding:3px 8px; vertical-align:top; }
   img { max-width:100%; height:auto; }
   a[href] { color:#1f5fbf; }
   hr { border:0; border-top:1px solid #c9cfcb; margin:1em 0; }
-  @media (max-width:600px) { body { padding:14px 14px 18px; } }
+  @media (max-width:600px) {
+    body { padding:14px 14px 18px; }
+    /* Text always wraps. Tables drop the fixed widths they were authored with and shrink to
+       their content; only a table that still can't fit scrolls, inside its own box. */
+    table { font-size:.88em; width:auto !important; min-width:0 !important; }
+    td, th, col { width:auto !important; padding:3px 5px; }
+  }
 </style></head><body>${html}</body></html>`;
     }
 
@@ -851,6 +886,8 @@
         const measure = () => {
           try {
             const d = frame.contentDocument;
+            // Flag tables that don't fit, so a "scroll sideways" hint shows above them.
+            if (d) d.querySelectorAll(".rns-tw").forEach(w => w.classList.toggle("rns-tw-scroll", w.scrollWidth > w.clientWidth + 1));
             // The document's own box, not scrollHeight: scrollHeight never reports less than
             // the frame's current height, so the frame could grow but never shrink back.
             if (d && d.documentElement) setHeight(Math.max(60, Math.ceil(d.documentElement.getBoundingClientRect().height)));
@@ -884,6 +921,254 @@
       );
     }
 
+    // ── Pasted releases ──────────────────────────────────────────────────────
+    // Investegate now loads release text in the browser, so the server can't fetch it. The
+    // reader therefore accepts a release the user has copied from Investegate. Pasted copies
+    // stay on this device only (localStorage), are kept for the day, and capped in number.
+    // The HTML is cleaned here with the same allow-list as the server, then displayed in
+    // the same sandboxed frame, so a paste can no more run code than a fetched release can.
+    const RELEASE_KEEP_TAGS = new Set(["p","br","div","span","b","strong","i","em","u","s","strike","sub","sup","small",
+      "big","h1","h2","h3","h4","h5","h6","ul","ol","li","dl","dt","dd","table","thead","tbody","tfoot","tr","td","th",
+      "caption","colgroup","col","blockquote","pre","hr","a","img","font","center","abbr","cite","code","figure","figcaption"]);
+    const RELEASE_DROP_TAGS = ["script","style","iframe","frame","frameset","object","embed","applet","form","input",
+      "button","select","option","textarea","label","svg","math","link","meta","base","noscript","nav","header","footer",
+      "template","canvas","video","audio","source","track","picture","dialog"];
+    const RELEASE_ATTRS_ANY = new Set(["style","align","valign","colspan","rowspan","nowrap","border","cellpadding",
+      "cellspacing","span","dir","bgcolor"]);
+    const RELEASE_ATTRS_TAG = { a:["href","title"], img:["src","alt"], font:["size","color","face"], ol:["start","type"], ul:["type"] };
+    // Fixed widths are what force sideways scrolling on a phone, so only tables and images keep them.
+    const RELEASE_SIZED = new Set(["table","td","th","col","colgroup","img"]);
+    const RELEASE_CSS = new Set(["text-align","font-weight","font-style","text-decoration","vertical-align","padding",
+      "padding-left","padding-right","padding-top","padding-bottom","margin-left","margin-right","margin-top",
+      "margin-bottom","border","border-top","border-bottom","border-left","border-right","border-collapse",
+      "border-color","border-width","border-style","border-spacing","white-space","font-size","font-family","color",
+      "background-color","line-height","text-indent","list-style-type","text-transform","letter-spacing"]);
+    const RELEASE_SIZE_CSS = new Set(["width","min-width","max-width","height"]);
+    const BAD_CSS = /url\s*\(|expression|javascript:|@import|behavior|\\|</i;
+
+    function cleanReleaseStyle(style, sized) {
+      return (style || "").split(";").map(d => {
+        const i = d.indexOf(":"); if (i < 0) return null;
+        const prop = d.slice(0, i).trim().toLowerCase(), value = d.slice(i + 1).trim();
+        if (!value || BAD_CSS.test(value)) return null;
+        if (RELEASE_CSS.has(prop) || (sized && RELEASE_SIZE_CSS.has(prop))) return `${prop}: ${value}`;
+        return null;
+      }).filter(Boolean).join("; ");
+    }
+    function safeReleaseUrl(url, images) {
+      let u = (url || "").trim();
+      if (!u) return null;
+      if (u.startsWith("//")) u = "https:" + u;
+      else if (u.startsWith("/")) u = "https://www.investegate.co.uk" + u;
+      const low = u.toLowerCase();
+      if (low.startsWith("http://") || low.startsWith("https://")) return u;
+      if (!images && (low.startsWith("mailto:") || low.startsWith("#"))) return u;
+      if (images && low.startsWith("data:image/") && low.includes(";base64,") && !low.includes("svg")) return u;
+      return null;
+    }
+    function sanitiseRelease(root) {
+      const doc = root.ownerDocument;
+      const walker = doc.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+      const comments = []; while (walker.nextNode()) comments.push(walker.currentNode);
+      comments.forEach(c => c.remove());
+      root.querySelectorAll(RELEASE_DROP_TAGS.join(",")).forEach(e => e.remove());
+      for (const el of [...root.querySelectorAll("*")].reverse()) {
+        const name = el.tagName.toLowerCase();
+        if (!RELEASE_KEEP_TAGS.has(name)) { el.replaceWith(...el.childNodes); continue; }
+        const sized = RELEASE_SIZED.has(name);
+        for (const a of [...el.attributes]) {
+          const n = a.name.toLowerCase();
+          const ok = RELEASE_ATTRS_ANY.has(n) || (RELEASE_ATTRS_TAG[name] || []).includes(n) || (sized && (n === "width" || n === "height"));
+          if (!ok) el.removeAttribute(a.name);
+        }
+        if (el.hasAttribute("style")) {
+          const c = cleanReleaseStyle(el.getAttribute("style"), sized);
+          if (c) el.setAttribute("style", c); else el.removeAttribute("style");
+        }
+        if (name === "a") {
+          const h = safeReleaseUrl(el.getAttribute("href"));
+          if (h) { el.setAttribute("href", h); el.setAttribute("rel", "noopener noreferrer"); } else el.removeAttribute("href");
+        } else if (name === "img") {
+          const src = safeReleaseUrl(el.getAttribute("src"), true);
+          if (src) el.setAttribute("src", src); else el.remove();
+        }
+      }
+      root.querySelectorAll("table").forEach(t => {
+        if (t.parentElement && t.parentElement.closest("table")) return;
+        const w = doc.createElement("div"); w.className = "rns-tw";
+        t.replaceWith(w); w.appendChild(t);
+      });
+    }
+
+    // Investegate's own page content, which arrives too if the whole page is copied.
+    const PAGE_FURNITURE = ["Summary by AI", "AI Summary Disclaimer", "The content you are viewing has been generated",
+      "We encourage you to independently verify", "Latest directors dealings", "All directors dealings today",
+      "This website is for Private Investors", "by TradingView", "FTSE quotes", "Create your FREE account",
+      "Personalise your experience", "Complete Profile", "I am a Private Investor", "All intraday prices are subject",
+      "Investegate takes no responsibility", "The announcements are supplied by the denoted source",
+      "Investegate reserves the right", "Please note, this site uses cookies", "Investor Meet Company"];
+    const AGO_LINE = /^\s*\d+\s+(second|minute|hour|day|week)s?\s+ago\b/i;
+    const RELEASE_START = "RNS Number";
+    const RELEASE_END = "This information is provided by RNS";
+    const BLOCK_TAGS = new Set(["P","DIV","LI","TD","TH","TR","H1","H2","H3","H4","H5","H6","TABLE","UL","OL","SECTION","ARTICLE","BLOCKQUOTE","PRE"]);
+
+    function blockOf(node, root) {
+      let el = node.nodeType === 1 ? node : node.parentElement;
+      while (el && el !== root && !BLOCK_TAGS.has(el.tagName)) el = el.parentElement;
+      return el && el !== root ? el : (node.nodeType === 1 ? node : node.parentElement || node);
+    }
+    function findText(root, needle) {
+      const w = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      while (w.nextNode()) if (w.currentNode.nodeValue.includes(needle)) return w.currentNode;
+      return null;
+    }
+    function removeSiblings(node, root, direction) {
+      let cur = node;
+      while (cur && cur !== root) {
+        let s = direction === "before" ? cur.previousSibling : cur.nextSibling;
+        while (s) { const next = direction === "before" ? s.previousSibling : s.nextSibling; s.remove(); s = next; }
+        cur = cur.parentNode;
+      }
+    }
+
+    // Narrow a pasted page down to the release: cut to the RNS start and end lines when
+    // present, then remove Investegate's own blocks wherever they sit.
+    function trimToRelease(root) {
+      const start = findText(root, RELEASE_START);
+      if (start) removeSiblings(blockOf(start, root), root, "before");
+      const end = findText(root, RELEASE_END);
+      if (end) removeSiblings(blockOf(end, root), root, "after");
+      const summary = findText(root, "Summary by AI");
+      if (summary) {
+        const head = blockOf(summary, root);
+        const next = head.nextElementSibling;
+        if (next && next.tagName === "P" && !findText(next, RELEASE_START)) next.remove();   // the AI summary text
+      }
+      for (const phrase of PAGE_FURNITURE) {
+        let t;
+        while ((t = findText(root, phrase))) {
+          const b = blockOf(t, root);
+          if ((b.textContent || "").length > 1500) { t.nodeValue = t.nodeValue.replace(phrase, ""); continue; }
+          b.remove();
+        }
+      }
+      root.querySelectorAll("li,p,div").forEach(el => { if (AGO_LINE.test(el.textContent || "")) el.remove(); });
+      for (const el of [...root.querySelectorAll("*")].reverse()) {
+        if (!(el.textContent || "").trim() && !el.querySelector("img,table,hr,br") && !["IMG","HR","BR","TD","TH"].includes(el.tagName)) el.remove();
+      }
+    }
+
+    const escapeHtml = (t) => t.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+    // Returns cleaned release HTML, or null when nothing readable was found.
+    function prepareRelease(html, text) {
+      if (html && html.trim()) {
+        const doc = new DOMParser().parseFromString(`<div id="rns-paste-root">${html}</div>`, "text/html");
+        const root = doc.getElementById("rns-paste-root");
+        if (root) {
+          sanitiseRelease(root);
+          trimToRelease(root);
+          if ((root.textContent || "").replace(/\s+/g, " ").trim().length >= 40) return root.innerHTML.trim();
+        }
+      }
+      if (text && text.trim()) {
+        let lines = text.replace(/\r/g, "").split("\n");
+        const s = lines.findIndex(l => l.includes(RELEASE_START));
+        if (s > 0) lines = lines.slice(s);
+        const e = lines.findIndex(l => l.includes(RELEASE_END));
+        if (e >= 0) lines = lines.slice(0, e + 1);
+        lines = lines.filter(l => !PAGE_FURNITURE.some(p => l.includes(p)) && !AGO_LINE.test(l));
+        const paras = buildParagraphs(lines.join("\n"));
+        if (paras.join(" ").trim().length >= 40) return paras.map(p => `<p>${escapeHtml(p)}</p>`).join("\n");
+      }
+      return null;
+    }
+
+    // Pasted copies, per announcement, kept on this device until midnight (London).
+    const pastedStore = (() => {
+      const KEY = "rns_pasted_v1";
+      const MAX = 12;
+      const empty = () => ({ day: londonDayKey(), items: {}, order: [] });
+      const read = () => {
+        try { const raw = JSON.parse(localStorage.getItem(KEY) || "null"); return raw && raw.day === londonDayKey() ? raw : empty(); }
+        catch (e) { return empty(); }
+      };
+      const write = (st) => { try { localStorage.setItem(KEY, JSON.stringify(st)); return true; } catch (e) { return false; } };
+      return {
+        get: (id) => (read().items[id] || null),
+        set: (id, html) => {
+          const st = read();
+          st.items[id] = { html, at: Date.now() };
+          st.order = [...st.order.filter(x => x !== id), id];
+          while (st.order.length > MAX) delete st.items[st.order.shift()];
+          if (write(st)) return true;
+          while (st.order.length > 1) { delete st.items[st.order.shift()]; if (write(st)) return true; }   // storage full
+          return false;
+        },
+        remove: (id) => { const st = read(); delete st.items[id]; st.order = st.order.filter(x => x !== id); write(st); },
+      };
+    })();
+
+    // Where the user pastes. Works with a button (clipboard API, where the browser allows
+    // it), a paste box (press and hold, then Paste, on a phone), or Ctrl+V anywhere.
+    function PastePanel({ann, onPasted}) {
+      const [msg, setMsg] = useState(null);
+      const [draft, setDraft] = useState("");
+      const accept = useCallback((html, text) => {
+        const out = prepareRelease(html, text);
+        if (!out) { setMsg("Nothing readable was found in what you pasted. Copy the release text from Investegate and try again."); return; }
+        onPasted(out);
+      }, [onPasted]);
+      useEffect(() => {
+        const onDocPaste = (e) => {
+          if (e.target && e.target.classList && e.target.classList.contains("paste-box")) return;   // handled by the box
+          const cd = e.clipboardData; if (!cd) return;
+          e.preventDefault();
+          accept(cd.getData("text/html") || null, cd.getData("text/plain") || null);
+        };
+        document.addEventListener("paste", onDocPaste);
+        return () => document.removeEventListener("paste", onDocPaste);
+      }, [accept]);
+      const fromClipboard = async () => {
+        setMsg(null);
+        try {
+          if (navigator.clipboard && navigator.clipboard.read) {
+            for (const item of await navigator.clipboard.read()) {
+              if (item.types.includes("text/html")) return accept(await (await item.getType("text/html")).text(), null);
+              if (item.types.includes("text/plain")) return accept(null, await (await item.getType("text/plain")).text());
+            }
+          }
+          if (navigator.clipboard && navigator.clipboard.readText) return accept(null, await navigator.clipboard.readText());
+          setMsg("This browser doesn't let a button read the clipboard. Press and hold in the box below and choose Paste.");
+        } catch (e) {
+          setMsg("The clipboard couldn't be read. Press and hold in the box below and choose Paste, or press Ctrl+V.");
+        }
+      };
+      const onBoxPaste = (e) => {
+        const cd = e.clipboardData; if (!cd) return;
+        e.preventDefault();
+        accept(cd.getData("text/html") || null, cd.getData("text/plain") || null);
+      };
+      return (
+        <div className="paste-panel">
+          <p className="paste-lead">Investegate now loads the release text in your browser, so the monitor can't fetch it. Paste it in to read it here, formatted for your screen.</p>
+          <ol className="paste-steps">
+            <li>{ann.url ? <a href={ann.url} target="_blank" rel="noopener noreferrer">Open the release on Investegate</a> : "Open the release on Investegate"}.</li>
+            <li>Select the release text and copy it. Copying the whole page also works: Investegate's own content is removed where it can be recognised.</li>
+            <li>Come back here and paste.</li>
+          </ol>
+          <div className="paste-actions">
+            <button className="reader-btn primary" onClick={fromClipboard}>Paste from clipboard</button>
+          </div>
+          <textarea className="paste-box" value={draft} onChange={e=>setDraft(e.target.value)} onPaste={onBoxPaste}
+                    placeholder="Or press and hold here and choose Paste (Ctrl+V on a computer)" aria-label="Paste the release here" rows={3}/>
+          {draft.trim() && <button className="reader-btn" onClick={()=>accept(null, draft)}>Read this text</button>}
+          {msg && <div className="paste-msg" role="status">{msg}</div>}
+          <p className="paste-note">Pasted releases stay on this device and are cleared at midnight.</p>
+        </div>
+      );
+    }
+
     const READER_SCALES = [0.85, 1, 1.15, 1.3, 1.5];
     const readerScaleStore = {
       load: () => { try { const v = Number(localStorage.getItem("rns_reader_scale")); return READER_SCALES.includes(v) ? v : 1; } catch (e) { return 1; } },
@@ -893,7 +1178,7 @@
     // Full-screen reader for long announcements and wide tables. Rendered into <body> so
     // no card or panel styling can affect its positioning. While it is open the feed's
     // keyboard shortcuts are paused (see the guard in App), and Escape closes it.
-    function ReaderView({ann, detail, onClose}) {
+    function ReaderView({ann, detail, pasted, onPasted, onRemovePasted, onClose}) {
       const [scale, setScale] = useState(readerScaleStore.load);
       const closeRef = useRef(null);
       useEffect(() => { readerScaleStore.save(scale); }, [scale]);
@@ -915,7 +1200,11 @@
         return READER_SCALES[Math.min(READER_SCALES.length - 1, Math.max(0, (i < 0 ? 1 : i) + dir))];
       });
       const hasFormatted = !!(detail && detail.body_html);
-      const paragraphs = hasFormatted ? [] : buildParagraphs(detail && detail.body_text);
+      const fetchedAvailable = !!detail && detail.body_available !== false;
+      const paragraphs = hasFormatted || !fetchedAvailable ? [] : buildParagraphs(detail && detail.body_text);
+      // What to show, best first: the user's pasted copy, the fetched formatted release, the
+      // fetched plain text, and otherwise the panel for pasting it in.
+      const mode = pasted ? "pasted" : hasFormatted ? "formatted" : paragraphs.length ? "plain" : "paste";
       const view = (
         <div className="reader-wrap" role="dialog" aria-modal="true" aria-label={`Announcement: ${ann.headline}`} onClick={onClose}>
           <div className="reader" onClick={e=>e.stopPropagation()}>
@@ -931,19 +1220,21 @@
               <div className="reader-controls">
                 <button className="reader-btn" onClick={()=>step(-1)} disabled={scale===READER_SCALES[0]} aria-label="Smaller text">A&minus;</button>
                 <button className="reader-btn" onClick={()=>step(1)} disabled={scale===READER_SCALES[READER_SCALES.length-1]} aria-label="Larger text">A+</button>
-                {ann.url && <a className="reader-btn" href={ann.url} target="_blank" rel="noopener noreferrer">View on Investegate &#8599;</a>}
+                {mode === "pasted" && <button className="reader-btn" onClick={onRemovePasted} title="Remove the pasted copy so you can paste it again">Paste again</button>}
+                {ann.url && <a className="reader-btn" href={ann.url} target="_blank" rel="noopener noreferrer">Investegate &#8599;</a>}
                 <button ref={closeRef} className="reader-btn close" onClick={onClose} aria-label="Close reader (Esc)">&#10005;</button>
               </div>
             </div>
             <div className="reader-scroll">
               <div className="reader-paper">
-                {hasFormatted
-                  ? <RnsDocument html={detail.body_html} scale={scale} title={ann.headline}/>
-                  : <div className="reader-plain" style={{fontSize:`${14*scale}px`}}>
-                      {paragraphs.length
-                        ? paragraphs.map((p,i)=><p key={i}>{p}</p>)
-                        : <p>The full text of this announcement couldn't be extracted. Use View on Investegate to read it at source.</p>}
-                    </div>}
+                {mode === "pasted" && <RnsDocument html={pasted} scale={scale} title={ann.headline}/>}
+                {mode === "formatted" && <RnsDocument html={detail.body_html} scale={scale} title={ann.headline}/>}
+                {mode === "plain" && (
+                  <div className="reader-plain" style={{fontSize:`${14*scale}px`}}>
+                    {paragraphs.map((p,i)=><p key={i}>{p}</p>)}
+                  </div>
+                )}
+                {mode === "paste" && <PastePanel ann={ann} onPasted={onPasted}/>}
               </div>
             </div>
           </div>
@@ -962,6 +1253,10 @@
     // reading panels, so the two stay identical in content and behaviour.
     function AnnouncementDetail({ann, backendUrl}) {
       const [readerOpen, setReaderOpen] = useState(false);
+      const pasteKey = annId(ann);
+      const [pasted, setPasted] = useState(() => (pastedStore.get(pasteKey) || {}).html || null);
+      const savePasted = useCallback((html) => { pastedStore.set(pasteKey, html); setPasted(html); }, [pasteKey]);
+      const removePasted = useCallback(() => { pastedStore.remove(pasteKey); setPasted(null); }, [pasteKey]);
       const closeReader = useCallback(() => setReaderOpen(false), []);
       const [detail, setDetail] = useState(() => detailCache.get(ann.url) || null);
       const [loading, setLoading] = useState(false);
@@ -1004,9 +1299,14 @@
           {/* Source link sits at the TOP: on a long release you should not have to scroll to the
               bottom to reach Investegate. */}
           <div className="detail-actions">
-            {detail && (detail.body_html || (detail.body_text && detail.body_text !== "Could not extract announcement body from the page.")) && (
+            {detail && (pasted || detail.body_html || (detail.body_available !== false && detail.body_text && detail.body_text !== "Could not extract announcement body from the page.")) && (
               <button className="expand-link reader-open" onClick={(e)=>{e.stopPropagation();setReaderOpen(true);}}>
                 Open in reader
+              </button>
+            )}
+            {detail && !pasted && detail.body_available === false && (
+              <button className="expand-link reader-open" onClick={(e)=>{e.stopPropagation();setReaderOpen(true);}}>
+                Paste the release
               </button>
             )}
             {ann.url && (
@@ -1051,12 +1351,19 @@
                   {detail.key_figures.map((fig,i) => <span key={i} className="key-figure">{fig}</span>)}
                 </div>
               )}
-              {detail.body_html
-                ? <FormattedToggle html={detail.body_html} title={ann.headline}/>
-                : <FullTextToggle text={detail.body_text} />}
+              {pasted
+                ? <FormattedToggle html={pasted} title={ann.headline}/>
+                : detail.body_available === false
+                  ? <div className="release-missing">
+                      The release text isn't on Investegate's page any more, so it can't be shown here automatically.
+                      Use <b>Paste the release</b> above to copy it in and read it formatted for your screen.
+                    </div>
+                  : detail.body_html
+                    ? <FormattedToggle html={detail.body_html} title={ann.headline}/>
+                    : <FullTextToggle text={detail.body_text} />}
             </>
           )}
-          {readerOpen && detail && <ReaderView ann={ann} detail={detail} onClose={closeReader}/>}
+          {readerOpen && detail && <ReaderView ann={ann} detail={detail} pasted={pasted} onPasted={savePasted} onRemovePasted={removePasted} onClose={closeReader}/>}
         </>
       );
     }
@@ -1117,7 +1424,9 @@
                 {tier === "core" && <span className="row-tag tier-core">CORE</span>}
                 {isRA && <span className="row-tag tier-ra">R/A</span>}
                 {isRA && raTargets && raTargets.length > 0 && (
-                  <span className="row-ra-map" title={`Reads across to ${raTargets.join(", ")}`}>&#8594; {raTargets.join(" ")}</span>
+                  <span className="row-ra-map" title={`Reads across to ${raTargets.join(", ")}`}>
+                    &#8594; {raTargets.slice(0,3).join(" ")}{raTargets.length > 3 ? ` +${raTargets.length - 3}` : ""}
+                  </span>
                 )}
                 <span className="row-category" style={{color: catColor.color, background: catColor.bg}}>{ann.category}</span>
                 {ann.source_feed && ann.source_feed !== "RNS" && <span className="row-source">{ann.source_feed}</span>}
@@ -1999,6 +2308,15 @@
       const fetchRef=useRef(null);          // always points at the current fetchData
       const [reconnectAttempt,setReconnectAttempt]=useState(0);
       const [signedOut,setSignedOut]=useState(false);
+      const [updateReady,setUpdateReady]=useState(false);
+      // Once an update is waiting, apply it the next time the tab is out of sight, so nobody
+      // is interrupted mid-read but nobody stays on an old version for long either.
+      useEffect(()=>{
+        if(!updateReady) return;
+        const onVis=()=>{ if(document.hidden){ try{ window.location.reload(); }catch(e){} } };
+        document.addEventListener("visibilitychange",onVis);
+        return ()=>document.removeEventListener("visibilitychange",onVis);
+      },[updateReady]);
       const signedOutRef=useRef(false);
       useEffect(()=>{ signedOutRef.current=signedOut; },[signedOut]);
       const etagRef=useRef(null);        // last feed ETag, for conditional requests
@@ -2078,6 +2396,13 @@
           // 401 means the sign-in cookie has expired. It used to be treated like a network
           // failure, so the banner said the backend was unreachable and retried forever;
           // only a full reload recovered. Stop polling and ask the user to sign in.
+          // A tab left open keeps running the code it loaded; the server stamps each feed
+          // response with the current version so this tab can tell when it's out of date.
+          const serverVersion = r.headers && r.headers.get ? r.headers.get("X-App-Version") : null;
+          if (LOADED_VERSION && serverVersion && serverVersion !== LOADED_VERSION) {
+            if (typeof document !== "undefined" && document.hidden) { try { window.location.reload(); } catch (e) {} return; }
+            setUpdateReady(true);
+          }
           if(r.status===401){
             setSignedOut(true);
             setStatus("signed out");
@@ -2600,6 +2925,14 @@
                     </div>
                   </div>
 
+                  {updateReady && (
+                    <div className="reconnect update-ready">
+                      <span style={{flex:1,minWidth:160}}>
+                        A new version of the RNS Monitor is available. It will load next time you switch away from this tab, or reload now.
+                      </span>
+                      <button className="toolbar-btn primary" onClick={()=>{ try{ window.location.reload(); }catch(e){} }}>Reload now</button>
+                    </div>
+                  )}
                   {signedOut && (
                     <div className="reconnect">
                       <span style={{flex:1,minWidth:160}}>
