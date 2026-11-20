@@ -76,8 +76,10 @@ function defaultServer({ feed = BASE_FEED, etag = '"v1"' } = {}) {
   };
 }
 
-function boot({ width = 1400, prefs = null, server = defaultServer() } = {}) {
-  const dom = new JSDOM('<!DOCTYPE html><html><body><div id="root"></div></body></html>',
+function boot({ width = 1400, prefs = null, server = defaultServer(), version = null } = {}) {
+  // `version` stands in for the stamp app.py puts in the page as it serves it.
+  const head = version ? `<head><meta name="app-version" content="${version}"></head>` : "";
+  const dom = new JSDOM(`<!DOCTYPE html><html>${head}<body><div id="root"></div></body></html>`,
     { url: "https://localhost/", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   window.self = window;
@@ -151,55 +153,50 @@ async function main() {
     check("marks are removed when the card closes", !cards.some((c) => c.hasAttribute("data-beside-open")));
   }
 
-  // ── Reader: formatted announcement ────────────────────────────────────────
-  {
-    const FORMATTED = '<p style="text-align: center"><b>Made Tech Group plc</b></p><div class="rns-tw"><table><tr><td>Revenue</td><td style="text-align: right">£48.1m</td></tr></table></div>';
-    const base = defaultServer();
-    const server = (url, opts) => {
-      if (url.includes("/api/rns/detail")) return res(200, { ai_summary: "A summary.", key_figures: [], body_text: "Made Tech Group plc. Revenue £48.1m.", body_html: FORMATTED, fetched_at: new Date().toISOString() });
-      return base(url, opts);
-    };
-    const { window, doc } = boot({ server });
-    await wait(400);
-    doc.querySelectorAll(".row-body")[0].click(); await wait(300);
-    btn(doc, "Show full announcement").click(); await wait(200);
-    const frame = doc.querySelector(".row.expanded iframe.rns-doc");
-    check("formatted announcement renders in a frame", !!frame);
-    const sandbox = (frame && frame.getAttribute("sandbox")) || "";
-    check("frame cannot run scripts (no allow-scripts)", sandbox && !sandbox.includes("allow-scripts"));
-    const srcdoc = (frame && frame.getAttribute("srcdoc")) || "";
-    check("frame carries a Content-Security-Policy", /Content-Security-Policy/.test(srcdoc) && /default-src 'none'/.test(srcdoc));
-    check("frame contains the source formatting", srcdoc.includes("<table>") && srcdoc.includes("text-align: right"));
-
-    btn(doc, "Open in reader").click(); await wait(300);
-    const reader = doc.body.querySelector(":scope > .reader-wrap");
-    check("reader opens as a full view on the page", !!reader);
-    check("reader shows the formatted document", !!(reader && reader.querySelector("iframe.rns-doc")));
-    check("reader moves focus to its close button", doc.activeElement && doc.activeElement.getAttribute("aria-label") === "Close reader (Esc)");
-    const focusedBefore = doc.querySelector(".row.focused");
-    key(window, "j"); await wait(150);
-    check("feed shortcuts are paused while reading", doc.querySelector(".row.focused") === focusedBefore);
-    btn(doc, "A+").click(); await wait(150);
-    check("text size control is remembered", window.localStorage.getItem("rns_reader_scale") === "1.15");
-    key(window, "Escape"); await wait(200);
-    check("Escape closes the reader", !doc.querySelector(".reader-wrap"));
-    check("closing the reader leaves the announcement open", !!doc.querySelector(".row.expanded"));
-  }
-
-  // ── Reader: plain-text fallback ───────────────────────────────────────────
+  // ── Expanded card: summary and the source link, nothing else ─────────────
   {
     const base = defaultServer();
-    const server = (url, opts) => {
-      if (url.includes("/api/rns/detail")) return res(200, { ai_summary: null, key_figures: [], body_text: "First paragraph.\nSecond paragraph.", body_html: "", fetched_at: new Date().toISOString() });
-      return base(url, opts);
-    };
+    const server = (url, opts) => url.includes("/api/rns/detail")
+      ? res(200, { ai_summary: "Grainger reported rental growth.", key_figures: [], body_text: "", body_html: "", body_available: false, fetched_at: new Date().toISOString() })
+      : base(url, opts);
     const { doc } = boot({ server });
     await wait(400);
     doc.querySelectorAll(".row-body")[0].click(); await wait(300);
-    check("without formatted HTML the plain-text toggle is used", !!btn(doc, "Show full announcement") && !doc.querySelector(".row.expanded iframe"));
-    btn(doc, "Open in reader").click(); await wait(300);
-    const paras = [...doc.querySelectorAll(".reader-plain p")].map((p) => p.textContent);
-    check("reader falls back to plain-text paragraphs", paras.length === 2 && paras[0] === "First paragraph.");
+    const exp = doc.querySelector(".row.expanded .expand");
+    const t = (exp && exp.textContent) || "";
+    check("expanded card shows the AI summary", t.includes("Grainger reported rental growth."));
+    check("expanded card links to Investegate", !!(exp && [...exp.querySelectorAll("a")].some(a => /View on Investegate/.test(a.textContent))));
+    check("reader and paste options are gone",
+      !btn(doc, "Open in reader") && !btn(doc, "Paste the release") && !btn(doc, "Show full announcement") && !doc.querySelector("iframe"));
+  }
+
+  // ── Long-open tabs learn about deploys ────────────────────────────────────
+  {
+    const base = defaultServer();
+    const server = (url, opts) => url.includes("/api/rns?")
+      ? res(200, { date: "d", announcements: BASE_FEED, errors: [], default_hidden_categories: [] }, { ETag: '"v1"', "X-App-Version": "newbuild0002" })
+      : base(url, opts);
+    const { doc } = boot({ server, version: "oldbuild0001" });
+    await wait(400);
+    check("update notice shown when the server runs a newer version", /A new version of the RNS Monitor is available/.test(text(doc)) && !!btn(doc, "Reload now"));
+    const same = boot({ server, version: "newbuild0002" });
+    await wait(400);
+    check("no update notice when versions match", !/A new version/.test(text(same.doc)));
+  }
+
+  // ── Card meta stays on one line on wide screens ───────────────────────────
+  {
+    const feed = [ann({ ticker: "GRI", company: "Grainger", headline: "Preliminary Results", category: "Results", is_watchlist: true, url: "https://x/gri" })];
+    const base = defaultServer({ feed });
+    const server = (url, opts) => url.includes("/api/readacross")
+      ? res(200, { matrix: { GRI: { IRES: {}, FOXT: {}, BYG: {}, PHP: {}, NRR: {}, PSN: {} } } })
+      : url.includes("/api/watchlist") ? res(200, { watchlist: { GRI: { name: "Grainger", tier: "read_across" } } }) : base(url, opts);
+    const { doc } = boot({ server });
+    await wait(400);
+    const badge = doc.querySelector(".row-ra-map");
+    check("long read-across lists show three names and a count", badge && /IRES FOXT BYG \+3/.test(badge.textContent) && /PSN/.test(badge.getAttribute("title")));
+    const css = (html.match(/<style>([\s\S]*?)<\/style>/) || [, ""])[1];
+    check("wide screens keep card tags on one line", /@media \(min-width: 881px\)\s*\{\s*\.row-meta \{ flex-wrap:nowrap; \}/.test(css));
   }
 
   // ── 304 keeps the feed ─────────────────────────────────────────────────────

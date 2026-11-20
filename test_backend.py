@@ -278,7 +278,7 @@ def test_diagnostics():
 
 
 
-# ── Formatted reader body ───────────────────────────────────────────────────
+# ── Announcement detail ─────────────────────────────────────────────────────
 
 # Shaped like an Investegate announcement: site chrome, AI summary, the RNS itself, and the
 # site's footer, with attack attempts mixed into the body.
@@ -321,53 +321,6 @@ def _detail_for(page_html):
     return url, run(app.fetch_announcement_detail(url))
 
 
-def test_formatted_body_keeps_source_formatting():
-    reset_state()
-    url, d = _detail_for(SAMPLE_RNS_PAGE)
-    h = d.body_html
-    check("reader: formatted version produced", bool(h))
-    check("reader: results table, alignment and bold kept",
-          "<table" in h and "text-align: right" in h and "<b>FY26</b>" in h)
-    check("reader: lists and the RNS footer line kept", "<li>Sales pipeline" in h and "This information is provided by RNS" in h)
-    check("reader: AI summary and site chrome cut away",
-          "Summary by AI" not in h and "Disclaimer" not in h and ">Home<" not in h and "uses cookies" not in h)
-    check("reader: wide tables wrapped to scroll", '<div class="rns-tw"><table' in h)
-    check("reader: relative links and images made absolute",
-          'href="https://www.investegate.co.uk/announcement/rns/made-tech--mtec/notice/1"' in h
-          and 'src="https://www.investegate.co.uk/images/chart.png"' in h)
-    diag = app._last_format_diag.get(url, {})
-    check("reader: diagnostics recorded", diag.get("used") and diag.get("ai_summary_trimmed"))
-
-
-def test_formatted_body_is_sanitised():
-    reset_state()
-    _, d = _detail_for(SAMPLE_RNS_PAGE)
-    h = d.body_html.lower()
-    for bad, label in (("<script", "script"), ("<iframe", "iframe"), ("<svg", "svg"), ("onclick", "event handler"),
-                       ("onload", "onload handler"), ("javascript:", "javascript link"), ("url(", "css url()"),
-                       ("svg+xml", "svg data image"), ("steal", "script contents")):
-        check(f"sanitiser: {label} removed", bad not in h)
-    raw = app.BeautifulSoup('<p style="color:red; position:fixed; background:url(x)" onmouseover="x()">'
-                            '<a href="data:text/html,x">a</a><img src="javascript:x()"></p>', "html.parser")
-    out = app.sanitise_rns_html(raw)
-    check("sanitiser: only presentational CSS survives", 'style="color: red"' in out and "position" not in out)
-    check("sanitiser: data: links and script image sources dropped", "data:text" not in out and "<img" not in out)
-
-
-def test_formatted_body_falls_back_to_plain_text():
-    """If the page chrome can't be cut cleanly, show plain text rather than a mess."""
-    reset_state()
-    page = SAMPLE_RNS_PAGE.replace("<p><em>Disclaimer*</em></p>", "")    # AI block has no end marker
-    url, d = _detail_for(page)
-    check("fallback: no formatted version when the AI summary can't be removed", d.body_html == "")
-    check("fallback: plain text still available", "Adjusted EBITDA" in d.body_text)
-    check("fallback: diagnostics say why", "AI summary" in (app._last_format_diag.get(url, {}).get("fallback_reason") or ""))
-
-
-
-# Modelled on the live Investegate page for Breedon "Total Voting Rights" (19 Nov 2026): same
-# blocks, order and wording. Since late 2026 the release text is loaded in the browser, so a
-# server-side fetch receives only the AI summary, disclaimer, sidebar and footer, as here.
 SUMMARY_ONLY_PAGE = """<html><head><title>Total Voting Rights | Company Announcement | Investegate</title></head><body>
 <div id="outterContent">
 <ul><li><a href="/welcome">Welcome</a></li><li><a href="/content">Articles</a></li><li><a href="/about-us">About</a></li><li><a href="/contact-us">Contact Us</a></li><li><a href="/help">Help</a></li></ul>
@@ -397,11 +350,12 @@ def test_summary_only_page_is_not_shown_as_the_release():
     reset_state()
     url, d = _detail_for(SUMMARY_ONLY_PAGE)
     check("summary-only page: release marked unavailable", d.body_available is False)
-    check("summary-only page: no page furniture passed off as release text", d.body_text == "" and d.body_html == "")
+    check("summary-only page: no page furniture passed off as release text", d.body_text == "")
     check("summary-only page: no key figures invented from furniture", d.key_figures == [])
     check("summary-only page: AI summary still provided", "347,106,800" in (d.ai_summary or ""))
     url2, d2 = _detail_for(SAMPLE_RNS_PAGE)
-    check("page with a release: still available and formatted", d2.body_available is True and bool(d2.body_html))
+    check("page with a release: still available, text kept for key figures", d2.body_available is True and "Adjusted EBITDA" in d2.body_text)
+    check("reader removed: no formatted HTML is produced", d.body_html == "" and d2.body_html == "")
 
 
 def test_version_stamp():
@@ -417,23 +371,6 @@ def test_version_stamp():
     r304 = c.get("/api/rns?include_all=true", headers={"If-None-Match": r.headers.get("etag")})
     check("version: a 304 also carries it", r304.status_code == 304 and r304.headers.get("x-app-version") == m.group(1))
 
-
-def test_widths_only_survive_on_tables():
-    raw = app.BeautifulSoup('<div style="width:820px; color:red" width="820"><p style="min-width:700px">x</p>'
-                            '<table width="900" style="width:900px"><tr><td width="120">1</td></tr></table></div>', "html.parser")
-    out = app.sanitise_rns_html(raw)
-    check("phone layout: fixed widths removed from text blocks", 'style="color: red"' in out and "820" not in out and "700px" not in out)
-    check("phone layout: table widths kept for structure", 'width="900"' in out and 'width="120"' in out)
-
-def test_debug_announcement_endpoint():
-    reset_state()
-    url = f"{B}/announcement/rns/made-tech--mtec/final-results/42"
-    MOCK.pages[url] = SAMPLE_RNS_PAGE
-    c = TestClient(app.app)
-    j = c.get("/api/debug/announcement", params={"url": url}).json()
-    check("debug endpoint: reports formatting outcome", j.get("formatting", {}).get("used") is True and j.get("formatted_html_chars", 0) > 0)
-    r = c.get("/api/debug/announcement", params={"url": "https://evil.example/x"})
-    check("debug endpoint: refuses non-Investegate URLs", r.status_code == 400)
 
 # ── Categorisation and exclusion ────────────────────────────────────────────
 

@@ -60,24 +60,13 @@ documented at the top of `app.py`. `requirements.txt` must include `psycopg[bina
   `UK_BANK_HOLIDAYS` must be extended each year; `/api/health` flags when it runs out.
 - **Energy is in scope** (since September 2026). Only mining and metals are excluded, and
   they are flagged rather than dropped so the user can reveal them. M&A is never excluded.
-- **The reader displays third-party HTML, so it has two safeguards; keep both.** The
-  backend cleans each announcement to an allow-list (`sanitise_rns_html`), and the
-  frontend shows it in a sandboxed frame with a Content-Security-Policy (`RnsDocument`).
-  Never add `allow-scripts` to that sandbox, and never render `body_html` outside it. If
-  formatting fails a quality check, `body_html` is empty and plain text is shown instead.
-  `/api/debug/announcement?url=...` shows how a given announcement was extracted.
 - **Investegate no longer serves release text (since late 2026).** Its announcement pages load
   the release in the browser, so a server-side fetch gets only the AI summary, disclaimer,
-  sidebar and footer. `strip_page_chrome` detects this and returns `body_available: false`
-  rather than showing page furniture as the release. The reader then offers **paste to
-  read**: the user copies the release from Investegate and pastes it in; it is cleaned in the
-  browser with the same allow-list as the server (`sanitiseRelease`), trimmed to the release
-  (`trimToRelease`), stored on that device only for the day, and shown in the same sandboxed
-  frame. Investegate's terms restrict the site to private investors and prohibit commercial
-  reuse; that question has been raised with the user and is theirs to resolve.
-- **Phones must never scroll the text sideways.** Fixed widths are kept only on tables and
-  images; on narrow screens tables also drop their authored widths, and a table that still
-  doesn't fit scrolls inside its own box with a visible hint.
+  sidebar and footer. `strip_page_chrome` detects this (`body_available: false`) so page
+  furniture is never treated as release text. The expanded card shows the AI summary and a
+  link to Investegate; an in-app reader and a paste-to-read option were built and then removed
+  at the user's request. Investegate's terms restrict the site to private investors and
+  prohibit commercial reuse; that question has been raised with the user and is theirs to resolve.
 - **Open tabs never reload themselves**, because auto-refresh fetches data, not the page. The
   server stamps the page and every feed response with a version (`frontend_page`,
   `X-App-Version`); a mismatch shows an update notice and reloads when the tab is hidden.

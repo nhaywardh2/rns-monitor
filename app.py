@@ -804,8 +804,8 @@ class DetailResponse(BaseModel):
     fetched_at: str
     error: Optional[str] = None
     # False when the page Investegate served contained no release text, only its own
-    # summary, disclaimer, sidebar and footer. The frontend then offers to read the release
-    # at source or paste it in, rather than showing page furniture as if it were the release.
+    # summary, disclaimer, sidebar and footer. Key figures are then left empty rather than
+    # being extracted from that page furniture.
     body_available: bool = True
 
 class ShareholdingDetail(BaseModel):
@@ -1409,223 +1409,6 @@ async def fetch_shareholding_detail(url: str) -> ShareholdingDetail:
 
 
 
-# ── Formatted announcement bodies ────────────────────────────────────────────
-# The reader shows each announcement with its source formatting (tables, bold,
-# alignment). That means displaying third-party HTML, so it passes two independent
-# safeguards: an allow-list sanitiser here, and a sandboxed frame in the browser that
-# cannot run scripts at all.
-
-from bs4 import Comment, NavigableString
-
-_RNS_BASE = "https://www.investegate.co.uk"
-
-# Removed together with everything inside them.
-_DROP_TAGS = {
-    "script", "style", "iframe", "frame", "frameset", "object", "embed", "applet", "form",
-    "input", "button", "select", "option", "textarea", "label", "svg", "math", "link", "meta",
-    "base", "noscript", "nav", "header", "footer", "template", "canvas", "video", "audio",
-    "source", "track", "picture", "dialog", "portal",
-}
-# Kept. Any other tag is unwrapped: the tag goes, its text and children stay.
-_KEEP_TAGS = {
-    "p", "br", "div", "span", "b", "strong", "i", "em", "u", "s", "strike", "sub", "sup", "small",
-    "big", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "dl", "dt", "dd", "table",
-    "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "colgroup", "col", "blockquote",
-    "pre", "hr", "a", "img", "font", "center", "abbr", "cite", "code", "figure", "figcaption",
-}
-_KEEP_ATTRS_ANY = {"style", "align", "valign", "colspan", "rowspan", "nowrap",
-                   "border", "cellpadding", "cellspacing", "span", "dir", "bgcolor"}
-# Fixed widths are what force sideways scrolling on a phone, so they survive only where a
-# layout needs them (table structure and images); paragraphs and blocks always reflow.
-_SIZED_TAGS = {"table", "td", "th", "col", "colgroup", "img"}
-_SIZE_ATTRS = {"width", "height"}
-_SIZE_CSS = {"width", "min-width", "max-width", "height"}
-_KEEP_ATTRS_TAG = {
-    "a": {"href", "title"},
-    "img": {"src", "alt"},
-    "font": {"size", "color", "face"},
-    "ol": {"start", "type"},
-    "ul": {"type"},
-}
-# Presentation only. Nothing here can load a resource or run code.
-_KEEP_CSS = {
-    "text-align", "font-weight", "font-style", "text-decoration", "vertical-align", "width",
-    "min-width", "max-width", "height", "padding", "padding-left", "padding-right",
-    "padding-top", "padding-bottom", "margin-left", "margin-right", "margin-top",
-    "margin-bottom", "border", "border-top", "border-bottom", "border-left", "border-right",
-    "border-collapse", "border-color", "border-width", "border-style", "border-spacing",
-    "white-space", "font-size", "font-family", "color", "background-color", "line-height",
-    "text-indent", "list-style-type", "text-transform", "letter-spacing",
-}
-_BAD_CSS_VALUE = re.compile(r'url\s*\(|expression|javascript:|@import|behavior|\\|<', re.I)
-
-def _clean_style(style: str, sized: bool = True) -> str:
-    kept = []
-    for decl in (style or "").split(";"):
-        if ":" not in decl:
-            continue
-        prop, value = decl.split(":", 1)
-        prop, value = prop.strip().lower(), value.strip()
-        if prop in _SIZE_CSS and not sized:
-            continue
-        if prop in _KEEP_CSS and value and not _BAD_CSS_VALUE.search(value):
-            kept.append(f"{prop}: {value}")
-    return "; ".join(kept)
-
-def _safe_url(url: str, images: bool = False) -> Optional[str]:
-    u = (url or "").strip()
-    if not u:
-        return None
-    if u.startswith("//"):
-        u = "https:" + u
-    elif u.startswith("/"):
-        u = _RNS_BASE + u
-    low = u.lower()
-    if low.startswith(("http://", "https://")):
-        return u
-    if not images and low.startswith(("mailto:", "#")):
-        return u
-    if images and low.startswith("data:image/") and ";base64," in low and "svg" not in low:
-        return u   # embedded raster images only; SVG can carry script
-    return None
-
-def sanitise_rns_html(root) -> str:
-    """Reduce a BeautifulSoup fragment to safe, presentational HTML (modifies `root`)."""
-    for c in root.find_all(string=lambda t: isinstance(t, Comment)):
-        c.extract()
-    for tag in root.find_all(list(_DROP_TAGS)):
-        tag.decompose()
-    for tag in list(root.find_all(True)):
-        if getattr(tag, "decomposed", False):
-            continue
-        name = (tag.name or "").lower()
-        if name not in _KEEP_TAGS:
-            tag.unwrap()
-            continue
-        allowed = _KEEP_ATTRS_ANY | _KEEP_ATTRS_TAG.get(name, set()) | (_SIZE_ATTRS if name in _SIZED_TAGS else set())
-        for attr in list(tag.attrs):
-            if attr.lower() not in allowed:
-                del tag.attrs[attr]
-        if "style" in tag.attrs:
-            cleaned = _clean_style(tag["style"], sized=name in _SIZED_TAGS)
-            if cleaned:
-                tag["style"] = cleaned
-            else:
-                del tag.attrs["style"]
-        if name == "a":
-            href = _safe_url(tag.get("href", ""))
-            if href:
-                tag["href"] = href
-                tag["rel"] = "noopener noreferrer"
-            else:
-                tag.attrs.pop("href", None)
-        elif name == "img":
-            src = _safe_url(tag.get("src", ""), images=True)
-            if src:
-                tag["src"] = src
-            else:
-                tag.decompose()
-    # Wide tables scroll inside their own box instead of squashing the page.
-    for table in root.find_all("table"):
-        if not table.find_parent("table"):
-            wrapper = BeautifulSoup('<div class="rns-tw"></div>', "html.parser").div
-            table.wrap(wrapper)
-    return "".join(str(c) for c in root.contents).strip()
-
-# Same markers the plain-text cleaner in fetch_announcement_detail relies on. The page
-# chrome Investegate puts around an announcement is cut away at these points.
-_AI_SUMMARY_START = "Summary by AI"
-_AI_SUMMARY_END = re.compile(r'^\s*Disclaimer\*?\s*$')
-_PAGE_END_MARKERS = (
-    "Please note, this site uses cookies", "To continue using Investegate",
-    "Privacy and Cookie Policy", "Terms and conditions relating to",
-    "A Private Investor is a recipient", "All intraday prices are subject",
-    "Investegate takes no responsibility", "\u00a9 2026 Stockomendation", "\u00a9 2027 Stockomendation",
-)
-
-def _remove_before(node, root):
-    """Remove everything that precedes `node` within `root`, then `node` itself."""
-    cur = node
-    while cur is not None and cur is not root:
-        for sib in list(cur.previous_siblings):
-            sib.extract()
-        cur = cur.parent
-    target = node if node.parent is not None else None
-    if target is not None:
-        target.extract()
-
-def _remove_from(node, root):
-    """Remove `node` and everything that follows it within `root`."""
-    cur = node
-    while cur is not None and cur is not root:
-        for sib in list(cur.next_siblings):
-            sib.extract()
-        cur = cur.parent
-    node.extract()
-
-def _block_of(text_node, root):
-    """The nearest block-level element around a text node (or the text node's parent)."""
-    el = text_node.parent
-    blocks = {"p", "div", "li", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "span"}
-    while el is not None and el is not root and el.name not in blocks:
-        el = el.parent
-    return el if el is not None and el is not root else text_node
-
-def _norm(text: str) -> str:
-    return re.sub(r'\s+', ' ', text or "").strip()
-
-def extract_formatted_body(content_div, body_text: str):
-    """Formatted, sanitised HTML of the announcement body, or None when the result does not
-    look like the same announcement as the plain-text version. Returns (html, diagnostics)."""
-    diag = {"ai_summary_trimmed": False, "page_end_marker": None}
-    root = BeautifulSoup(str(content_div), "html.parser")
-    for tag in root.find_all(list(_DROP_TAGS)):
-        tag.decompose()
-
-    # Start: drop Investegate's AI summary block and everything above it.
-    start = root.find(string=lambda t: isinstance(t, NavigableString) and _AI_SUMMARY_START in t)
-    if start is not None:
-        end = None
-        for t in start.find_all_next(string=True):
-            if _AI_SUMMARY_END.match(t):
-                end = t
-                break
-        if end is not None:
-            _remove_before(_block_of(end, root), root)
-            diag["ai_summary_trimmed"] = True
-
-    # End: drop the site's footer, cookie notice and legal text.
-    for t in root.find_all(string=True):
-        hit = next((m for m in _PAGE_END_MARKERS if m in t), None)
-        if not hit:
-            continue
-        # As in the plain-text cleaner, ignore a marker that appears near the very start.
-        text_before = _norm(" ".join(reversed(list(t.find_all_previous(string=True)))))
-        if len(text_before) > 100:
-            _remove_from(_block_of(t, root), root)
-            diag["page_end_marker"] = hit
-            break
-
-    html = sanitise_rns_html(root)
-    formatted_text = _norm(BeautifulSoup(html, "html.parser").get_text(" "))
-    plain = _norm(body_text)
-    diag["formatted_chars"] = len(formatted_text)
-    diag["plain_chars"] = len(plain)
-
-    # Quality gate: the formatted version must carry essentially the same text as the
-    # plain-text version, and must not still contain the AI summary. Otherwise the reader
-    # falls back to plain text, which is always correct if less pretty.
-    reason = None
-    if not formatted_text:
-        reason = "empty"
-    elif _AI_SUMMARY_START in formatted_text:
-        reason = "AI summary still present"
-    elif plain and not (0.6 * len(plain) <= len(formatted_text) <= 1.8 * len(plain)):
-        reason = f"length mismatch ({len(formatted_text)} formatted vs {len(plain)} plain)"
-    diag["used"] = reason is None
-    diag["fallback_reason"] = reason
-    return (html if reason is None else None), diag
-
 # ── Detail Scraping ──────────────────────────────────────────────────────────
 
 
@@ -1652,8 +1435,8 @@ def strip_page_chrome(body_text: str) -> tuple[str, bool]:
     A release is judged absent when, once the furniture is removed, too little text is left
     to be one. Measured on a summary-only page modelled on the live site, nothing substantive
     survives; a short results release keeps over 300 characters. 150 sits between the two.
-    A genuinely tiny release could be judged absent; the reader then offers the source link
-    and paste option instead, which is a safe failure."""
+    A genuinely tiny release could be judged absent; that only suppresses key figures, which
+    is a safe failure."""
     kept = []
     skip_next_name = False
     for line in (body_text or "").split("\n"):
@@ -1674,8 +1457,6 @@ def strip_page_chrome(body_text: str) -> tuple[str, bool]:
     substantive = sum(len(t) for t in kept if len(t) > 40)
     return cleaned, substantive >= 150
 
-# Diagnostics from the most recent formatting attempt per URL, for /api/debug/announcement.
-_last_format_diag: dict[str, dict] = {}
 
 async def fetch_announcement_detail(url: str) -> DetailResponse:
     """Fetch a single Investegate announcement page and extract the RNS body."""
@@ -1726,11 +1507,9 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
         ]
 
         content_div = None
-        matched_selector = None
         for selector in content_selectors:
             content_div = soup.find("div", **selector)
             if content_div:
-                matched_selector = str(selector)
                 break
 
         # Fallback: find the largest text block on the page
@@ -1748,21 +1527,18 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
                     if not any(kw in " ".join(div_classes + [div_id]).lower() for kw in skip_keywords):
                         max_text_len = len(text)
                         content_div = div
-                        matched_selector = "largest text block (fallback)"
 
         if content_div:
             # Clean up the HTML — remove scripts, styles, ads, nav elements
             for tag in content_div.find_all(["script", "style", "iframe", "noscript", "nav", "header", "footer"]):
                 tag.decompose()
 
-            raw_container_html = str(content_div)
             body_text = content_div.get_text("\n", strip=True)
 
             company_tag = soup.find("h2") or soup.find("h3")
             if company_tag:
                 company = company_tag.get_text(strip=True)
         else:
-            raw_container_html = ""
             body_text = "Could not extract announcement body from the page."
 
         # Aggressively clean body text — remove Investegate navigation and boilerplate
@@ -1843,22 +1619,9 @@ async def fetch_announcement_detail(url: str) -> DetailResponse:
         key_figures = extract_key_figures(body_text) if body_available else []
         ai_summary = extract_ai_summary(soup)
 
-        # body_html is the announcement with its source formatting, cleaned and safe to
-        # display, or "" when the formatted version failed the quality gate (the frontend
-        # then shows body_text instead). It used to be the raw, uncleaned page container,
-        # which nothing displayed.
+        # body_html is no longer produced: the in-app reader was removed and the release is
+        # read on Investegate. The field stays (always empty) so the response shape is stable.
         body_html = ""
-        format_diag = {"used": False, "fallback_reason": "no announcement container found"}
-        if not body_available:
-            format_diag = {"used": False, "fallback_reason": "release text not present on the page"}
-        elif raw_container_html:
-            try:
-                formatted, format_diag = extract_formatted_body(
-                    BeautifulSoup(raw_container_html, "html.parser"), body_text)
-                body_html = formatted or ""
-            except Exception as e:   # never let formatting break the plain-text detail
-                format_diag = {"used": False, "fallback_reason": f"{type(e).__name__}: {str(e)[:120]}"}
-        _last_format_diag[url] = {**format_diag, "selector": matched_selector}
 
         return DetailResponse(
             url=url,
@@ -2642,23 +2405,6 @@ async def reset_watchlist():
     WATCHLIST.update({t: dict(i) for t, i in DEFAULT_WATCHLIST.items()})
     save_error = await asyncio.to_thread(watchlist_store.reset)
     return {"status": "reset", "warning": save_error, "watchlist": WATCHLIST}
-
-@app.get("/api/debug/announcement")
-async def debug_announcement(url: str = Query(..., description="Investegate announcement URL")):
-    """How the formatted reader version of one announcement was produced: which page
-    element held it, where the page chrome was cut, and whether it passed the quality
-    gate (if not, the reader shows plain text and this says why)."""
-    if not _is_investegate_url(url):
-        return JSONResponse(status_code=400, content={"error": _URL_GUARD_MSG})
-    result = await fetch_announcement_detail(url)
-    return {
-        "url": url,
-        "formatting": _last_format_diag.get(url),
-        "formatted_html_chars": len(result.body_html or ""),
-        "plain_text_chars": len(result.body_text or ""),
-        "formatted_preview": (result.body_html or "")[:1500],
-        "error": result.error,
-    }
 
 @app.get("/api/debug/raw-html")
 async def debug_raw_html():
