@@ -568,6 +568,18 @@
 
     // Resolve the colour for a category tag under the active scheme, honouring any per-category
     // override the user has picked in Options.
+    // TradingView page for a London ticker, where prices are free at a 15-minute delay.
+    // Tickers ending in a dot (TW., BP.) use the chart address, which takes the symbol as a
+    // query parameter. Codes starting with a digit (0QT8, 0HAF) are Investegate's codes for
+    // overseas companies, not London tickers, so they get no link rather than a broken one.
+    function priceChartUrl(ticker) {
+      const t = (ticker || "").trim().toUpperCase();
+      if (!/^[A-Z][A-Z0-9]{0,5}\.?$/.test(t)) return null;
+      return t.endsWith(".")
+        ? `https://www.tradingview.com/chart/?symbol=${encodeURIComponent("LSE:" + t)}`
+        : `https://www.tradingview.com/symbols/LSE-${t}/`;
+    }
+
     function makeCatColor(scheme, custom) {
       return (cat) => {
         const override = custom && custom[cat];
@@ -776,6 +788,12 @@
             {ann.url && (
               <a href={ann.url} target="_blank" rel="noopener noreferrer" className="expand-link" onClick={e=>e.stopPropagation()}>
                 View on Investegate &#8599;
+              </a>
+            )}
+            {priceChartUrl(ann.ticker) && (
+              <a href={priceChartUrl(ann.ticker)} target="_blank" rel="noopener noreferrer" className="expand-link"
+                 title="Opens TradingView, where London prices are delayed by 15 minutes" onClick={e=>e.stopPropagation()}>
+                Price chart &#8599;
               </a>
             )}
             {detail && detail.fetched_at && !isNaN(new Date(detail.fetched_at)) && (
