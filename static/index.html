@@ -54,6 +54,10 @@
       --admin: #94a3b8;
       --nonreg: #38bdf8;
       --other: #8a9e8f;
+      --listing: #fbbf24;
+      --event: #818cf8;
+      --fund: #7fb8b0;
+      --dealing: #7c8794;
       --danger: #ef4444;
       --new-cue: #3db86a;
       --font-sans: 'DM Sans', -apple-system, sans-serif;
@@ -105,6 +109,10 @@
       --admin: #5c6b78;
       --nonreg: #0369a1;
       --other: #6b7280;
+      --listing: #b45309;
+      --event: #4338ca;
+      --fund: #2f6f68;
+      --dealing: #5b6673;
       --danger: #dc2626;
       --new-cue: #1f8a4c;
     }
@@ -385,6 +393,9 @@
     /* Action bar at the TOP of an opened announcement, so the source link is reachable without
        scrolling past a long release. */
     .detail-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:9px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+    .opt-row-hint { display:block; font-size:10px; color:var(--text-muted); margin-top:2px; }
+    .share-price-chart { min-height:180px; border:1px solid var(--border); background:var(--bg-surface); }
+    .share-price-note { margin-top:4px; font-size:10px; color:var(--text-muted); }
     .detail-fetched { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-left:auto; }
 
     @media (max-width: 680px) {
@@ -650,6 +661,18 @@ const CATEGORY_COLORS = {
     color: "var(--dividend)",
     bg: "rgba(163,230,53,0.10)"
   },
+  "Listing & Advisers": {
+    color: "var(--listing)",
+    bg: "rgba(251,191,36,0.10)"
+  },
+  "Investor Event": {
+    color: "var(--event)",
+    bg: "rgba(129,140,248,0.10)"
+  },
+  "Fund Update": {
+    color: "var(--fund)",
+    bg: "rgba(127,184,176,0.10)"
+  },
   "Non-Reg": {
     color: "var(--nonreg)",
     bg: "rgba(56,189,248,0.10)"
@@ -657,6 +680,10 @@ const CATEGORY_COLORS = {
   "Admin": {
     color: "var(--admin)",
     bg: "rgba(148,163,184,0.10)"
+  },
+  "Dealing Disclosure": {
+    color: "var(--dealing)",
+    bg: "rgba(124,135,148,0.10)"
   },
   "Other": {
     color: "var(--other)",
@@ -666,7 +693,7 @@ const CATEGORY_COLORS = {
 
 // Categories that carry real IR signal. Used by the "Semantic" colour scheme, which greys
 // out procedural announcements so the material ones are what catch the eye.
-const MATERIAL_CATEGORIES = new Set(["Results", "Trading Update", "Company Update", "M&A", "Contract", "Board Change", "Regulatory"]);
+const MATERIAL_CATEGORIES = new Set(["Results", "Trading Update", "Company Update", "M&A", "Contract", "Board Change", "Regulatory", "Listing & Advisers", "Investor Event"]);
 const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
 const hexToRgba = (hex, alpha) => {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
@@ -674,8 +701,6 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
 };
 
-// Resolve the colour for a category tag under the active scheme, honouring any per-category
-// override the user has picked in Options.
 // TradingView page for a London ticker, where prices are free at a 15-minute delay.
 // Tickers ending in a dot (TW., BP.) use the chart address, which takes the symbol as a
 // query parameter. Codes starting with a digit (0QT8, 0HAF) are Investegate's codes for
@@ -685,6 +710,83 @@ function priceChartUrl(ticker) {
   if (!/^[A-Z][A-Z0-9]{0,5}\.?$/.test(t)) return null;
   return t.endsWith(".") ? `https://www.tradingview.com/chart/?symbol=${encodeURIComponent("LSE:" + t)}` : `https://www.tradingview.com/symbols/LSE-${t}/`;
 }
+
+// TradingView widgets are not allowed to show London Stock Exchange prices, but they can
+// show Turquoise, a London venue owned by LSEG, where UK shares trade under the ticker
+// plus "L" (Fintel FNTL is TURQUOISE:FNTLL). Prices are delayed 15 minutes. For thinly
+// traded AIM names Turquoise may see few trades, so the full TradingView link stays too.
+function turquoiseSymbol(ticker) {
+  const t = (ticker || "").trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9]{0,5}\.?$/.test(t)) return null;
+  return `TURQUOISE:${t.replace(/\.$/, "")}L`;
+}
+
+// TradingView's mini chart widget, loaded only when a card is opened. The widget draws
+// into its own frame; the configuration takes the app's theme and accent colour so it sits
+// inside the card's style rather than TradingView's.
+function SharePriceChart({
+  ticker
+}) {
+  const ref = useRef(null);
+  const symbol = turquoiseSymbol(ticker);
+  // Follow the app's theme switch while the card is open.
+  const [theme, setTheme] = useState(() => document.documentElement.getAttribute("data-theme") || "dark");
+  useEffect(() => {
+    const mo = new MutationObserver(() => setTheme(document.documentElement.getAttribute("data-theme") || "dark"));
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"]
+    });
+    return () => mo.disconnect();
+  }, []);
+  useEffect(() => {
+    const host = ref.current;
+    if (!host || !symbol) return;
+    const light = theme === "light";
+    const css = getComputedStyle(document.documentElement);
+    const accent = (css.getPropertyValue("--accent") || "").trim() || (light ? "#1f8a4c" : "#3db86a");
+    host.innerHTML = '<div class="tradingview-widget-container__widget"></div>';
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.async = true;
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js";
+    script.innerHTML = JSON.stringify({
+      symbol,
+      width: "100%",
+      height: 180,
+      locale: "en",
+      dateRange: "1M",
+      colorTheme: light ? "light" : "dark",
+      isTransparent: true,
+      autosize: false,
+      trendLineColor: accent,
+      underLineColor: accent + "33",
+      underLineBottomColor: accent + "00",
+      largeChartUrl: "",
+      chartOnly: false,
+      noTimeScale: false
+    });
+    host.appendChild(script);
+    return () => {
+      host.innerHTML = "";
+    };
+  }, [symbol, theme]);
+  if (!symbol) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "expand-section share-price",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "expand-label"
+  }, "Share price"), /*#__PURE__*/React.createElement("div", {
+    className: "tradingview-widget-container share-price-chart",
+    ref: ref
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "share-price-note"
+  }, "Turquoise prices via TradingView, delayed 15 minutes"));
+}
+
+// Resolve the colour for a category tag under the active scheme, honouring any per-category
+// override the user has picked in Options.
 function makeCatColor(scheme, custom) {
   return cat => {
     const override = custom && custom[cat];
@@ -1097,7 +1199,9 @@ function AnnouncementDetail({
     onClick: e => e.stopPropagation()
   }, "Price chart ↗"), detail && detail.fetched_at && !isNaN(new Date(detail.fetched_at)) && /*#__PURE__*/React.createElement("span", {
     className: "detail-fetched"
-  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))), loading && /*#__PURE__*/React.createElement("div", {
+  }, new Date(detail.fetched_at).toLocaleTimeString("en-GB"))), /*#__PURE__*/React.createElement(SharePriceChart, {
+    ticker: ann.ticker
+  }), loading && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -1349,13 +1453,16 @@ function Seg({
 function OptRow({
   label,
   on,
-  onToggle
+  onToggle,
+  hint
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "opt-row"
   }, /*#__PURE__*/React.createElement("span", {
     className: "opt-row-text"
-  }, label), /*#__PURE__*/React.createElement(Switch, {
+  }, label, hint && /*#__PURE__*/React.createElement("span", {
+    className: "opt-row-hint"
+  }, hint)), /*#__PURE__*/React.createElement(Switch, {
     on: on,
     onClick: onToggle
   }));
@@ -1533,6 +1640,11 @@ function OptionsModal({
     label: "Dim announcements once read",
     on: opts.dimRead,
     onToggle: () => setOpt("dimRead", !opts.dimRead)
+  }), /*#__PURE__*/React.createElement(OptRow, {
+    label: "Hidden types still show for watchlist companies",
+    on: opts.watchlistIgnoresHidden,
+    hint: "Except dealing disclosures and buybacks",
+    onToggle: () => setOpt("watchlistIgnoresHidden", !opts.watchlistIgnoresHidden)
   }), /*#__PURE__*/React.createElement(OptRow, {
     label: "Keyboard shortcuts (j/k, Enter, /)",
     on: opts.keyboardNav,
@@ -2869,8 +2981,17 @@ const OPTION_DEFAULTS = {
   showRaMap: true,
   dimRead: true,
   keyboardNav: true,
-  refreshSecs: 120
+  refreshSecs: 120,
+  // Hidden announcement types still show for watchlist companies, so a mis-tagged
+  // announcement from a covered company can't vanish. Dealing disclosures and buybacks
+  // are repetitive by nature and stay hidden (see ALWAYS_HIDDEN_EVEN_FOR_WATCHLIST).
+  watchlistIgnoresHidden: true
 };
+const ALWAYS_HIDDEN_EVEN_FOR_WATCHLIST = new Set(["Dealing Disclosure", "Buyback"]);
+// The default-hidden list before "Dealing Disclosure" existed. Saved settings from then
+// record the user's choices against this list; anything added to the server's defaults
+// since is new to them and gets hidden once (see the fetch handler).
+const LEGACY_DEFAULT_HIDDEN = ["Fundraise", "Buyback", "Director Dealing", "Shareholding", "Admin", "Dividend"];
 function App() {
   // Restore saved preferences (null on first ever visit)
   const savedPrefs = useMemo(() => prefsStore.load(), []);
@@ -2891,6 +3012,13 @@ function App() {
   const intervalRef = useRef(null);
   const [tab, setTab] = useState("feed");
   const [excludedCats, setExcludedCats] = useState(() => savedPrefs?.excludedCats ? new Set(savedPrefs.excludedCats) : new Set());
+  // Default-hidden categories this user has already been given. A category the server
+  // adds to its defaults later is hidden once for them; anything they un-hid stays shown.
+  const [seenDefaults, setSeenDefaults] = useState(() => new Set(savedPrefs?.seenDefaults ?? (savedPrefs ? LEGACY_DEFAULT_HIDDEN : [])));
+  const seenDefaultsRef = useRef(seenDefaults);
+  useEffect(() => {
+    seenDefaultsRef.current = seenDefaults;
+  }, [seenDefaults]);
   // Mining and metals companies arrive flagged excluded_sector and are hidden unless this
   // is on. M&A and watchlist announcements are never flagged by the server.
   const [showMining, setShowMining] = useState(() => savedPrefs?.showMining ?? false);
@@ -2996,12 +3124,16 @@ function App() {
       sortMode,
       sourceFilter,
       excludedCats: [...excludedCats],
+      seenDefaults: [...seenDefaults],
       autoRefresh,
       showMining,
       options: opts
     });
-  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, autoRefresh, showMining, opts]);
+  }, [filter, categoryFilter, sortMode, sourceFilter, excludedCats, seenDefaults, autoRefresh, showMining, opts]);
   const NONREG_SOURCES = ["GNW", "UKN", "PRN", "MFN", "EQS"];
+  // Investegate labels each announcement Regulatory or Non-Regulatory; the wire's name is
+  // only a fallback, as GlobeNewswire, PR Newswire and others carry regulatory news too.
+  const isNonReg = a => a.is_regulatory === false || a.is_regulatory == null && NONREG_SOURCES.includes(a.source_feed);
   const toggleExcludeCat = cat => {
     setExcludedCats(prev => {
       const next = new Set(prev);
@@ -3102,7 +3234,14 @@ function App() {
       if (Array.isArray(j.default_hidden_categories)) serverDefaultsRef.current = j.default_hidden_categories;
       if (!defaultsAppliedRef.current && Array.isArray(j.default_hidden_categories)) {
         setExcludedCats(new Set(j.default_hidden_categories));
+        setSeenDefaults(new Set(j.default_hidden_categories));
         defaultsAppliedRef.current = true;
+      } else if (Array.isArray(j.default_hidden_categories)) {
+        const fresh = j.default_hidden_categories.filter(c => !seenDefaultsRef.current.has(c));
+        if (fresh.length) {
+          setExcludedCats(prev => new Set([...prev, ...fresh]));
+          setSeenDefaults(prev => new Set([...prev, ...fresh]));
+        }
       }
       const ids = (j.announcements || []).map(annId);
       if (seenStore.size() === 0) {
@@ -3282,7 +3421,7 @@ function App() {
       raCount: allAnns.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across").length,
       secCount: allAnns.filter(a => a.sector_relevant).length,
       rnsCount: allAnns.filter(a => !a.source_feed || a.source_feed === "RNS").length,
-      nonregCount: allAnns.filter(a => NONREG_SOURCES.includes(a.source_feed)).length,
+      nonregCount: allAnns.filter(isNonReg).length,
       miningCount: allAnns.filter(a => a.excluded_sector).length,
       catCounts: cc,
       sortedCats: Object.entries(cc).sort((a, b) => b[1] - a[1]).map(([c]) => c)
@@ -3293,8 +3432,8 @@ function App() {
     if (!showMining) out = out.filter(a => !a.excluded_sector);
     if (filter === "watchlist") out = out.filter(a => a.is_watchlist);else if (filter === "core") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "core");else if (filter === "read_across") out = out.filter(a => a.is_watchlist && watchlist[a.ticker]?.tier === "read_across");else if (filter === "sector") out = out.filter(a => a.sector_relevant);
     if (categoryFilter !== "all") out = out.filter(a => a.category === categoryFilter);
-    if (excludedCats.size > 0) out = out.filter(a => !excludedCats.has(a.category));
-    if (sourceFilter === "rns") out = out.filter(a => !a.source_feed || a.source_feed === "RNS");else if (sourceFilter === "nonreg") out = out.filter(a => NONREG_SOURCES.includes(a.source_feed));
+    if (excludedCats.size > 0) out = out.filter(a => !excludedCats.has(a.category) || opts.watchlistIgnoresHidden && a.is_watchlist && !ALWAYS_HIDDEN_EVEN_FOR_WATCHLIST.has(a.category));
+    if (sourceFilter === "rns") out = out.filter(a => !a.source_feed || a.source_feed === "RNS");else if (sourceFilter === "nonreg") out = out.filter(isNonReg);
     if (searchText) {
       const q = searchText.toLowerCase();
       out = out.filter(a => a.company.toLowerCase().includes(q) || a.headline.toLowerCase().includes(q) || (a.ticker || "").toLowerCase().includes(q));
@@ -3308,7 +3447,7 @@ function App() {
       });
     }
     return out;
-  }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode, showMining]);
+  }, [allAnns, watchlist, filter, categoryFilter, excludedCats, sourceFilter, searchText, sortMode, showMining, opts.watchlistIgnoresHidden]);
   const tierFor = ticker => watchlist[ticker]?.tier;
   const catColorFor = useMemo(() => makeCatColor(opts.tagScheme, opts.customColors), [opts.tagScheme, opts.customColors]);
   const newCount = useMemo(() => anns.filter(a => newIds.has(annId(a))).length, [anns, newIds]);
