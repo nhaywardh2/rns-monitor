@@ -191,6 +191,64 @@ async function main() {
     check("overseas codes get no price link rather than a broken one", (await linkFor("I-RES")) === null);
   }
 
+  // ── No embedded price chart (removed November 2026) ──────────────────────
+  {
+    const { doc } = boot();
+    await wait(400);
+    doc.querySelectorAll(".row-body")[0].click(); await wait(300);
+    const exp = doc.querySelector(".row.expanded");
+    check("expanded card has no embedded TradingView chart",
+      !exp.querySelector(".share-price") && !exp.querySelector('script[src*="tradingview"]'));
+  }
+
+  // ── Categories: watchlist safety net, new defaults, Non-Reg label ──────────
+  {
+    const feed = [
+      ann({ ticker: "PSN", company: "Persimmon", headline: "Result of AGM", category: "Admin", is_watchlist: true, url: "https://x/psn-agm" }),
+      ann({ ticker: "PSN", company: "Persimmon", headline: "Form 8.3 - Persimmon", category: "Dealing Disclosure", is_watchlist: true, url: "https://x/psn-f8" }),
+      ann({ ticker: "XYZ", company: "Other Co", headline: "Total Voting Rights", category: "Admin", url: "https://x/xyz-tvr" }),
+      ann({ ticker: "VOF", company: "VinaCapital", headline: "Monthly Report", category: "Fund Update", url: "https://x/vof" }),
+      ann({ ticker: "SUS", company: "Suspended plc", headline: "Suspension of Listing", category: "Listing & Advisers", url: "https://x/sus" }),
+      ann({ ticker: "PVN", company: "ProVen VCT", headline: "Issue of Equity", category: "Admin", source_feed: "GNW", is_regulatory: true, url: "https://x/pvn" }),
+      ann({ ticker: "SGG", company: "Sensys", headline: "We expect a strong finish", category: "Non-Reg", source_feed: "MFN", is_regulatory: false, url: "https://x/sgg" }),
+    ];
+    const defaults = ["Fundraise","Buyback","Director Dealing","Shareholding","Admin","Dividend","Dealing Disclosure"];
+    const server = (url, opts) => url.includes("/api/rns?")
+      ? res(200, { date: "d", announcements: feed, errors: [], default_hidden_categories: defaults }, { ETag: '"c1"' })
+      : defaultServer({ feed })(url, opts);
+    const names = (doc) => [...doc.querySelectorAll(".row")].map((r) => r.textContent);
+    {
+      const { doc } = boot({ server });
+      await wait(450);
+      const t = names(doc).join(" | ");
+      check("hidden Admin still shows a watchlist company's announcement", t.includes("Result of AGM"));
+      check("hidden Admin still hides other companies' routine paperwork", !t.includes("Total Voting Rights"));
+      check("dealing disclosures stay hidden even for watchlist companies", !t.includes("Form 8.3 - Persimmon"));
+      check("fund updates and listing news are visible by default", t.includes("Monthly Report") && t.includes("Suspension of Listing"));
+      const nonreg = [...doc.querySelectorAll(".filter-row")].find((r) => r.textContent.includes("Non-Reg only"));
+      check("Non-Reg count follows Investegate's label, not the newswire name", nonreg && / 1$|1$/.test(nonreg.textContent.trim()));
+    }
+    {
+      // Settings saved before this release: Admin deliberately un-hidden, no record of defaults.
+      const prefs = { filter: "all", categoryFilter: "all", sortMode: "relevance", sourceFilter: "all",
+        excludedCats: ["Fundraise","Buyback","Director Dealing","Shareholding","Dividend"], options: { watchlistIgnoresHidden: false } };
+      const { window, doc } = boot({ server, prefs });
+      await wait(450);
+      const t = names(doc).join(" | ");
+      check("a newly added default-hidden category is hidden for existing users", !t.includes("Form 8.3 - Persimmon"));
+      check("categories the user chose to show stay shown", t.includes("Total Voting Rights"));
+      const saved = JSON.parse(window.localStorage.getItem("rns_prefs_v1"));
+      check("the new default is remembered so it's applied only once", (saved.seenDefaults || []).includes("Dealing Disclosure"));
+    }
+    {
+      const prefs = { filter: "all", categoryFilter: "all", sortMode: "relevance", sourceFilter: "all",
+        excludedCats: defaults, seenDefaults: defaults, options: { watchlistIgnoresHidden: false } };
+      const { doc } = boot({ server, prefs });
+      await wait(450);
+      check("switching the safety net off hides watchlist routine paperwork too", !names(doc).join(" | ").includes("Result of AGM"));
+    }
+  }
+
   // ── Long-open tabs learn about deploys ────────────────────────────────────
   {
     const base = defaultServer();

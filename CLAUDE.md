@@ -79,11 +79,10 @@ documented at the top of `app.py`. `requirements.txt` must include `psycopg[bina
   link to Investegate; an in-app reader and a paste-to-read option were built and then removed
   at the user's request. Investegate's terms restrict the site to private investors and
   prohibit commercial reuse; that question has been raised with the user and is theirs to resolve.
-- **Share price charts come from Turquoise, not the LSE.** TradingView's free widgets are not
-  allowed to show London Stock Exchange prices, but can show Turquoise (an LSEG venue), where
-  UK shares use the ticker plus "L" (`turquoiseSymbol`: FNTL becomes TURQUOISE:FNTLL). Delayed
-  15 minutes. Thinly traded AIM names may look sparse there, so the "Price chart" link to the
-  full TradingView LSE page stays alongside. Codes starting with a digit get neither.
+- **No embedded price data in cards.** A TradingView chart was tried and removed (November
+  2026): free widgets can't show LSE prices, only Turquoise, whose figures differ from the
+  LSE's. Cards keep a "Price chart" link to TradingView's LSE page (`priceChartUrl`). Revisit
+  only with a licensed LSE data source.
 - **Open tabs never reload themselves**, because auto-refresh fetches data, not the page. The
   server stamps the page and every feed response with a version (`frontend_page`,
   `X-App-Version`); a mismatch shows an update notice and reloads when the tab is hidden.
