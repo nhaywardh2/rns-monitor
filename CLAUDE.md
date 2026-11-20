@@ -52,6 +52,18 @@ documented at the top of `app.py`. `requirements.txt` must include `psycopg[bina
   `READ_ACROSS_MATRIX`. `test_categorise.py` enforces this.
 - **Aliases:** some companies file under a different Investegate code (I-RES is `0QT8`).
   Add them to `TICKER_ALIASES`. The watchlist dialog warns when this is likely.
+- **Hidden categories must only contain routine material.** Admin and Dealing Disclosure are
+  hidden by default, so anything that can be news (suspensions, delistings, adviser changes,
+  AGM statements, circulars, compulsory acquisitions) must land in a visible category such
+  as Listing & Advisers. `MUST_BE_VISIBLE` in `test_categorise.py` enforces this; add to it
+  whenever something important is found hiding. Watchlist companies ignore hidden categories
+  by default (except Dealing Disclosure and Buyback); this is a user option.
+- **Non-Reg comes from Investegate's own label** on each row (`regulatory_label`), not the
+  newswire's name: GlobeNewswire, PR Newswire, Modular Finance and EQS carry regulatory news too.
+- **Categories are recomputed at serve time** (`apply_live_watchlist`), so a rule change
+  applies to the whole day's cache on the next refresh.
+- **Adding a default-hidden category:** the frontend hides it once for users with saved
+  settings (`seenDefaults`) without re-hiding anything they chose to show.
 - **Categorisation uses word-boundary matching (`_kw`).** Plain substring checks caused
   mis-tags ("director" inside "directorate"). Takeover vocabulary is checked before
   Results, Contract and Regulatory because those used to capture M&A headlines first.
@@ -67,6 +79,11 @@ documented at the top of `app.py`. `requirements.txt` must include `psycopg[bina
   link to Investegate; an in-app reader and a paste-to-read option were built and then removed
   at the user's request. Investegate's terms restrict the site to private investors and
   prohibit commercial reuse; that question has been raised with the user and is theirs to resolve.
+- **Share price charts come from Turquoise, not the LSE.** TradingView's free widgets are not
+  allowed to show London Stock Exchange prices, but can show Turquoise (an LSEG venue), where
+  UK shares use the ticker plus "L" (`turquoiseSymbol`: FNTL becomes TURQUOISE:FNTLL). Delayed
+  15 minutes. Thinly traded AIM names may look sparse there, so the "Price chart" link to the
+  full TradingView LSE page stays alongside. Codes starting with a digit get neither.
 - **Open tabs never reload themselves**, because auto-refresh fetches data, not the page. The
   server stamps the page and every feed response with a version (`frontend_page`,
   `X-App-Version`); a mismatch shows an update notice and reloads when the tab is hidden.

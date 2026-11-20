@@ -11,6 +11,73 @@ import app
 # ── Headline classification ──────────────────────────────────────────────────
 # (headline, expected_category)
 CASES = [
+
+    # ── Real Investegate headlines, 19-20 November 2026 ─────────────────────────
+    # Routine takeover dealing disclosures: hidden, never M&A or Other.
+    ("Form 38.5a (EPT/RI) DCC Energy plc BNPP FM", "Dealing Disclosure"),
+    ("20261119_Irish Residential_38.5 (b)_IE_BOFASE", "Dealing Disclosure"),
+    ("20261119_Irish Residential_38.5 (a)_IE_MLI", "Dealing Disclosure"),
+    ("Form 38.5A – Irish Residential Prop REIT PLC", "Dealing Disclosure"),
+    ("Form 38.5a Kenmare Resources plc", "Dealing Disclosure"),
+    ("Form 8.3 DCC Energy PLC 201126", "Dealing Disclosure"),
+    ("Form 8.3: DCC LN", "Dealing Disclosure"),
+    ("Irish Takeover Panel - Form 8.3 - DCC Energy PLC", "Dealing Disclosure"),   # was M&A
+    ("20261119_SEGRO PLC_8.5 EPT RI_UK_MLI", "Dealing Disclosure"),
+    # Routine paperwork: Admin.
+    ("Result of GM", "Admin"),
+    ("Result of AGM", "Admin"),
+    ("Results of Annual General Meeting and Salient...", "Admin"),
+    ("Company Secretary Change", "Admin"),
+    ("Notice to Noteholders", "Admin"),
+    ("Issue of Options", "Admin"),
+    ("Purchase of Shares by Employee Benefit Trust", "Admin"),
+    ("Director Declaration", "Admin"),
+    ("Publication of AGM Date", "Admin"),
+    ("Publication Of Final Terms", "Admin"),
+    ("Admission to Trading", "Admin"),
+    ("Total Voting Rights", "Admin"),
+    ("Net Asset Value(s)", "Admin"),
+    # Fund reporting.
+    ("Monthly Report", "Fund Update"),
+    ("Portfolio Update", "Fund Update"),
+    ("Monthly Shareholder Report - October 2026", "Fund Update"),
+    ("Kepler Trust Intelligence: New Research", "Fund Update"),
+    ("Monthly Factsheet", "Fund Update"),
+    # Investor events.
+    ("AVIATION TO PRESENT AT WOLFE RESEARCH CONFERENCE", "Investor Event"),
+    ("Investor Presentation via Investor Meet Company", "Investor Event"),
+    ("Publication of Investor Presentation", "Investor Event"),
+    # News that used to fall to Other.
+    ("Business Plan Implementation Update", "Company Update"),
+    ("£130,000 Share Subscription at 5.25p per Share", "Fundraise"),
+    ("Listing on the Canadian Securities Exchange", "Listing & Advisers"),
+    ("Result of GM & Update on Proposed Admission to AIM", "Listing & Advisers"),
+    ("Auction Suspension", "Listing & Advisers"),
+
+    # ── Looks routine, but is news: must be visible ──────────────────────────────
+    ("Suspension of Listing", "Listing & Advisers"),
+    ("Temporary Suspension of Trading", "Listing & Advisers"),
+    ("Restoration of Trading", "Listing & Advisers"),
+    ("Restoration - MobilityOne Limited", "Listing & Advisers"),
+    ("Proposed Cancellation of Admission to AIM", "Listing & Advisers"),
+    ("Notice of Delisting", "Listing & Advisers"),
+    ("Change of Nominated Adviser", "Listing & Advisers"),
+    ("Resignation of Nominated Adviser", "Listing & Advisers"),
+    ("Change of Broker", "Listing & Advisers"),
+    ("Appointment of Joint Broker", "Listing & Advisers"),
+    ("Change of Auditor", "Listing & Advisers"),
+    ("Appointment of Administrators", "Listing & Advisers"),
+    ("Going Concern Update", "Listing & Advisers"),
+    ("Change of Name", "Listing & Advisers"),
+    ("AGM Statement", "Trading Update"),
+    ("Publication of Prospectus", "Fundraise"),
+    ("Posting of Circular", "Company Update"),
+    ("Compulsory Acquisition", "M&A"),
+    ("Share Consolidation", "Company Update"),
+
+    # ── Numbers in ordinary headlines must not look like dealing forms ───────────
+    ("Revenue up 8.5% in Q3", "Other"),   # the point: never a dealing form
+    ("Results for the 38.5 week period", "Results"),
     # Board change vs director dealing. 'director' is a substring of 'directorate',
     # which is why categorise() relies on word-boundary matching via _kw().
     ("Directorate Change", "Board Change"),
@@ -43,7 +110,7 @@ CASES = [
     # Trading and company updates
     ("Trading Update", "Trading Update"),
     ("Q1 Trading Statement", "Trading Update"),
-    ("Capital Markets Day", "Company Update"),
+    ("Capital Markets Day", "Investor Event"),
     ("Strategic Review", "Company Update"),
     ("Profit Warning", "Company Update"),
 
@@ -86,8 +153,8 @@ CASES = [
     ("Retail Offer", "Fundraise"),
     ("Offer for Subscription", "Fundraise"),
     ("Results of Tender Offer", "Buyback"),
-    ("Opening Position Disclosure", "Admin"),
-    ("Form 8.3 - Tribal Group plc", "Admin"),
+    ("Opening Position Disclosure", "Dealing Disclosure"),
+    ("Form 8.3 - Tribal Group plc", "Dealing Disclosure"),
 
     # Contracts, holdings, dividends, admin
     ("Contract Award with NHS", "Contract"),
@@ -112,6 +179,14 @@ TRAPS = [
 
 # Announcements that must never be hidden by default, whatever else changes.
 MUST_BE_VISIBLE = [
+    # Announcements that look administrative but can be the most important news a
+    # company issues. Admin is hidden by default; none of these may land in a hidden
+    # category.
+    "Suspension of Listing", "Notice of Delisting", "Change of Nominated Adviser",
+    "Resignation of Nominated Adviser", "Change of Broker", "Appointment of Administrators",
+    "AGM Statement", "Posting of Circular", "Compulsory Acquisition",
+    "Monthly Report", "Portfolio Update", "AVIATION TO PRESENT AT WOLFE RESEARCH CONFERENCE",
+    "Business Plan Implementation Update",
     "Scheme Document",
     "Statement regarding Possible Offer",
     "Increase in Price for the Recommended Acquisition",

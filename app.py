@@ -746,13 +746,11 @@ ENERGY_TERMS = [
 ]
 
 EXCLUDED_TYPES = [
-    # Pure noise — drop entirely, even for watchlist companies. These are administrative
-    # filings or fund-trust boilerplate where there's no plausible IR signal.
-    # Most other regulatory boilerplate (block listing, TVR, Form 8, scheme docs etc.)
-    # is now categorised as "Admin" so watchlist override still surfaces them.
-    "factsheet", "monthly factsheet", "portfolio update", "portfolio holdings",
-    "net asset value", "monthly nav", "weekly nav", "daily nav",
-    "monthly update", "investment update",
+    # Only used by the API's filtered mode (include_all=false); the app shows everything
+    # and filters by category. Fund reporting (factsheets, portfolio and monthly updates)
+    # used to be dropped here; it is now its own visible category, Fund Update, so only
+    # daily and weekly NAV figures remain excluded.
+    "net asset value", "weekly nav", "daily nav",
     # Re-issues / corrections — same content as the original announcement, just reposted
     "replacement:", "amendment:", "correction:", "additional information:",
     "re:", "re :",
@@ -780,6 +778,8 @@ class Announcement(BaseModel):
     # Mining and metals companies. Hidden in the feed by default behind a switch; never
     # set on M&A or watchlist announcements.
     excluded_sector: bool = False
+    # Investegate's own Regulatory / Non-Regulatory label for the row; None if not shown.
+    is_regulatory: Optional[bool] = None
 
 class ScrapeResponse(BaseModel):
     announcements: list[Announcement]
@@ -915,22 +915,49 @@ def is_sector_relevant(company, headline):
     combined = f"{company} {headline}".lower()
     return _any_kw(combined, RELEVANT_SECTORS)
 
-def categorise(headline, source_feed="RNS"):
+# Takeover dealing disclosures: UK Panel Forms 8 / 8.3 / 8.5 (including market makers'
+# "EPT" forms), Irish Panel Forms 38.5, opening position disclosures. Dozens a day during
+# any offer, purely procedural, and often headlined as file names such as
+# "20261119_SEGRO PLC_8.5 EPT RI_UK_MLI", where word-boundary keywords don't match because
+# "_" counts as a word character. Hence regexes rather than _kw.
+_DEALING_DISCLOSURE_RES = [
+    re.compile(r'\bform\s*(?:8|38)(?:\.\d)?\s*(?:[ab]\b|\(|\b)'),          # Form 8.3, Form 38.5a, Form 8 (OPD)
+    # File-name style ("..._8.5 EPT RI_...", "..._38.5 (b)_..."). The number must be joined
+    # to the name by "_" or followed by EPT / (a) / (b) and "_", so "revenue up 8.5%" never
+    # matches.
+    re.compile(r'_(?:8\.[35]|38\.5)\s*(?:\(?[ab]\)?\s*)?(?:_|ept\b)'),
+    re.compile(r'(?<![\d.])(?:8\.[35]|38\.5)\s*\(?[ab]\)?\s*_'),
+    re.compile(r'\bept\s*/\s*(?:ri|non-ri)\b|\(ept\b|\bept ri\b|\bept non-ri\b'),
+    re.compile(r'\b(?:rule|panel)\s*(?:8|38)\.\d\b'),
+    re.compile(r'opening position disclosure|dealing disclosure|disclosure under rule 8'),
+]
+
+def regulatory_label(source_cell):
+    """Investegate's own label for a row: the source link's tooltip reads, for example,
+    "supplier: GlobeNewswire (Regulatory)" or "supplier: UKNewswire (Non-Regulatory)".
+    Returns True, False, or None when the label isn't there."""
+    try:
+        link = source_cell.find("a")
+        title = (link.get("title") if link else "") or source_cell.get("title") or ""
+    except AttributeError:
+        return None
+    if "(Non-Regulatory)" in title:
+        return False
+    if "(Regulatory)" in title:
+        return True
+    return None
+
+def is_dealing_disclosure(h: str) -> bool:
+    return any(rx.search(h) for rx in _DEALING_DISCLOSURE_RES)
+
+def categorise(headline, source_feed="RNS", regulatory=None):
+    """Headline -> category. `regulatory` is Investegate's own label for the announcement
+    (True, False, or None when unknown); it decides Non-Reg for anything no rule matched."""
     h = headline.lower()
-    # Early disambiguation: compound phrases that contain keywords from other buckets.
-    # "Voting Results" contains 'results' but is admin. "Interim Dividend" contains 'interim'.
-    # "Price Monitoring Extension" contains 'extension' (a Contract keyword).
-    # "Publication of Annual Report" contains 'annual report' (a Results keyword).
-    # Without this pre-check the broad keyword cascade below would mis-tag them.
-    if _any_kw(h, [
-        "voting results", "result of agm", "result of egm", "result of meeting",
-        "result of general meeting", "results of general meeting",
-        "agm voting", "agm statement", "results of agm", "results of egm",
-        "price monitoring extension", "second price monitoring",
-        "block listing", "block-listing",
-        "publication of annual report", "posting of annual report",
-    ]):
-        return "Admin"
+    # Takeover dealing disclosures first: they mention "takeover" ("Irish Takeover Panel -
+    # Form 8.3") and would otherwise show as M&A, or fall to Other.
+    if is_dealing_disclosure(h):
+        return "Dealing Disclosure"
     # Tender offers are capital returns (usually investment-trust buybacks), not takeovers.
     # Checked early because "Results of Tender Offer" would otherwise tag as Results.
     if _any_kw(h, ["tender offer", "tender offers"]):
@@ -976,9 +1003,44 @@ def categorise(headline, source_feed="RNS"):
         "proposed combination", "recommended acquisition",
         "sale of business", "sale of subsidiary", "sale of the group", "sale of the company",
         "sale of division", "proposed sale", "conditional sale", "sale and purchase agreement",
-        "reverse takeover", "takeover offer", "takeover",
+        "reverse takeover", "takeover offer", "takeover", "compulsory acquisition",
     ]):
         return "M&A"
+    # Listing status and advisers. Several of these used to sit in Admin, which is hidden by
+    # default, so a suspension or a lost nominated adviser could disappear from the feed.
+    # Checked before the meeting-results rule so "Result of GM & Update on Proposed Admission
+    # to AIM" lands here. Plain "Admission to Trading" (debt notes) stays routine Admin.
+    if _any_kw(h, [
+        "suspension", "suspended", "temporary suspension", "restoration", "restored to trading",
+        "delisting", "de-listing", "cancellation of listing", "cancellation of admission",
+        "cancellation of trading", "cancel admission", "intention to cancel", "proposed cancellation",
+        "admission to aim", "admission to the main market", "admission to the official list",
+        "proposed admission", "transfer to the main market", "move to aim", "listing on",
+        "dual listing", "secondary listing", "nasdaq listing",
+        "nominated adviser", "nomad", "change of broker", "appointment of broker", "joint broker",
+        "corporate broker", "change of auditor", "auditor", "change of name", "name change",
+        "administration", "administrators", "liquidation", "liquidator", "insolvency",
+        "going concern", "winding up", "wind-up",
+    ]):
+        return "Listing & Advisers"
+    # Early disambiguation: compound phrases that contain keywords from other buckets.
+    # "Voting Results" contains 'results' but is admin. "Interim Dividend" contains 'interim'.
+    # "Price Monitoring Extension" contains 'extension' (a Contract keyword).
+    # "Publication of Annual Report" contains 'annual report' (a Results keyword).
+    # Without this pre-check the broad keyword cascade below would mis-tag them.
+    if _any_kw(h, [
+        "voting results", "result of agm", "result of egm", "result of meeting",
+        "result of general meeting", "results of general meeting",
+        "result of gm", "results of gm", "result of annual general meeting",
+        "results of annual general meeting", "result of extraordinary general meeting",
+        "agm voting", "results of agm", "results of egm",
+        "price monitoring extension", "second price monitoring",
+        "block listing", "block-listing",
+        "publication of annual report", "posting of annual report",
+        # Checked here, ahead of Director Dealing, which would take it via 'director'.
+        "director declaration", "directors' declaration",
+    ]):
+        return "Admin"
     if _any_kw(h, [
         "interim dividend", "final dividend", "special dividend", "quarterly dividend",
         "dividend declaration", "dividend payment", "dividend timetable", "ex-dividend",
@@ -1000,7 +1062,27 @@ def categorise(headline, source_feed="RNS"):
         "q1 update", "q2 update", "q3 update", "q4 update",
         "first quarter trading", "second quarter trading", "third quarter trading", "fourth quarter trading",
         "h1 trading", "h2 trading", "year-end trading", "year end trading",
+        # AGM statements usually carry trading commentary; they were Admin, i.e. hidden.
+        "agm statement", "agm trading", "agm update",
     ]): return "Trading Update"
+    # Fund reporting from investment trusts and funds: monthly and portfolio reports,
+    # factsheets, periodic NAV updates, research notes. Daily NAVs are routine (Admin).
+    if _any_kw(h, [
+        "monthly report", "monthly update", "monthly factsheet", "monthly shareholder report",
+        "shareholder report", "factsheet", "fact sheet", "portfolio update", "portfolio report",
+        "investment update", "investment report", "investment manager's report", "manager's review",
+        "monthly nav", "quarterly nav", "nav update", "nav announcement", "quarterly valuation",
+        "new research", "research note", "trust intelligence", "edison research",
+    ]): return "Fund Update"
+    # Investor events: presentations, conferences, capital markets days. Relevant to IR work;
+    # they used to be filed under Company Update or, worded differently, fell to Other.
+    if _any_kw(h, [
+        "investor presentation", "presentation via", "investor meet", "investor day",
+        "investor event", "capital markets day", "capital markets event", "cmd",
+        "analyst presentation", "analyst day", "site visit", "webinar", "roadshow",
+        "fireside chat", "live q&a", "to present", "present at", "presenting at",
+        "presentation at", "conference", "investor briefing",
+    ]): return "Investor Event"
     # Company Update — broader operational and strategic update phrasings.
     # Includes CMD / investor-event headlines: material for IR work and previously
     # falling through to Other, where hiding Other hid them.
@@ -1013,9 +1095,8 @@ def categorise(headline, source_feed="RNS"):
         "year-end update", "year end update", "month-end update", "month end update",
         "interim update", "trading and operational",
         "response to press", "response to media", "response to speculation",
-        "capital markets day", "capital markets event", "cmd",
-        "investor presentation", "investor meet", "investor day", "investor event",
-        "analyst presentation", "analyst day", "site visit",
+        "business plan", "implementation update", "share consolidation", "capital reorganisation",
+        "stock split", "circular", "change of domicile",
     ]): return "Company Update"
     # Buyback — checked before Contract so "Renewal of Buyback Programme" doesn't
     # mis-tag as Contract via 'renewal', and before Fundraise so capital returns
@@ -1029,7 +1110,8 @@ def categorise(headline, source_feed="RNS"):
         "memorandum of understanding", "mou", "letter of intent", "loi",
     ]): return "Contract"
     # Fundraise — runs before M&A so 'open offer' / 'primary bid' phrasing doesn't mis-tag as M&A
-    if _any_kw(h, ["placing", "rights issue", "fundrais*", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise", "intention to float", "ipo", "offering", "offer for subscription"]): return "Fundraise"
+    if _any_kw(h, ["placing", "rights issue", "fundrais*", "share issue", "capital raise", "open offer", "subscription agreement", "retail offer", "primary bid", "bookbuild", "equity raise", "intention to float", "ipo", "offering", "offer for subscription",
+                   "share subscription", "subscription", "prospectus", "fundraising"]): return "Fundraise"
     # M&A
     if _any_kw(h, [
         "acquisition", "merger", "disposal", "takeover", "offer", "bid",
@@ -1054,36 +1136,44 @@ def categorise(headline, source_feed="RNS"):
     if _any_kw(h, ["regulatory", "fca", "compliance", "sanction", "investigation", "enforcement"]): return "Regulatory"
     # Dividend
     if _any_kw(h, ["dividend", "distribution"]): return "Dividend"
-    # Admin — formal regulatory and listing-related boilerplate that's typically non-material.
-    # Runs AFTER all material category checks so anything containing both material and admin keywords (e.g. "Result of Q3" containing both Results and "result of") falls into the material bucket first.
+    # Admin: strictly routine paperwork, hidden by default. Anything that can be news
+    # (suspensions, delistings, adviser changes, circulars, prospectuses, AGM statements,
+    # compulsory acquisitions) has been moved to a visible category above.
     if _any_kw(h, [
         "block listing", "block-listing",
-        "total voting rights", "tvr", "issued share capital",
-        "form 8.3", "form 8.5", "form 8", "rule 8.3", "rule 8.5", "rule 8",
-        "statement of capital",
+        "total voting rights", "tvr", "issued share capital", "statement of capital",
         "notification of investments", "notification of holdings",
-        "compulsory acquisition",
         "stabilisation notice", "pricing notice", "settlement notice",
-        "publication of", "document available", "availability of", "documents available",
-        "result of agm", "result of egm", "result of meeting", "result of general meeting", "voting results", "agm voting", "agm statement",
+        "publication of annual report", "publication of final terms", "publication of agm",
+        "publication of notice", "agm date", "notice of agm", "notice of meeting",
+        "document available", "documents available", "availability of",
+        "result of agm", "result of egm", "result of meeting", "result of general meeting", "voting results", "agm voting",
         "person closely associated", "pca dealing",
         "exercise of warrants", "exercise of options", "exercise of share options",
+        "issue of options", "grant of options", "grant of awards", "option grant",
         "share incentive plan", "ltip", "lti award", "rsu award",
+        "employee benefit trust", "ebt",
+        "issue of equity", "allotment of shares", "allotment",
         "annual financial report",
-        "share consolidation", "stock split",
-        "notice of redemption",
-        "delisting", "cancellation of listing",
-        "scheme document", "publication of scheme",
-        "admission to trading", "final terms",
-        "prospectus", "circular",
+        "notice of redemption", "notice to noteholders", "noteholder", "noteholders",
+        "admission to trading", "final terms", "interest payment", "coupon", "rate fix",
+        "director declaration", "directors' declaration", "company secretary",
+        "change of registered office", "registered office", "legal entity identifier",
+        "net asset value", "net asset values", "daily nav", "nav",
         "agm", "egm", "annual general meeting", "extraordinary general meeting",
-        "change of name", "change of registered office", "registered office",
-        "change of adviser", "change of nominated adviser", "change of broker",
-        # Rule 8 position/dealing disclosures: high volume during offer periods, procedural
-        "opening position disclosure", "dealing disclosure", "form 8 (opd)", "form 8 (dd)",
     ]): return "Admin"
-    # Non-regulatory sources get their own category if not matched above
-    if source_feed in ("UKN", "GNW", "PRN", "MFN", "EQS"):
+    # Plain "update" / "statement" headlines are the company telling the market something.
+    # Checked after every specific category, including routine Admin, so news phrased
+    # generically lands in a visible category instead of Other.
+    if _any_kw(h, ["update", "statement"]):
+        return "Company Update"
+    # Non-Reg comes from Investegate's own label on each row ("Regulatory" or
+    # "Non-Regulatory"). Guessing from the newswire's name was wrong: GlobeNewswire, PR
+    # Newswire, Modular Finance and EQS carry regulatory announcements too. The name-based
+    # rule remains only for rows whose label isn't known.
+    if regulatory is False:
+        return "Non-Reg"
+    if regulatory is None and source_feed in ("UKN", "GNW", "PRN", "MFN", "EQS"):
         return "Non-Reg"
     return "Other"
 
@@ -1674,7 +1764,7 @@ async def resolve_truncated_headlines(anns, client) -> int:
             continue
         if a.url in _full_titles:
             a.headline = _full_titles[a.url]
-            a.category = categorise(a.headline, a.source_feed)
+            a.category = categorise(a.headline, a.source_feed, a.is_regulatory)
         elif a.url not in {t.url for t in todo}:
             todo.append(a)
     todo = todo[:TITLE_FETCHES_PER_CYCLE]
@@ -1690,7 +1780,7 @@ async def resolve_truncated_headlines(anns, client) -> int:
         if full:
             _full_titles[a.url] = full
             a.headline = full
-            a.category = categorise(full, a.source_feed)
+            a.category = categorise(full, a.source_feed, a.is_regulatory)
             a.sector_relevant = a.sector_relevant or is_sector_relevant(a.company, full)
     return len({u for u, t in fetched.items() if t})
 
@@ -1765,6 +1855,7 @@ async def scrape_investegate(force: bool = False):
                 if not time_display:
                     continue
                 source_feed = cells[1].get_text(strip=True)
+                regulatory = regulatory_label(cells[1])
                 company_name = clean_company_name(cells[2].get_text(strip=True))
                 if not company_name:
                     continue
@@ -1788,8 +1879,9 @@ async def scrape_investegate(force: bool = False):
 
                 results.append(Announcement(
                     time=time_display, company=company_name, ticker=ticker,
-                    headline=headline, category=categorise(headline, source_feed), url=url,
-                    source_feed=source_feed, is_watchlist=ticker in WATCHLIST if ticker else False,
+                    headline=headline, category=categorise(headline, source_feed, regulatory), url=url,
+                    source_feed=source_feed, is_regulatory=regulatory,
+                    is_watchlist=ticker in WATCHLIST if ticker else False,
                     sector_relevant=is_sector_relevant(company_name, headline),
                     source="investegate", date_str=ann_date.strftime("%d/%m/%Y"),
                 ))
@@ -1990,6 +2082,7 @@ async def scrape_investegate(force: bool = False):
                         date_raw = cells[0].get_text(strip=True)
                         time_raw = cells[1].get_text(strip=True)
                         source_feed = cells[2].get_text(strip=True) or "RNS"
+                        regulatory = regulatory_label(cells[2])
                         headline_cell = cells[3]
 
                         # Filter to today's announcements only
@@ -2038,8 +2131,8 @@ async def scrape_investegate(force: bool = False):
 
                         found.append(Announcement(
                             time=time_display, company=info["name"], ticker=ticker,
-                            headline=headline, category=categorise(headline, sf), url=url,
-                            source_feed=sf, is_watchlist=True, sector_relevant=True,
+                            headline=headline, category=categorise(headline, sf, regulatory), url=url,
+                            source_feed=sf, is_regulatory=regulatory, is_watchlist=True, sector_relevant=True,
                             source="investegate-company", date_str=row_date.strftime("%d/%m/%Y"),
                         ))
                     except (IndexError, AttributeError):
@@ -2093,8 +2186,9 @@ NOISE_CATEGORIES = {
     "Buyback",           # transactions in own shares (procedural, not material to non-holders)
     "Director Dealing",  # PDMR transactions (hundreds per day, rarely material)
     "Shareholding",      # TR-1 holdings notifications (lots of fund rebalancing noise)
-    "Admin",             # block listings, voting rights, scheme docs, AGM results, etc.
+    "Admin",             # routine paperwork only: voting rights, block listings, meeting results, final terms
     "Dividend",          # dividend declarations (usually announced with results anyway)
+    "Dealing Disclosure",  # Takeover Panel Forms 8.3 / 8.5 / 38.5: dozens a day in any offer
 }
 
 def _date_key(date_str):
@@ -2125,6 +2219,9 @@ def apply_live_watchlist(anns):
         # (e.g. 0QT8 for I-RES) are recognised as the watchlist company they are.
         a.ticker = canonical_ticker(a.ticker)
         a.is_watchlist = bool(a.ticker) and a.ticker in WATCHLIST
+        # Categories are recomputed too, so a change to the rules applies to everything
+        # already in today's cache on the next refresh, not just to new announcements.
+        a.category = categorise(a.headline, a.source_feed, a.is_regulatory)
     return anns
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
